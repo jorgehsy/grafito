@@ -1,0 +1,18 @@
+import "dotenv/config";
+import express from "express";
+import { drawHandler } from "./draw";
+import { boardHandler } from "./board";
+import { createSessionsHandlers } from "./sessions";
+
+const app = express();
+app.use(express.json({ limit: "10mb" }));
+app.post("/api/draw", drawHandler);
+app.post("/api/board", boardHandler);
+const sessions = createSessionsHandlers();
+app.post("/api/sessions", sessions.save);
+app.get("/api/sessions", sessions.list);
+app.get("/api/sessions/:file", sessions.get);
+app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+const port = Number(process.env.PORT ?? 8787);
+app.listen(port, () => console.log(`[grafito] servidor en http://localhost:${port}`));

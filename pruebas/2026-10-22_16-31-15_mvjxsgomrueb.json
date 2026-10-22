@@ -1,0 +1,240 @@
+{
+  "version": 1,
+  "id": "mvjxsgomrueb",
+  "startedAt": 1792697475190,
+  "updatedAt": 1792697498848,
+  "model": "claude-sonnet-5-5",
+  "shape": "auto",
+  "lang": "es-CL",
+  "requests": [
+    {
+      "n": 1,
+      "model": "claude-sonnet-5-5",
+      "text": "clauco tiene una ventana de contexto limitada que en la mayoría de los modelos tiene un millón de tokens.",
+      "startedAt": 1792697486525,
+      "firstOpMs": 1631,
+      "voiceFirstMs": null,
+      "totalMs": 2623,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "ventana_contexto",
+            "kind": "scale",
+            "title": "Ventana de contexto (1M tokens)",
+            "min_label": "0%",
+            "max_label": "100%"
+          }
+        },
+        {
+          "name": "add_callout",
+          "input": {
+            "id": "nota_limite",
+            "target": "ventana_contexto",
+            "text": "Claude: límite de 1M tokens en la mayoría de modelos"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Claude tiene una ventana de contexto limitada, de un millón de tokens en la mayoría de los modelos."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 179,
+        "cacheRead": 0,
+        "cacheWrite": 7838,
+        "output": 361
+      },
+      "costUsd": 0.023563
+    },
+    {
+      "n": 2,
+      "model": "claude-sonnet-5-5",
+      "text": "lo que sucede es que al llegar al 20% de los tokens la mayor cantidad de veces llega a convertirse mala las respuestas.",
+      "startedAt": 1792697489165,
+      "firstOpMs": 1526,
+      "voiceFirstMs": null,
+      "totalMs": 1973,
+      "ops": [
+        {
+          "name": "add_mark",
+          "input": {
+            "zone": "ventana_contexto",
+            "id": "marca_20",
+            "at": 20,
+            "label": "20%: empeoran",
+            "note": "Casi siempre las respuestas se vuelven malas",
+            "tone": "warn"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Claude tiene una ventana de contexto de un millón de tokens en la mayoría de los modelos, pero al llegar al 20% las respuestas suelen empeorar."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 311,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 289
+      },
+      "costUsd": 0.0050796
+    },
+    {
+      "n": 3,
+      "model": "claude-sonnet-5-5",
+      "text": "Eso quiere decir que es recomendable cuando el modelo llega el 20% de la ventana de contexto se delegue la conversación con un handdoft a una sesión nueva con una ventana de contexto limpia. si no se hace esto cuando en la ventana de contexto llega un 90% de este límite de tokens lo que hace el modelo es compactar la conversación y se sigue en la misma sesión con la información compactada pero eso arrastra breadcons o contexto corrupto en la sesión anterior.",
+      "startedAt": 1792697491143,
+      "firstOpMs": 1927,
+      "voiceFirstMs": null,
+      "totalMs": 6035,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "handoff",
+            "kind": "flow",
+            "title": "Qué hacer al llegar al 20%",
+            "place": {
+              "relation": "below",
+              "of": "ventana_contexto"
+            }
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "handoff",
+            "id": "paso_20",
+            "label": "Contexto llega al 20%"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "handoff",
+            "id": "paso_handoff",
+            "label": "Handoff a sesión nueva",
+            "after": "paso_20"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "handoff",
+            "id": "paso_limpio",
+            "label": "Contexto limpio",
+            "after": "paso_handoff"
+          }
+        },
+        {
+          "name": "add_mark",
+          "input": {
+            "zone": "ventana_contexto",
+            "id": "marca_90",
+            "at": 90,
+            "label": "90%: compacta",
+            "note": "Compacta y sigue en la misma sesión",
+            "tone": "danger"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c_marca20",
+            "from": "marca_20",
+            "to": "paso_20"
+          }
+        },
+        {
+          "name": "add_callout",
+          "input": {
+            "id": "nota_corrupto",
+            "target": "marca_90",
+            "text": "Arrastra contexto corrupto"
+          }
+        },
+        {
+          "name": "emphasize",
+          "input": {
+            "target": "paso_handoff",
+            "style": "star"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Claude tiene 1M tokens de contexto, pero al 20% las respuestas empeoran; se recomienda hacer un handoff a una sesión limpia. Si no, al 90% compacta y sigue en la misma sesión arrastrando contexto corrupto."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 511,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 1089
+      },
+      "costUsd": 0.0134796
+    },
+    {
+      "n": 4,
+      "model": "claude-sonnet-5-5",
+      "text": "corrige el diseño de la ventana con texto las líneas que marca el 20% y el 90% están debajo del input.",
+      "startedAt": 1792697497183,
+      "firstOpMs": 1357,
+      "voiceFirstMs": null,
+      "totalMs": 1360,
+      "ops": [
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Claude tiene 1M tokens de contexto, pero al 20% las respuestas empeoran; se recomienda hacer un handoff a una sesión limpia. Si no, al 90% compacta y sigue en la misma sesión arrastrando contexto corrupto."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 667,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 136
+      },
+      "costUsd": 0.0042616
+    }
+  ],
+  "transcript": [
+    {
+      "text": "clauco tiene una ventana de contexto limitada que en la mayoría de los modelos tiene un millón de tokens.",
+      "at": 1792697486525
+    },
+    {
+      "text": "lo que sucede es que al llegar al 20% de los tokens la mayor cantidad de veces llega a convertirse mala las respuestas.",
+      "at": 1792697488026
+    },
+    {
+      "text": "Eso quiere decir que es recomendable cuando el modelo llega el 20% de la ventana de contexto se delegue la conversación con un handdoft a una sesión nueva con una ventana de contexto limpia.",
+      "at": 1792697489528
+    },
+    {
+      "text": "si no se hace esto cuando en la ventana de contexto llega un 90% de este límite de tokens lo que hace el modelo es compactar la conversación y se sigue en la misma sesión con la información compactada pero eso arrastra breadcons o contexto corrupto en la sesión anterior.",
+      "at": 1792697491028
+    },
+    {
+      "text": "corrige el diseño de la ventana con texto las líneas que marca el 20% y el 90% están debajo del input.",
+      "at": 1792697492529
+    }
+  ],
+  "summary": "Claude tiene 1M tokens de contexto, pero al 20% las respuestas empeoran; se recomienda hacer un handoff a una sesión limpia. Si no, al 90% compacta y sigue en la misma sesión arrastrando contexto corrupto.",
+  "totals": {
+    "requests": 4,
+    "costUsd": 0.046383799999999996,
+    "medianVoiceFirstMs": null
+  }
+}

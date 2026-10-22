@@ -1,0 +1,271 @@
+{
+  "version": 1,
+  "id": "mvjx9as0el3n",
+  "startedAt": 1792696581072,
+  "updatedAt": 1792696641493,
+  "model": "claude-sonnet-5-5",
+  "shape": "auto",
+  "lang": "es-CL",
+  "requests": [
+    {
+      "n": 1,
+      "model": "claude-sonnet-5-5",
+      "text": "Primero se tiene que pulir las ideas tener una lista de todos los features Cuál es el scope.",
+      "startedAt": 1792696590990,
+      "firstOpMs": 1974,
+      "voiceFirstMs": null,
+      "totalMs": 3306,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "inicio",
+            "kind": "flow",
+            "title": "Definición inicial"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "inicio",
+            "id": "pulir",
+            "label": "Pulir las ideas"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "inicio",
+            "id": "features",
+            "label": "Lista de features",
+            "after": "pulir"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "inicio",
+            "id": "scope",
+            "label": "Definir el scope",
+            "after": "features"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Primero se pulen las ideas, se lista todos los features y se define el scope."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 173,
+        "cacheRead": 0,
+        "cacheWrite": 7458,
+        "output": 499
+      },
+      "costUsd": 0.023981
+    },
+    {
+      "n": 2,
+      "model": "claude-sonnet-5-5",
+      "text": "convertir esa lista de necesidades en tareas específicas que luego van a decantar en historias de usuarios. luego se estima el costo en cuanto a equipos de desarrollo y luego se crea el software o prototipo.",
+      "startedAt": 1792696594318,
+      "firstOpMs": 2337,
+      "voiceFirstMs": null,
+      "totalMs": 4424,
+      "ops": [
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "inicio",
+            "id": "tareas",
+            "label": "Convertir en tareas específicas",
+            "after": "scope"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "inicio",
+            "id": "historias",
+            "label": "Historias de usuario",
+            "after": "tareas"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "inicio",
+            "id": "costo",
+            "label": "Estimar costo por equipos",
+            "after": "historias"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "inicio",
+            "id": "crear",
+            "label": "Crear software o prototipo",
+            "after": "costo"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se pulen las ideas, se listan features y se define el scope; luego se convierten en tareas e historias de usuario, se estima el costo en equipos de desarrollo y se crea el software o prototipo."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 322,
+        "cacheRead": 7458,
+        "cacheWrite": 0,
+        "output": 597
+      },
+      "costUsd": 0.008105600000000001
+    },
+    {
+      "n": 3,
+      "model": "claude-sonnet-5-5",
+      "text": "Esta es la forma en la que se implementaba software antes es muy costoso y llevaba entre dos y tres meses este proceso. ahora los equipos de producto pueden crear prototipos funcionales con herramientas como clot. antes estos prototipos se le delegaban a un equipo de diseño en Sigma.",
+      "startedAt": 1792696598747,
+      "firstOpMs": 1374,
+      "voiceFirstMs": null,
+      "totalMs": 4240,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "antes_ahora",
+            "kind": "timeline",
+            "title": "Antes y ahora",
+            "place": {
+              "relation": "below",
+              "of": "inicio"
+            }
+          }
+        },
+        {
+          "name": "add_event",
+          "input": {
+            "zone": "antes_ahora",
+            "id": "ev_antes",
+            "label": "Proceso costoso",
+            "when": "Antes",
+            "note": "Prototipos delegados a diseño en Figma"
+          }
+        },
+        {
+          "name": "add_event",
+          "input": {
+            "zone": "antes_ahora",
+            "id": "ev_ahora",
+            "label": "Product crea prototipos funcionales",
+            "when": "Ahora",
+            "note": "Con herramientas como Claude"
+          }
+        },
+        {
+          "name": "add_span",
+          "input": {
+            "zone": "antes_ahora",
+            "id": "sp_antes",
+            "from": 0,
+            "to": 50,
+            "label": "2 a 3 meses",
+            "tone": "warn"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se pulen ideas, se listan features, se define el scope, tareas, historias, costo y se crea el prototipo. Antes tardaba 2 a 3 meses y se delegaba a diseño en Figma; ahora producto crea prototipos funcionales con herramientas como Claude."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 501,
+        "cacheRead": 7458,
+        "cacheWrite": 0,
+        "output": 770
+      },
+      "costUsd": 0.0101936
+    },
+    {
+      "n": 4,
+      "model": "claude-sonnet-5-5",
+      "text": "acortando el tiempo de desarrollo de un software o incluso de prototipo a un mes.",
+      "startedAt": 1792696602991,
+      "firstOpMs": 5288,
+      "voiceFirstMs": null,
+      "totalMs": 5954,
+      "ops": [
+        {
+          "name": "add_span",
+          "input": {
+            "zone": "antes_ahora",
+            "id": "sp_ahora",
+            "from": 50,
+            "to": 100,
+            "label": "Un mes",
+            "tone": "ok"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se pulen ideas, se listan features, se define el scope, tareas, historias, costo y se crea el prototipo. Antes tardaba 2 a 3 meses y se delegaba a diseño en Figma; ahora producto crea prototipos funcionales con herramientas como Claude, acortando el desarrollo a un mes."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 633,
+        "cacheRead": 7458,
+        "cacheWrite": 0,
+        "output": 321
+      },
+      "costUsd": 0.0059676
+    }
+  ],
+  "transcript": [
+    {
+      "text": "Primero se tiene que pulir las ideas tener una lista de todos los features Cuál es el scope.",
+      "at": 1792696590989
+    },
+    {
+      "text": "convertir esa lista de necesidades en tareas específicas que luego van a decantar en historias de usuarios.",
+      "at": 1792696592491
+    },
+    {
+      "text": "luego se estima el costo en cuanto a equipos de desarrollo y luego se crea el software o prototipo.",
+      "at": 1792696593992
+    },
+    {
+      "text": "Esta es la forma en la que se implementaba software antes es muy costoso y llevaba entre dos y tres meses este proceso.",
+      "at": 1792696595493
+    },
+    {
+      "text": "ahora los equipos de producto pueden crear prototipos funcionales con herramientas como clot.",
+      "at": 1792696596994
+    },
+    {
+      "text": "antes estos prototipos se le delegaban a un equipo de diseño en Sigma.",
+      "at": 1792696598496
+    },
+    {
+      "text": "acortando el tiempo de desarrollo de un software o incluso de prototipo a un mes.",
+      "at": 1792696599997
+    }
+  ],
+  "summary": "Se pulen ideas, se listan features, se define el scope, tareas, historias, costo y se crea el prototipo. Antes tardaba 2 a 3 meses y se delegaba a diseño en Figma; ahora producto crea prototipos funcionales con herramientas como Claude, acortando el desarrollo a un mes.",
+  "totals": {
+    "requests": 4,
+    "costUsd": 0.04824780000000001,
+    "medianVoiceFirstMs": null
+  }
+}

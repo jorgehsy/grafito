@@ -1,0 +1,388 @@
+{
+  "version": 1,
+  "id": "mvk17l592ij5",
+  "startedAt": 1792703219661,
+  "updatedAt": 1792707229620,
+  "model": "claude-sonnet-5-5",
+  "shape": "auto",
+  "lang": "es-CL",
+  "requests": [
+    {
+      "n": 1,
+      "model": "claude-sonnet-5-5",
+      "text": "vamos a explicar cómo funciona el bifest backen for frontend",
+      "mode": "content",
+      "startedAt": 1792705652849,
+      "firstOpMs": 3198,
+      "voiceFirstMs": 4011,
+      "totalMs": 3413,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "bff",
+            "kind": "system",
+            "title": "Backend for Frontend (BFF)"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se inicia la explicación de cómo funciona el patrón Backend for Frontend (BFF)."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 162,
+        "cacheRead": 0,
+        "cacheWrite": 7838,
+        "output": 181
+      },
+      "costUsd": 0.021729
+    },
+    {
+      "n": 2,
+      "model": "claude-sonnet-5-5",
+      "text": "esta estrategia modifica la forma en la que se obtienen Las Cookies o el navegador del usuario obtiene las cookies",
+      "mode": "content",
+      "startedAt": 1792705663862,
+      "firstOpMs": 1754,
+      "voiceFirstMs": 2562,
+      "totalMs": 3087,
+      "ops": [
+        {
+          "name": "add_component",
+          "input": {
+            "zone": "bff",
+            "id": "navegador",
+            "label": "Navegador del usuario",
+            "type": "client"
+          }
+        },
+        {
+          "name": "add_component",
+          "input": {
+            "zone": "bff",
+            "id": "cookies",
+            "label": "Cookies",
+            "type": "storage",
+            "icon": "🍪"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c1",
+            "from": "cookies",
+            "to": "navegador",
+            "label": "obtiene cookies"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se explica el patrón BFF: esta estrategia cambia la forma en que el navegador del usuario obtiene las cookies."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 238,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 464
+      },
+      "costUsd": 0.0066836000000000005
+    },
+    {
+      "n": 3,
+      "model": "claude-sonnet-5-5",
+      "text": "en un escenario normal el navegador le solicita cognito las credenciales con grito les entrega las cookies",
+      "mode": "content",
+      "startedAt": 1792705674720,
+      "firstOpMs": 1373,
+      "voiceFirstMs": 2180,
+      "totalMs": 2826,
+      "ops": [
+        {
+          "name": "add_component",
+          "input": {
+            "zone": "bff",
+            "id": "cognito",
+            "label": "Cognito",
+            "type": "external"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c2",
+            "from": "navegador",
+            "to": "cognito",
+            "label": "solicita credenciales"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c3",
+            "from": "cognito",
+            "to": "cookies",
+            "label": "entrega cookies"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se explica el patrón BFF, que cambia cómo el navegador obtiene las cookies. En el escenario normal, el navegador pide credenciales a Cognito y este le entrega las cookies."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 312,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 460
+      },
+      "costUsd": 0.0067916
+    },
+    {
+      "n": 4,
+      "model": "claude-sonnet-5-5",
+      "text": "Y luego el navegador con las cookies se las entregas al backen para poder utilizar la Api",
+      "mode": "content",
+      "startedAt": 1792705683283,
+      "firstOpMs": 2892,
+      "voiceFirstMs": 3699,
+      "totalMs": 4782,
+      "ops": [
+        {
+          "name": "add_component",
+          "input": {
+            "zone": "bff",
+            "id": "backend",
+            "label": "Backend",
+            "type": "service"
+          }
+        },
+        {
+          "name": "add_component",
+          "input": {
+            "zone": "bff",
+            "id": "api",
+            "label": "API",
+            "type": "service"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c4",
+            "from": "navegador",
+            "to": "backend",
+            "label": "entrega cookies"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c5",
+            "from": "backend",
+            "to": "api",
+            "label": "usa la API"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se explica el patrón BFF: el navegador pide credenciales a Cognito, recibe las cookies y se las entrega al backend para poder utilizar la API."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 394,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 548
+      },
+      "costUsd": 0.0078356
+    },
+    {
+      "n": 5,
+      "model": "claude-sonnet-5-5",
+      "text": "en cambio en el bff se maneja distinto",
+      "mode": "content",
+      "startedAt": 1792705689783,
+      "firstOpMs": 1918,
+      "voiceFirstMs": 2723,
+      "totalMs": 1919,
+      "ops": [
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se explica el patrón BFF: el navegador pide credenciales a Cognito, recibe las cookies y se las entrega al backend para usar la API. El hablante anuncia que en el BFF el manejo es distinto."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 433,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 120
+      },
+      "costUsd": 0.0036336000000000003
+    },
+    {
+      "n": 6,
+      "model": "claude-sonnet-5-5",
+      "text": "el navegador le pide Las Cookies albaquen al bioffer el backen redirecciona con Nito",
+      "mode": "content",
+      "startedAt": 1792705701083,
+      "firstOpMs": 3395,
+      "voiceFirstMs": 4201,
+      "totalMs": 4251,
+      "ops": [
+        {
+          "name": "connect",
+          "input": {
+            "id": "c6",
+            "from": "navegador",
+            "to": "backend",
+            "label": "pide las cookies"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c7",
+            "from": "backend",
+            "to": "cognito",
+            "label": "redirecciona"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se explica el patrón BFF: primero el navegador pedía credenciales a Cognito y entregaba las cookies al backend para usar la API. En el BFF, el navegador pide las cookies al backend y este redirecciona a Cognito."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 471,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 533
+      },
+      "costUsd": 0.0078396
+    },
+    {
+      "n": 7,
+      "model": "claude-sonnet-5-5",
+      "text": "e incógnito hace login y conito hace un calpak a la URL del navegador al navegador del usuario con un token luego es usuario intercambia o el navegador intercambia ese token con el bff para obtener las cookies",
+      "mode": "content",
+      "startedAt": 1792705720357,
+      "firstOpMs": 2286,
+      "voiceFirstMs": 3091,
+      "totalMs": 3338,
+      "ops": [
+        {
+          "name": "connect",
+          "input": {
+            "id": "c8",
+            "from": "cognito",
+            "to": "navegador",
+            "label": "callback con token"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c9",
+            "from": "navegador",
+            "to": "backend",
+            "label": "intercambia token por cookies"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se explica el patrón BFF: antes el navegador pedía credenciales a Cognito y entregaba las cookies al backend. En el BFF, el navegador pide las cookies al backend, que redirecciona a Cognito; tras el login, Cognito hace callback al navegador con un token y este lo intercambia con el BFF por las cookies."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 553,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 393
+      },
+      "costUsd": 0.0066036
+    },
+    {
+      "n": 8,
+      "model": "claude-sonnet-5-5",
+      "text": "se para en dos diagramas Cómo es la opción sin el biofef y la opción con el biefer",
+      "mode": "content",
+      "startedAt": 1792705751661,
+      "firstOpMs": null,
+      "voiceFirstMs": null,
+      "totalMs": 3642,
+      "ops": [],
+      "invalid": [],
+      "usage": {
+        "input": 591,
+        "cacheRead": 7838,
+        "cacheWrite": 0,
+        "output": 44
+      },
+      "costUsd": 0.0031896000000000003,
+      "error": "Error al llamar a Claude: Expected ',' or '}' after property value in JSON at position 142 (line 1 column 143)"
+    }
+  ],
+  "transcript": [
+    {
+      "text": "vamos a explicar cómo funciona el bifest backen for frontend",
+      "at": 1792705652047
+    },
+    {
+      "text": "esta estrategia modifica la forma en la que se obtienen Las Cookies o el navegador del usuario obtiene las cookies",
+      "at": 1792705663061
+    },
+    {
+      "text": "en un escenario normal el navegador le solicita cognito las credenciales con grito les entrega las cookies",
+      "at": 1792705673919
+    },
+    {
+      "text": "Y luego el navegador con las cookies se las entregas al backen para poder utilizar la Api",
+      "at": 1792705682482
+    },
+    {
+      "text": "en cambio en el bff se maneja distinto",
+      "at": 1792705688982
+    },
+    {
+      "text": "el navegador le pide Las Cookies albaquen al bioffer el backen redirecciona con Nito",
+      "at": 1792705700281
+    },
+    {
+      "text": "e incógnito hace login y conito hace un calpak a la URL del navegador al navegador del usuario con un token luego es usuario intercambia o el navegador intercambia ese token con el bff para obtener las cookies",
+      "at": 1792705719556
+    },
+    {
+      "text": "se para en dos diagramas Cómo es la opción sin el biofef y la opción con el biefer",
+      "at": 1792705751340
+    }
+  ],
+  "summary": "Se explica el patrón BFF: primero el navegador pedía credenciales a Cognito y entregaba las cookies al backend para usar la API. En el BFF, el navegador pide las cookies al backend y este redirecciona a Cognito.",
+  "totals": {
+    "requests": 7,
+    "costUsd": 0.0611166,
+    "medianVoiceFirstMs": 3091
+  }
+}

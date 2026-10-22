@@ -1,0 +1,97 @@
+import { describe, expect, it } from "vitest";
+import { AnimationQueue, diffTrees, speedForBacklog } from "./animator";
+import type { Executor, SeqTask } from "./animator";
+import type { RItem, RenderTree } from "./tree";
+
+const item = (key: string, kind: RItem["kind"], x = 0, sig = key): RItem => ({
+  key, kind, sig, hue: 0, geom: { x, y: 0, w: 100, h: 50 }, data: {},
+});
+const tree = (...items: RItem[]): RenderTree => ({ items, map: new Map(items.map((i) => [i.key, i])) });
+
+describe("diffTrees", () => {
+  it("nuevos: orden zona, elemento, arista, anotación", () => {
+    const next = tree(item("n", "callout"), item("e", "edge"), item("el", "element"), item("z", "zone"));
+    const d = diffTrees(tree(), next);
+    expect(d.sequential.map((t) => (t as { key: string }).key)).toEqual(["z", "el", "e", "n"]);
+    expect(d.moves).toEqual([]);
+  });
+  it("borrados agrupados, luego actualizaciones, luego dibujos; movimientos aparte", () => {
+    const prev = tree(item("a", "element"), item("b", "element", 0, "viejo"), item("c", "element", 0));
+    const next = tree(item("b", "element", 0, "nuevo"), item("c", "element", 200), item("d", "element"));
+    const d = diffTrees(prev, next);
+    expect(d.sequential).toEqual([{ kind: "delete", keys: ["a"] }, { kind: "update", key: "b" }, { kind: "draw", key: "d" }]);
+    expect(d.moves).toEqual([{ kind: "move", key: "c" }]);
+  });
+  it("sin cambios: nada", () => {
+    const t = tree(item("a", "element"));
+    expect(diffTrees(t, tree(item("a", "element")))).toEqual({ sequential: [], moves: [] });
+  });
+});
+
+describe("speedForBacklog", () => {
+  it("1x hasta 2 pendientes, sube hasta 4x en 12 y por encima es instantáneo", () => {
+    expect(speedForBacklog(0)).toBe(1);
+    expect(speedForBacklog(2)).toBe(1);
+    expect(speedForBacklog(7)).toBeCloseTo(2.5);
+    expect(speedForBacklog(12)).toBeCloseTo(4);
+    expect(speedForBacklog(13)).toBe(Infinity);
+    let prev = 0;
+    for (let n = 0; n <= 12; n++) { expect(speedForBacklog(n)).toBeGreaterThanOrEqual(prev); prev = speedForBacklog(n); }
+  });
+});
+
+describe("AnimationQueue", () => {
+  function setup() {
+    const events: string[] = [];
+    const releases: (() => void)[] = [];
+    const hold = (label: string) => new Promise<void>((res) => { events.push("inicio " + label); releases.push(() => { events.push("fin " + label); res(); }); });
+    const exec: Executor = {
+      draw: (k) => hold("draw " + k),
+      update: (k) => hold("update " + k),
+      remove: (ks) => hold("delete " + ks.join(",")),
+      move: (k) => { events.push("move " + k); },
+    };
+    return { events, releases, q: new AnimationQueue(exec) };
+  }
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it("ejecuta en secuencia y los movimientos van enseguida, en paralelo", async () => {
+    const { events, releases, q } = setup();
+    q.push({ sequential: [{ kind: "draw", key: "a" }, { kind: "draw", key: "b" }], moves: [{ kind: "move", key: "m" }] });
+    await flush();
+    expect(events).toEqual(["move m", "inicio draw a"]);
+    releases[0]();
+    await flush();
+    expect(events.slice(-2)).toEqual(["fin draw a", "inicio draw b"]);
+    q.push({ sequential: [], moves: [{ kind: "move", key: "m2" }] });
+    expect(events.at(-1)).toBe("move m2"); // sin esperar al dibujo en curso
+    releases[1]();
+    await q.whenIdle();
+    expect(q.pending).toBe(0);
+  });
+
+  it("acelera con la cola y se pone al instante por encima de 12", async () => {
+    const exec: Executor = { draw: async () => {}, update: async () => {}, remove: async () => {}, move() {} };
+    const q = new AnimationQueue(exec);
+    const tasks: SeqTask[] = Array.from({ length: 16 }, (_, i) => ({ kind: "draw", key: "k" + i }));
+    q.push({ sequential: tasks, moves: [] });
+    await q.whenIdle();
+    const speeds = q.log.map((l) => l.speed);
+    expect(speeds[0]).toBe(Infinity); // 16 pendientes
+    expect(speeds[3]).toBe(Infinity); // 13 pendientes
+    expect(speeds[4]).toBeCloseTo(4); // 12 pendientes
+    expect(speeds.at(-1)).toBe(1);
+    expect(speeds.at(-2)).toBe(1);
+    expect(speeds.slice(4)).toEqual([...speeds.slice(4)].sort((a, b) => b - a)); // desacelera al vaciarse
+  });
+
+  it("reset cancela lo pendiente", async () => {
+    const { events, q } = setup();
+    q.push({ sequential: [{ kind: "draw", key: "a" }, { kind: "draw", key: "b" }], moves: [] });
+    await flush();
+    q.reset();
+    expect(q.pending).toBe(0);
+    await flush();
+    expect(events).toEqual(["inicio draw a"]);
+  });
+});
