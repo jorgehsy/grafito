@@ -13,6 +13,7 @@ import type { SessionRecord } from "./record";
 import { boardSvgText, download } from "./exporter";
 
 import { WebSpeechSource, UNAVAILABLE_MESSAGE } from "./speech/webSpeech";
+import { createMicLock, MIC_TAKEN_MESSAGE } from "./speech/micLock";
 import { createGrouper } from "./speech/grouper";
 import { SPEECH_LANGS } from "./speech/types";
 import type { SpeechSource, SpeechState } from "./speech/types";
@@ -162,10 +163,21 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
       if (state === "error" || state === "idle") { if (speech.current === src) { speech.current = null; setMicOn(false); } if (state === "error") grouper.flush(); }
     };
     speech.current = src; setMicOn(true);
+    micLock.current?.claim();
     src.start();
   };
   const toggleMicRef = useRef(toggleMic);
   toggleMicRef.current = toggleMic;
+  // otra pestaña reclamó el mic: soltarlo aquí y avisar
+  const micLock = useRef<ReturnType<typeof createMicLock> | null>(null);
+  useEffect(() => {
+    micLock.current = createMicLock(() => {
+      if (!speech.current) return;
+      toggleMicRef.current();
+      setMic({ state: "error", detail: MIC_TAKEN_MESSAGE });
+    });
+    return () => { micLock.current?.close(); micLock.current = null; };
+  }, []);
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (!activeRef.current || e.code !== "Space" || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
