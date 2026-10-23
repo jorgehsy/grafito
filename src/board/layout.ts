@@ -84,7 +84,7 @@ const maxLen = (lines: string[]) => Math.max(...lines.map((l) => [...l].length))
 
 /** Líneas visibles de un elemento (el icono va delante de la primera). */
 export function elLines(e: El): string[] {
-  const wrap = e.type === "mark" || e.type === "event" || e.type === "span" ? 18 : e.type === "stage" ? 16 : e.type === "decision" ? 14 : e.type === "item" ? 28 : e.type === "node" ? 20 : e.comp === "actor" ? 14 : 18;
+  const wrap = e.type === "mark" || e.type === "event" || e.type === "span" || e.type === "branch" ? 18 : e.type === "stage" ? 16 : e.type === "decision" ? 14 : e.type === "item" ? 28 : e.type === "node" ? 20 : e.comp === "actor" ? 14 : 18;
   const lines = wrapText(e.label, wrap);
   if (e.icon) lines[0] = `${e.icon} ${lines[0]}`;
   return lines;
@@ -110,10 +110,11 @@ export function elSize(e: El): { w: number; h: number } {
       };
     }
     case "stage":
+    case "branch":
     case "event": {
       const nl = markNoteLines(e);
       return {
-        w: Math.max(e.type === "stage" ? 130 : 100, maxLen(lines) * MARK_LABEL_CW, nl.length ? maxLen(nl) * MARK_NOTE_CW : 0) + 34,
+        w: Math.max(e.type === "stage" ? 130 : e.type === "branch" ? 90 : 100, maxLen(lines) * MARK_LABEL_CW, nl.length ? maxLen(nl) * MARK_NOTE_CW : 0) + 34,
         h: lines.length * MARK_LABEL_LH + nl.length * MARK_NOTE_LH + 26,
       };
     }
@@ -342,6 +343,72 @@ function layoutMindmap(els: El[]): ZoneLocal {
     const dx = (p3.x - p0.x) / 2;
     out.edges[`auto:${n.data.id}`] = { kind: "curve", pts: [p0, { x: p0.x + dx, y: p0.y }, { x: p3.x - dx, y: p3.y }, p3] };
   });
+  return out;
+}
+
+const TREE_COL_GAP = 76;
+const TREE_ROW_GAP = 14;
+const TREE_ROOT_GAP = 30;
+
+/** Árbol de izquierda a derecha: una columna por profundidad (ancho = la etiqueta más ancha del nivel),
+ *  hermanos apilados en orden de llegada, cada padre centrado ante sus hijos y conectores de codo. */
+function layoutTree(els: El[]): ZoneLocal {
+  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {} };
+  if (!els.length) return out;
+  const byId = new Map(els.map((e) => [e.id, e]));
+  // un padre ausente o que no precede al hijo cuenta como raíz (evita ciclos)
+  const order = new Map(els.map((e, k) => [e.id, k]));
+  const parentOf = (e: El) => (e.parent && byId.has(e.parent) && order.get(e.parent)! < order.get(e.id)! ? e.parent : undefined);
+  const kids = new Map<string | undefined, El[]>();
+  for (const e of els) {
+    const p = parentOf(e);
+    kids.set(p, [...(kids.get(p) ?? []), e]);
+  }
+  const size = new Map(els.map((e) => [e.id, elSize(e)]));
+  const depth = new Map<string, number>();
+  const walk = (e: El, d: number) => { depth.set(e.id, d); for (const k of kids.get(e.id) ?? []) walk(k, d + 1); };
+  for (const r of kids.get(undefined) ?? []) walk(r, 0);
+  const colW: number[] = [];
+  for (const e of els) colW[depth.get(e.id)!] = Math.max(colW[depth.get(e.id)!] ?? 0, size.get(e.id)!.w);
+  const colX: number[] = [];
+  let x = 0;
+  colW.forEach((w, d) => { colX[d] = x; x += w + TREE_COL_GAP; });
+  const cy = new Map<string, number>(); // centro vertical de cada nodo
+  const subtree = (e: El): string[] => [e.id, ...(kids.get(e.id) ?? []).flatMap(subtree)];
+  /** coloca el subárbol desde yStart y devuelve su borde inferior */
+  const place = (e: El, yStart: number): number => {
+    const s = size.get(e.id)!;
+    const ks = kids.get(e.id) ?? [];
+    if (!ks.length) { cy.set(e.id, yStart + s.h / 2); return yStart + s.h; }
+    let y = yStart, bottom = yStart;
+    for (const k of ks) { bottom = place(k, y); y = bottom + TREE_ROW_GAP; }
+    let c = (cy.get(ks[0].id)! + cy.get(ks[ks.length - 1].id)!) / 2;
+    if (c - s.h / 2 < yStart) { // el padre es más alto que sus hijos: bajar todo el subárbol
+      const dy = yStart - (c - s.h / 2);
+      for (const k of ks) for (const id of subtree(k)) cy.set(id, cy.get(id)! + dy);
+      c += dy; bottom += dy;
+    }
+    cy.set(e.id, c);
+    return Math.max(bottom, c + s.h / 2);
+  };
+  let y = 0;
+  for (const r of kids.get(undefined) ?? []) y = place(r, y) + TREE_ROOT_GAP;
+  for (const e of els) {
+    const s = size.get(e.id)!;
+    out.els[e.id] = { x: colX[depth.get(e.id)!], y: cy.get(e.id)! - s.h / 2, w: s.w, h: s.h };
+  }
+  // conectores de corchete: padre -> tramo vertical compartido -> horizontal a cada hijo
+  for (const e of els) {
+    const p = parentOf(e);
+    if (!p) continue;
+    const a = out.els[p], b = out.els[e.id];
+    const pc = a.y + a.h / 2, cc = b.y + b.h / 2;
+    const mx = colX[depth.get(p)!] + colW[depth.get(p)!] + TREE_COL_GAP / 2;
+    const pts = Math.abs(pc - cc) < 0.5
+      ? [{ x: rectRight(a) + 3, y: pc }, { x: b.x - 4, y: cc }]
+      : [{ x: rectRight(a) + 3, y: pc }, { x: mx, y: pc }, { x: mx, y: cc }, { x: b.x - 4, y: cc }];
+    out.edges[`br:${e.id}`] = { kind: "poly", pts };
+  }
   return out;
 }
 
@@ -600,6 +667,7 @@ async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
     else if (!els.length) content = { w: 0, h: 0, els: {}, edges: {} };
     else if (zone.kind === "flow" || zone.kind === "system") content = await layoutElkWithEmph(zone, els, conns, circled);
     else if (zone.kind === "mindmap") content = layoutMindmap(els);
+    else if (zone.kind === "tree") content = layoutTree(els);
     else content = layoutStack(zone, els);
     if (cache.size > 300) cache.clear();
     cache.set(key, content);

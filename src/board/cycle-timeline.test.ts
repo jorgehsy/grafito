@@ -274,3 +274,87 @@ describe("layout timeline", () => {
     await check(tlBoard([op.add_span({ zone: "t", id: "p", from: 0, to: 50, label: "x" })]));
   });
 });
+
+describe("zona tree", () => {
+  const base = () => [op.create_zone({ id: "t", kind: "tree", title: "Tipos de prototipo" })];
+  const proto = () => [
+    ...base(),
+    op.add_branch({ zone: "t", id: "p", label: "Prototipos" }),
+    op.add_branch({ zone: "t", id: "v", label: "Visual", parent: "p", note: "cómo se ve" }),
+    op.add_branch({ zone: "t", id: "s", label: "Servicios", parent: "p" }),
+    op.add_branch({ zone: "t", id: "f", label: "Figma", parent: "v" }),
+    op.add_branch({ zone: "t", id: "a", label: "Artefactos en Claude Code", parent: "v" }),
+    op.add_branch({ zone: "t", id: "o", label: "OpenAPI", parent: "s" }),
+    op.add_branch({ zone: "t", id: "m", label: "Postman Collection", parent: "s" }),
+  ];
+
+  it("valida add_branch y rechaza zonas de otro tipo", () => {
+    expect(validateOp("add_branch", { zone: "t", id: "x", label: "L", parent: "p", note: "n" })).toBeNull();
+    expect(validateOp("add_branch", { zone: "t", id: "x" })).not.toBeNull();
+    const r = applyOps(emptyBoard(), [op.create_zone({ id: "l", kind: "list", title: "L" }), op.add_branch({ zone: "l", id: "x", label: "X" })]);
+    expect(r.warnings[0]).toContain("no se puede añadir branch");
+  });
+  it("padre inexistente: queda como raíz con aviso", () => {
+    const r = applyOps(emptyBoard(), [...base(), op.add_branch({ zone: "t", id: "x", label: "X", parent: "nada" })]);
+    expect(r.warnings[0]).toContain("queda como raíz");
+    expect(r.board.els[0].parent).toBeUndefined();
+  });
+  it("update_text edita la nota y la etiqueta del nodo", () => {
+    let b = finalBoard(proto());
+    b = applyOp(b, op.update_text({ id: "v", field: "note", value: "" })).board;
+    expect(b.els.find((e) => e.id === "v")!.note).toBeUndefined();
+    b = applyOp(b, op.update_text({ id: "v", field: "label", value: "Visuales" })).board;
+    expect(b.els.find((e) => e.id === "v")!.label).toBe("Visuales");
+  });
+  it("borrar un nodo sube a sus hijos un nivel", () => {
+    const b = applyOp(finalBoard(proto()), op.delete({ id: "v" })).board;
+    expect(b.els.find((e) => e.id === "f")!.parent).toBe("p");
+    expect(b.els.some((e) => e.id === "v")).toBe(false);
+  });
+  it("layout: una columna por profundidad, hijos en orden, sin solapes y dentro de la zona", async () => {
+    const lay = await computeLayout(finalBoard(proto()));
+    const e = lay.els, z = lay.zones.t;
+    expect(e.p.x).toBeLessThan(e.v.x);
+    expect(e.v.x).toBe(e.s.x);
+    expect(e.v.x).toBeLessThan(e.f.x);
+    expect(e.f.x).toBe(e.m.x);
+    expect(e.f.x).toBeGreaterThanOrEqual(e.v.x + e.v.w); // la columna de hijos empieza tras la más ancha del nivel anterior
+    expect(e.v.y).toBeLessThan(e.s.y);
+    expect(e.f.y).toBeLessThan(e.a.y);
+    expect(e.a.y).toBeLessThan(e.o.y);
+    expect(e.o.y).toBeLessThan(e.m.y);
+    noOverlap(Object.entries(e));
+    for (const [id, r] of Object.entries(e)) expect(inside(r, z), id).toBe(true);
+    expect(Object.keys(lay.edges).filter((k) => k.startsWith("br:"))).toHaveLength(6);
+  });
+  it("etiquetas largas ensanchan su columna sin chocar con la siguiente", async () => {
+    const lay = await computeLayout(finalBoard([
+      ...base(),
+      op.add_branch({ zone: "t", id: "r", label: "Una categoría con un nombre muy largo de verdad", note: "y una nota" }),
+      op.add_branch({ zone: "t", id: "h", label: "Hijo", parent: "r" }),
+    ]));
+    expect(lay.els.h.x).toBeGreaterThanOrEqual(lay.els.r.x + lay.els.r.w);
+  });
+  it("bosque: varias raíces se apilan", async () => {
+    const lay = await computeLayout(finalBoard([
+      ...base(),
+      op.add_branch({ zone: "t", id: "r1", label: "Uno" }),
+      op.add_branch({ zone: "t", id: "k1", label: "Hijo uno", parent: "r1" }),
+      op.add_branch({ zone: "t", id: "r2", label: "Dos" }),
+    ]));
+    expect(lay.els.r1.x).toBe(lay.els.r2.x);
+    expect(lay.els.r1.y).toBeLessThan(lay.els.r2.y);
+    noOverlap(Object.entries(lay.els));
+  });
+  it("buildTree incluye nota y corchetes; serialize muestra la jerarquía", async () => {
+    const b = finalBoard(proto());
+    const tree = buildTree(b, await computeLayout(b));
+    expect(tree.map.get("v")!.data.noteLines).toEqual(["cómo se ve"]);
+    expect(tree.map.get("br:f")!.data.variant).toBe("bracket");
+    const txt = serializeBoard(b);
+    expect(txt).toContain("- p (branch)");
+    expect(txt).toContain("-   v (branch)");
+    expect(txt).toContain("-     f (branch)");
+    expect(txt).toContain('nota:"cómo se ve"');
+  });
+});

@@ -3,7 +3,7 @@
 // ({name, description, input_schema}) para reutilizarlas tal cual en el servidor.
 // Ninguna operación lleva coordenadas.
 
-export type ZoneKind = "flow" | "system" | "list" | "compare" | "mindmap" | "scale" | "cycle" | "timeline";
+export type ZoneKind = "flow" | "system" | "list" | "compare" | "mindmap" | "scale" | "cycle" | "timeline" | "tree";
 export type MarkTone = "neutral" | "warn" | "danger" | "ok";
 export type ComponentType = "actor" | "client" | "service" | "database" | "queue" | "storage" | "external";
 export type EmphasisStyle = "circle" | "underline" | "star";
@@ -25,6 +25,7 @@ export interface OpInputs {
   add_component: { zone: string; id: string; label: string; type: ComponentType; icon?: string };
   add_node: { zone: string; id: string; label: string; parent?: string };
   add_item: { zone: string; id: string; text: string; column?: "left" | "right" };
+  add_branch: { zone: string; id: string; label: string; parent?: string; note?: string };
   add_mark: { zone: string; id: string; at: number; label: string; note?: string; tone?: MarkTone };
   add_stage: { zone: string; id: string; label: string; note?: string; after?: string };
   add_event: { zone: string; id: string; label: string; when?: string; note?: string; at?: number };
@@ -65,14 +66,14 @@ function tool(name: OpName, description: string, properties: Record<string, unkn
 }
 
 export const TEXT_FIELDS: TextField[] = ["label", "note", "text", "when"];
-export const ZONE_KINDS: ZoneKind[] = ["flow", "system", "list", "compare", "mindmap", "scale", "cycle", "timeline"];
+export const ZONE_KINDS: ZoneKind[] = ["flow", "system", "list", "compare", "mindmap", "scale", "cycle", "timeline", "tree"];
 export const MARK_TONES: MarkTone[] = ["neutral", "warn", "danger", "ok"];
 const COMP_TYPES: ComponentType[] = ["actor", "client", "service", "database", "queue", "storage", "external"];
 
 export const OP_TOOLS: ToolDef[] = [
   tool(
     "create_zone",
-    "Crea una zona (un recuadro temático) en el tablero. Úsala cuando el hablante empieza un tema nuevo. kind: flow = proceso paso a paso; system = arquitectura de componentes; list = lista de puntos; compare = dos columnas comparadas; mindmap = ideas ramificadas; scale = una cantidad que cambia sobre un eje (barra con umbrales: porcentaje, capacidad, tiempo, nivel); cycle = algo que se repite en bucle; timeline = eventos o fases en el tiempo, antes/ahora. No se dan coordenadas: el tablero coloca la zona. 'place' sólo para pedir vecindad.",
+    "Crea una zona (un recuadro temático) en el tablero. Úsala cuando el hablante empieza un tema nuevo. kind: flow = proceso paso a paso; system = arquitectura de componentes; list = lista de puntos; compare = dos columnas comparadas; mindmap = ideas ramificadas; scale = una cantidad que cambia sobre un eje (barra con umbrales: porcentaje, capacidad, tiempo, nivel); cycle = algo que se repite en bucle; timeline = eventos o fases en el tiempo, antes/ahora; tree = una jerarquía o clasificación que crece de izquierda a derecha (categorías con subcategorías, tipos con sus resultados, desgloses). No se dan coordenadas: el tablero coloca la zona. 'place' sólo para pedir vecindad.",
     {
       id: id("Identificador único y estable, p. ej. 'proceso_pedido'."),
       kind: { type: "string", enum: ZONE_KINDS },
@@ -143,6 +144,18 @@ export const OP_TOOLS: ToolDef[] = [
       column: { type: "string", enum: ["left", "right"] },
     },
     ["zone", "id", "text"],
+  ),
+  tool(
+    "add_branch",
+    "Añade un nodo a una zona tree: una caja en la jerarquía. Sin 'parent' es una raíz (varias raíces se apilan); con 'parent' cuelga de ese nodo, en una columna a su derecha. Los hermanos se apilan en el orden en que se añaden y el tablero dibuja los conectores. Los padres antes que los hijos.",
+    {
+      zone: id("Id de una zona tree."),
+      id: id("Identificador único."),
+      label: str("Nombre breve del nodo (1 a 4 palabras)."),
+      parent: id("Id del nodo padre (opcional; sin él es raíz)."),
+      note: str("Explicación corta debajo de la etiqueta (opcional)."),
+    },
+    ["zone", "id", "label"],
   ),
   tool(
     "add_mark",
@@ -244,7 +257,7 @@ export const OP_TOOLS: ToolDef[] = [
   ),
   tool(
     "update_text",
-    "Cambia o BORRA un texto dentro de un elemento sin borrar el elemento. field: label = título de zona, etiqueta de elemento o de conexión; note = nota de una marca, etapa o evento; text = texto de una nota manuscrita (callout); when = fecha de un evento. Un value vacío quita el texto opcional (note, when, label de conexión). Úsala en lugar de delete cuando sólo se pide quitar o cambiar un texto.",
+    "Cambia o BORRA un texto dentro de un elemento sin borrar el elemento. field: label = título de zona, etiqueta de elemento o de conexión; note = nota de una marca, etapa, evento o nodo de árbol; text = texto de una nota manuscrita (callout); when = fecha de un evento. Un value vacío quita el texto opcional (note, when, label de conexión). Úsala en lugar de delete cuando sólo se pide quitar o cambiar un texto.",
     {
       id: id("Id del elemento, zona, conexión o nota."),
       field: { type: "string", enum: TEXT_FIELDS },

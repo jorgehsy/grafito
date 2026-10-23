@@ -23,6 +23,7 @@ const SHAPE_OPTIONS = [
   { value: "flow", label: "Flujo (flow)" },
   { value: "scale", label: "Escala (scale)" },
   { value: "cycle", label: "Ciclo (cycle)" },
+  { value: "tree", label: "Árbol (tree)" },
   { value: "timeline", label: "Línea de tiempo (timeline)" },
   { value: "system", label: "Sistema (system)" },
   { value: "list", label: "Lista (list)" },

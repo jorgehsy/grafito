@@ -201,6 +201,11 @@ export function buildVisual(item: RItem, geom: Geom): Visual {
       const top = 13 + (lines.length * 27) / 2;
       b.text(lines, w / 2, top, { size: 22, weight: 700, lineH: 27 });
       if (notes.length) b.text(notes, w / 2, 13 + lines.length * 27 + (notes.length * 22) / 2, { size: 18, fill: "#495057", lineH: 22 });
+    } else if (v === "branch") {
+      const lines = item.data.lines ?? [], notes = item.data.noteLines ?? [];
+      b.rough("rect", "brn", [2, 2, w - 4, h - 4], { roughness: 1.3 }, { ...f, width: 2.4 });
+      b.text(lines, w / 2, 13 + (lines.length * 27) / 2, { size: 22, weight: 700, lineH: 27 });
+      if (notes.length) b.text(notes, w / 2, 13 + lines.length * 27 + (notes.length * 22) / 2, { size: 18, fill: "#495057", lineH: 22 });
     } else if (v === "event") {
       const lines = item.data.lines ?? [], notes = item.data.noteLines ?? [];
       b.rough("rect", "evt", [2, 2, w - 4, h - 4], { roughness: 1.3, fillStyle: "solid" }, { stroke: edge, width: 2.4, fill: PAPER });
@@ -274,6 +279,9 @@ export function buildVisual(item: RItem, geom: Geom): Visual {
     b.rough("line", "tick", [far.x, far.y, near.x, near.y], { roughness: 0.8 }, { ...ts, width: 3.4 });
     b.rough("line", "stem", [base.x, base.y, hook.x, hook.y], { roughness: 0.9 }, ts);
     b.rough("poly", "tri", [[[base.x - u.y * 8, base.y + u.x * 8], [base.x + u.y * 8, base.y - u.x * 8], [near.x, near.y]]], { fillStyle: "solid", roughness: 0.7 }, { ...ts, width: 2, fill: tone.fill });
+  } else if (item.kind === "edge" && item.data.variant === "bracket") {
+    // codo sin punta: la jerarquía se lee de izquierda a derecha
+    b.rough("path", "line", [roundedPoly(geom.pts!, 10)], { roughness: 0.9, bowing: 0.6 }, { stroke: edge, width: 2.4 });
   } else if (item.kind === "edge" && item.data.variant === "event-stem") {
     // punto en el eje + tallo hasta la caja
     const [, dot, hook] = geom.pts!;

@@ -23,11 +23,14 @@ export function serializeBoard(b: Board): string {
   out.push("ELEMENTOS");
   for (const e of b.els) {
     const kind = e.type === "component" ? `component/${e.comp ?? "service"}` : e.type;
-    let l = `- ${e.id} (${kind}) ${q(e.label)} @${e.zone}`;
+    // nodos de árbol: sangría por profundidad para que se vea la jerarquía
+    let depth = 0;
+    for (let p = e.type === "branch" ? e.parent : undefined; p && depth < 20; depth++) p = b.els.find((x) => x.id === p)?.parent;
+    let l = `- ${"  ".repeat(depth)}${e.id} (${kind}) ${q(e.label)} @${e.zone}`;
     if (e.type === "mark") l += ` at:${e.at} tone:${e.tone ?? "neutral"}${e.note ? " nota:" + q(e.note) : ""}`;
     if (e.type === "event") l += `${e.at !== undefined ? ` at:${e.at}` : ""}${e.when ? " when:" + q(e.when) : ""}${e.note ? " nota:" + q(e.note) : ""}`;
     if (e.type === "span") l += ` from:${e.at} to:${e.to} tone:${e.tone ?? "neutral"}`;
-    if (e.type === "stage" && e.note) l += ` nota:${q(e.note)}`;
+    if ((e.type === "stage" || e.type === "branch") && e.note) l += ` nota:${q(e.note)}`;
     if (e.column) l += ` col:${e.column}`;
     if (e.after) l += ` after:${e.after}`;
     if (e.parent) l += ` parent:${e.parent}`;

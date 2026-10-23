@@ -15,12 +15,12 @@ describe("herramientas", () => {
       expect(t.input_schema.type).toBe("object");
       expect(Object.keys(OP_SCHEMAS)).toContain(t.name);
     }
-    expect(OP_TOOLS).toHaveLength(20);
+    expect(OP_TOOLS).toHaveLength(21);
   });
 });
 
 /** Guiones cortos de una sola zona: sin mínimo de zonas ni autocorrección, duración propia. */
-const SHORT = ["contexto", "ciclo", "antes-ahora"];
+const SHORT = ["contexto", "ciclo", "antes-ahora", "prototipos", "compactar"];
 
 describe.each(SCRIPTS)("guion $id", ({ id, script }) => {
   it("todas las ops validan contra su JSON Schema", () => {

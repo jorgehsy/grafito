@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createGrouper, GROUP_WINDOW_MS, GROUP_MAX_CHARS, INSTRUCTION_WINDOW_MS } from "./grouper";
-import { WebSpeechSource, MAX_RETRIES, BACKOFF_BASE_MS, UNAVAILABLE_MESSAGE } from "./webSpeech";
+import { WebSpeechSource, MAX_RETRIES, BACKOFF_BASE_MS, START_TIMEOUT_MS, UNAVAILABLE_MESSAGE } from "./webSpeech";
 import type { SpeechSource, SpeechState } from "./types";
 
 // Fuente falsa: cumple la interfaz y deja disparar eventos a mano.
@@ -145,6 +145,60 @@ describe("WebSpeechSource", () => {
     expect(FakeRec.instances.length).toBe(1);
     expect(states[states.length - 1]).toBe("error");
     expect(details[details.length - 1]).toMatch(/micrófono/);
+  });
+
+  it("start() que lanza se reprograma y luego llega a listening", () => {
+    let n = 0;
+    class ThrowOnce extends FakeRec { start() { if (n++ === 0) throw new Error("InvalidStateError"); super.start(); } }
+    const s = new WebSpeechSource("es-CL", ThrowOnce);
+    const states: SpeechState[] = []; s.onState = (st) => states.push(st);
+    s.start();
+    expect(states).toContain("restarting");
+    vi.advanceTimersByTime(BACKOFF_BASE_MS);
+    expect(FakeRec.instances.length).toBe(2);
+    expect(states[states.length - 1]).toBe("listening");
+  });
+
+  it("instancia que nunca arranca: el watchdog la aborta y al agotar reintentos da error", () => {
+    const aborted: any[] = [];
+    class Silent extends FakeRec { start() {} abort() { aborted.push(this); } }
+    const s = new WebSpeechSource("es-CL", Silent);
+    const states: SpeechState[] = []; const details: (string | undefined)[] = [];
+    s.onState = (st, d) => { states.push(st); details.push(d); };
+    s.start();
+    vi.advanceTimersByTime(START_TIMEOUT_MS);
+    expect(aborted.length).toBe(1);
+    expect(states[states.length - 1]).toBe("restarting");
+    vi.advanceTimersByTime(60000);
+    expect(FakeRec.instances.length).toBeGreaterThan(1);
+    vi.advanceTimersByTime(10 * 60000);
+    expect(FakeRec.instances.length).toBe(MAX_RETRIES + 1);
+    expect(states[states.length - 1]).toBe("error");
+    expect(details[details.length - 1]).toMatch(/pulsa Hablar otra vez/);
+  });
+
+  it("onend tardío de una instancia vieja no provoca spawn extra", () => {
+    const { s } = mk(); s.start();
+    const viejo = FakeRec.instances[0].onend;
+    FakeRec.instances[0].onend();
+    vi.advanceTimersByTime(BACKOFF_BASE_MS);
+    expect(FakeRec.instances.length).toBe(2);
+    viejo();
+    vi.advanceTimersByTime(60000);
+    expect(FakeRec.instances.length).toBe(2);
+  });
+
+  it("stop cancela watchdog y timers", () => {
+    class Silent extends FakeRec { start() {} }
+    const s = new WebSpeechSource("es-CL", Silent);
+    s.start(); s.stop();
+    vi.advanceTimersByTime(60000);
+    expect(FakeRec.instances.length).toBe(1);
+    const { s: s2 } = mk(); s2.start();
+    FakeRec.instances[FakeRec.instances.length - 1].onend(); s2.stop();
+    const n = FakeRec.instances.length;
+    vi.advanceTimersByTime(60000);
+    expect(FakeRec.instances.length).toBe(n);
   });
 
   it("separa parciales y finales", () => {

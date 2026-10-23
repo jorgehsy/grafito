@@ -101,7 +101,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       });
       continue;
     }
-    if (e.type === "stage" || e.type === "event") {
+    if (e.type === "stage" || e.type === "event" || e.type === "branch") {
       const noteLines = markNoteLines(e);
       items.push({
         key: e.id, kind: "element", sig: JSON.stringify([variant, lines, noteLines]), hue: zoneN.get(e.zone) ?? 0,
@@ -140,6 +140,14 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       continue;
     }
     items.push({ key: e.id, kind: "element", sig: JSON.stringify([variant, lines]), hue: zoneN.get(e.zone) ?? 0, geom: { ...r }, data: { variant, lines } });
+  }
+  // corchetes de un árbol
+  for (const [key, g] of Object.entries(lay.edges)) {
+    if (!key.startsWith("br:")) continue;
+    items.push({
+      key, kind: "edge", hue: zoneN.get(findEl(board, key.slice(3))?.zone ?? "") ?? 0, sig: JSON.stringify(["bracket"]),
+      geom: { ...bbox(g.pts), pts: g.pts }, data: { variant: "bracket" },
+    });
   }
   // anillo de un ciclo y eje de una línea de tiempo
   for (const [key, g] of Object.entries(lay.edges)) {

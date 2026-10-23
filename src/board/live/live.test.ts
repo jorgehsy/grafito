@@ -125,7 +125,7 @@ describe("dictado y validación", () => {
     expect(splitSentences("Hola mundo. ¿Qué tal? Bien.")).toEqual(["Hola mundo.", "¿Qué tal?", "Bien."]);
   });
   it("valida entradas de herramientas con el esquema", () => {
-    expect(OP_TOOLS.length).toBe(20);
+    expect(OP_TOOLS.length).toBe(21);
     expect(validateOp("delete", { id: "a" })).toBeNull();
     expect(validateOp("delete", {})).not.toBeNull();
     expect(validateOp("create_zone", { id: "a", kind: "raro", title: "t" })).not.toBeNull();

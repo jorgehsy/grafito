@@ -1,0 +1,890 @@
+{
+  "version": 1,
+  "id": "mvk6tmobep97",
+  "startedAt": 1792712646155,
+  "updatedAt": 1792713073084,
+  "model": "claude-sonnet-5-5",
+  "shape": "auto",
+  "lang": "es-CL",
+  "requests": [
+    {
+      "n": 1,
+      "model": "claude-sonnet-5-5",
+      "text": "vamos a representar como Claudio todos los modelos de Inteligencia artificial ocupan la ventana del contexto o el contexto Windows",
+      "mode": "content",
+      "startedAt": 1792712676351,
+      "firstOpMs": 2087,
+      "voiceFirstMs": 2928,
+      "totalMs": 2368,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "ventana_contexto",
+            "kind": "scale",
+            "title": "Ventana de contexto"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se va a representar cómo los modelos de inteligencia artificial, como Claude, ocupan la ventana de contexto."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 186,
+        "cacheRead": 0,
+        "cacheWrite": 10062,
+        "output": 190
+      },
+      "costUsd": 0.027427
+    },
+    {
+      "n": 2,
+      "model": "claude-sonnet-5-5",
+      "text": "cuando tú conversas en una nueva sesión con el modelo se ejecuta un turno",
+      "mode": "content",
+      "startedAt": 1792712682830,
+      "firstOpMs": 1939,
+      "voiceFirstMs": 2746,
+      "totalMs": 1939,
+      "ops": [
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se va a representar cómo los modelos de IA, como Claude, ocupan la ventana de contexto; al conversar en una nueva sesión se ejecuta un turno."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 248,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 104
+      },
+      "costUsd": 0.0035484
+    },
+    {
+      "n": 3,
+      "model": "claude-sonnet-5-5",
+      "text": "un turno es un envío de mensaje que tú le haces al modelo el modelo ocupa un tiempo y tokens para razonar Y luego el modelo te responde eso es un turno",
+      "mode": "content",
+      "startedAt": 1792712696679,
+      "firstOpMs": 1777,
+      "voiceFirstMs": 2585,
+      "totalMs": 3810,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "turno",
+            "kind": "flow",
+            "title": "Un turno",
+            "place": {
+              "relation": "below",
+              "of": "ventana_contexto"
+            }
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "turno",
+            "id": "envio",
+            "label": "Envías un mensaje"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "turno",
+            "id": "razona",
+            "label": "Modelo razona (tiempo y tokens)",
+            "after": "envio"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "turno",
+            "id": "responde",
+            "label": "Modelo responde",
+            "after": "razona"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se representa cómo los modelos de IA ocupan la ventana de contexto; un turno es enviar un mensaje, el modelo razona gastando tiempo y tokens, y luego responde."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 294,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 582
+      },
+      "costUsd": 0.0084204
+    },
+    {
+      "n": 4,
+      "model": "claude-sonnet-5-5",
+      "text": "cada vez que tú ejecutas un turno y el modelo responde eso se convierte en contexto y se ocupa ocupa la ventana de contexto un porcentaje",
+      "mode": "content",
+      "startedAt": 1792712721928,
+      "firstOpMs": 2052,
+      "voiceFirstMs": 2859,
+      "totalMs": 3209,
+      "ops": [
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "turno",
+            "id": "se_vuelve_contexto",
+            "label": "Turno pasa a ser contexto",
+            "after": "responde"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c_ocupa",
+            "from": "se_vuelve_contexto",
+            "to": "ventana_contexto",
+            "label": "ocupa un porcentaje"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se representa cómo los modelos de IA ocupan la ventana de contexto; un turno es enviar un mensaje, el modelo razona gastando tiempo y tokens y responde, y cada turno completado pasa a ser contexto y ocupa un porcentaje de la ventana."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 399,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 406
+      },
+      "costUsd": 0.0068704
+    },
+    {
+      "n": 5,
+      "model": "claude-sonnet-5-5",
+      "text": "a medida que tú varias veces vas iterando con la Inteligencia artificial y convirtiendo varios turnos va ocupando y va llenando la barra de ventana de contexto",
+      "mode": "content",
+      "startedAt": 1792712740195,
+      "firstOpMs": 2279,
+      "voiceFirstMs": 3088,
+      "totalMs": 3163,
+      "ops": [
+        {
+          "name": "set_level",
+          "input": {
+            "zone": "ventana_contexto",
+            "at": 40,
+            "label": "se va llenando con cada turno"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c_turno_barra",
+            "from": "se_vuelve_contexto",
+            "to": "ventana_contexto",
+            "label": "llena la barra"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se representa cómo los modelos de IA ocupan la ventana de contexto; un turno es enviar un mensaje, el modelo razona gastando tiempo y tokens y responde, y cada turno completado pasa a ser contexto. Al iterar varios turnos, la barra de la ventana se va llenando."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 468,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 383
+      },
+      "costUsd": 0.0067783999999999995
+    },
+    {
+      "n": 6,
+      "model": "claude-sonnet-5-5",
+      "text": "por configuración los modelos tienen o configurado que cuando llegan a cierto tres Judas cierto porcentaje de la ventana de contexto automáticamente compacta toda la conversación",
+      "mode": "content",
+      "startedAt": 1792712766375,
+      "firstOpMs": 2271,
+      "voiceFirstMs": 3079,
+      "totalMs": 2940,
+      "ops": [
+        {
+          "name": "add_mark",
+          "input": {
+            "zone": "ventana_contexto",
+            "id": "umbral_compacta",
+            "at": 80,
+            "label": "Umbral configurado",
+            "note": "Compacta toda la conversación automáticamente",
+            "tone": "warn"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se representa cómo los modelos de IA ocupan la ventana de contexto; un turno es enviar un mensaje, el modelo razona y responde, y pasa a ser contexto, llenando la barra. Por configuración, al llegar a cierto porcentaje el modelo compacta automáticamente toda la conversación."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 498,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 338
+      },
+      "costUsd": 0.0063884
+    },
+    {
+      "n": 7,
+      "model": "claude-sonnet-5-5",
+      "text": "el compactar lo que hace es resume y saca todas las notas importantes de la conversación y los convierte en un contexto más pequeñito para que puedas continuar en la misma sesión con el contexto resumido",
+      "mode": "content",
+      "startedAt": 1792712790525,
+      "firstOpMs": 1747,
+      "voiceFirstMs": 2554,
+      "totalMs": 4691,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "compactar",
+            "kind": "flow",
+            "title": "Compactar",
+            "place": {
+              "relation": "right_of",
+              "of": "turno"
+            }
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "compactar",
+            "id": "resume",
+            "label": "Resume la conversación"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "compactar",
+            "id": "saca_notas",
+            "label": "Extrae notas importantes",
+            "after": "resume"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "compactar",
+            "id": "contexto_chico",
+            "label": "Contexto más pequeño",
+            "after": "saca_notas"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "compactar",
+            "id": "continua",
+            "label": "Continúas en la misma sesión",
+            "after": "contexto_chico"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c_umbral_resume",
+            "from": "umbral_compacta",
+            "to": "resume"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se representa cómo la ventana de contexto se llena con cada turno; al llegar al umbral configurado se compacta automáticamente: se resume la conversación, se extraen las notas importantes y se obtiene un contexto más pequeño para continuar en la misma sesión."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 565,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 839
+      },
+      "costUsd": 0.0115324
+    },
+    {
+      "n": 8,
+      "model": "claude-sonnet-5-5",
+      "text": "por defecto los modelos tienen configurado que al 90% la de la ventana de contexto se ejecuta automáticamente el compactar",
+      "mode": "content",
+      "startedAt": 1792712908816,
+      "firstOpMs": 2240,
+      "voiceFirstMs": 3045,
+      "totalMs": 3371,
+      "ops": [
+        {
+          "name": "add_mark",
+          "input": {
+            "zone": "ventana_contexto",
+            "id": "umbral_defecto",
+            "at": 90,
+            "label": "90%: por defecto",
+            "note": "Los modelos compactan automáticamente",
+            "tone": "danger"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c_defecto_resume",
+            "from": "umbral_defecto",
+            "to": "resume"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Se representa cómo la ventana de contexto se llena con cada turno; al llegar al umbral configurado (por defecto los modelos lo tienen al 90%) se compacta automáticamente: se resume la conversación, se extraen notas importantes y se continúa en la misma sesión con un contexto más pequeño."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 696,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 433
+      },
+      "costUsd": 0.0077344
+    },
+    {
+      "n": 9,
+      "model": "claude-sonnet-5-5",
+      "text": "sin embargo por experiencia propia una vez tú pasas el 20 o 25% de la ventana de contexto los modelos empiezan a degradar su respuesta y alucinar",
+      "mode": "content",
+      "startedAt": 1792712930934,
+      "firstOpMs": 2867,
+      "voiceFirstMs": 3672,
+      "totalMs": 3675,
+      "ops": [
+        {
+          "name": "add_mark",
+          "input": {
+            "zone": "ventana_contexto",
+            "id": "umbral_degrada",
+            "at": 22,
+            "label": "20-25%: degradan",
+            "note": "Por experiencia, los modelos empeoran y alucinan",
+            "tone": "warn"
+          }
+        },
+        {
+          "name": "emphasize",
+          "input": {
+            "target": "umbral_degrada",
+            "style": "circle"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente: se resume, se extraen notas y se continúa con menos contexto. Por experiencia, desde el 20-25% los modelos ya degradan sus respuestas y alucinan."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 804,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 412
+      },
+      "costUsd": 0.0077404
+    },
+    {
+      "n": 10,
+      "model": "claude-sonnet-5-5",
+      "text": "es por eso que recomiendo que cuando utilicen cualquier modelo de Inteligencia artificial sigan el siguiente flujo",
+      "mode": "content",
+      "startedAt": 1792712950748,
+      "firstOpMs": 2596,
+      "voiceFirstMs": 3400,
+      "totalMs": 3683,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "flujo_recomendado",
+            "kind": "flow",
+            "title": "Flujo recomendado",
+            "place": {
+              "relation": "right_of",
+              "of": "compactar"
+            }
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c_degrada_flujo",
+            "from": "umbral_degrada",
+            "to": "flujo_recomendado",
+            "style": "dashed"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente. Desde el 20-25% los modelos degradan y alucinan, por eso el ponente recomienda un flujo que va a explicar para cualquier modelo de IA."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 869,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 415
+      },
+      "costUsd": 0.0079004
+    },
+    {
+      "n": 11,
+      "model": "claude-sonnet-5-5",
+      "text": "una vez hayas hechos varios turnos y llegues al 20% de la ventana de contexto",
+      "mode": "content",
+      "startedAt": 1792712968915,
+      "firstOpMs": 2384,
+      "voiceFirstMs": 3199,
+      "totalMs": 3845,
+      "ops": [
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "flujo_recomendado",
+            "id": "varios_turnos",
+            "label": "Haces varios turnos"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "flujo_recomendado",
+            "id": "llegas_20",
+            "label": "Llegas al 20% de ventana",
+            "after": "varios_turnos"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c_degrada_flujo",
+            "from": "umbral_degrada",
+            "to": "llegas_20"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente. Desde el 20-25% los modelos degradan y alucinan, por eso el ponente recomienda un flujo para cualquier modelo: tras varios turnos, al llegar al 20% de la ventana, se actúa."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 887,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 507
+      },
+      "costUsd": 0.0088564
+    },
+    {
+      "n": 12,
+      "model": "claude-sonnet-5-5",
+      "text": "le pidas al modelo que cree un archivo de hand off que compacte todas las decisiones cruciales y la información más importante de la conversación",
+      "mode": "content",
+      "startedAt": 1792712982695,
+      "firstOpMs": 2334,
+      "voiceFirstMs": 3138,
+      "totalMs": 3555,
+      "ops": [
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "flujo_recomendado",
+            "id": "pides_handoff",
+            "label": "Pides archivo de hand off",
+            "after": "llegas_20"
+          }
+        },
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "flujo_recomendado",
+            "id": "handoff_contenido",
+            "label": "Compacta decisiones e info clave",
+            "after": "pides_handoff"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente. Desde el 20-25% los modelos degradan, por eso el ponente recomienda: tras varios turnos, al llegar al 20%, pedir al modelo un archivo de hand off con las decisiones cruciales y la información más importante."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 1017,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 438
+      },
+      "costUsd": 0.008426399999999999
+    },
+    {
+      "n": 13,
+      "model": "claude-sonnet-5-5",
+      "text": "luego inicias una nueva sesión con la ventana de contexto limpia",
+      "mode": "content",
+      "startedAt": 1792712997708,
+      "firstOpMs": 1693,
+      "voiceFirstMs": 2502,
+      "totalMs": 2342,
+      "ops": [
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "flujo_recomendado",
+            "id": "nueva_sesion",
+            "label": "Inicias nueva sesión limpia",
+            "after": "handoff_contenido"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente. Desde el 20-25% los modelos degradan, por eso se recomienda pedir al llegar al 20% un archivo de hand off con decisiones e información clave y luego iniciar una nueva sesión con la ventana limpia."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 1083,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 305
+      },
+      "costUsd": 0.007228399999999999
+    },
+    {
+      "n": 14,
+      "model": "claude-sonnet-5-5",
+      "text": "y le pides al modelo que lea este archivo de handdoft",
+      "mode": "content",
+      "startedAt": 1792713003812,
+      "firstOpMs": 1824,
+      "voiceFirstMs": 2629,
+      "totalMs": 2509,
+      "ops": [
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "flujo_recomendado",
+            "id": "lee_handoff",
+            "label": "Pides leer el hand off",
+            "after": "nueva_sesion"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente. Desde el 20-25% los modelos degradan, por eso se recomienda pedir al llegar al 20% un archivo de hand off con decisiones clave, iniciar una nueva sesión limpia y pedirle al modelo que lea ese archivo."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 1122,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 308
+      },
+      "costUsd": 0.0073364
+    },
+    {
+      "n": 15,
+      "model": "claude-sonnet-5-5",
+      "text": "con esto inicias una sesión con la ventana con texto limpia sin perder Los decisiones claves que tenías en la conversación anterior",
+      "mode": "content",
+      "startedAt": 1792713014823,
+      "firstOpMs": 2920,
+      "voiceFirstMs": 3723,
+      "totalMs": 3986,
+      "ops": [
+        {
+          "name": "add_step",
+          "input": {
+            "zone": "flujo_recomendado",
+            "id": "sesion_limpia",
+            "label": "Ventana limpia con decisiones clave",
+            "after": "lee_handoff"
+          }
+        },
+        {
+          "name": "emphasize",
+          "input": {
+            "target": "sesion_limpia",
+            "style": "star"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente. Desde el 20-25% los modelos degradan, por eso se recomienda pedir al llegar al 20% un hand off con decisiones clave, iniciar sesión limpia y leerlo, logrando una ventana limpia sin perder las decisiones previas."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 1195,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 387
+      },
+      "costUsd": 0.0082724
+    },
+    {
+      "n": 16,
+      "model": "claude-sonnet-5-5",
+      "text": "la diferencia del compactar a hacer un hand-uff es que no le delegas al modelo todas las decisiones tú puedes auditar este archivo es hand",
+      "mode": "content",
+      "startedAt": 1792713026358,
+      "firstOpMs": 1490,
+      "voiceFirstMs": 2298,
+      "totalMs": 2402,
+      "ops": [
+        {
+          "name": "add_callout",
+          "input": {
+            "id": "nota_audita",
+            "target": "handoff_contenido",
+            "text": "Puedes auditar el archivo; no delegas todo al modelo"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente. Desde el 20-25% los modelos degradan, por eso se recomienda al llegar al 20% pedir un hand off, iniciar sesión limpia y leerlo. A diferencia de compactar, el hand off no delega todas las decisiones al modelo: puedes auditar el archivo."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 1259,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 305
+      },
+      "costUsd": 0.007580399999999999
+    },
+    {
+      "n": 17,
+      "model": "claude-sonnet-5-5",
+      "text": "toma el flujo recomendado y dibújalo como visualmente se podría ir llenando la ventana de contexto Y cómo funcionan las anduve para cuando se inicia una nueva sesión con el handdoft",
+      "mode": "instruction",
+      "startedAt": 1792713060731,
+      "firstOpMs": 7292,
+      "voiceFirstMs": 9301,
+      "totalMs": 12030,
+      "ops": [
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "sesion_vieja",
+            "kind": "scale",
+            "title": "Sesión 1: se llena la ventana",
+            "place": {
+              "relation": "below",
+              "of": "flujo_recomendado"
+            }
+          }
+        },
+        {
+          "name": "set_level",
+          "input": {
+            "zone": "sesion_vieja",
+            "at": 20,
+            "label": "varios turnos"
+          }
+        },
+        {
+          "name": "add_mark",
+          "input": {
+            "zone": "sesion_vieja",
+            "id": "s1_handoff",
+            "at": 20,
+            "label": "20%: pides hand off",
+            "note": "Compacta decisiones e info clave en un archivo",
+            "tone": "warn"
+          }
+        },
+        {
+          "name": "create_zone",
+          "input": {
+            "id": "sesion_nueva_escala",
+            "kind": "scale",
+            "title": "Sesión 2: nueva con hand off",
+            "place": {
+              "relation": "right_of",
+              "of": "sesion_vieja"
+            }
+          }
+        },
+        {
+          "name": "set_level",
+          "input": {
+            "zone": "sesion_nueva_escala",
+            "at": 5,
+            "label": "ventana limpia"
+          }
+        },
+        {
+          "name": "add_mark",
+          "input": {
+            "zone": "sesion_nueva_escala",
+            "id": "s2_lee",
+            "at": 8,
+            "label": "Lee el hand off",
+            "note": "Solo entran las decisiones clave",
+            "tone": "ok"
+          }
+        },
+        {
+          "name": "connect",
+          "input": {
+            "id": "c_s1_s2",
+            "from": "s1_handoff",
+            "to": "s2_lee",
+            "label": "hand off"
+          }
+        },
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente. Desde el 20-25% los modelos degradan, así que al llegar al 20% se pide un hand off, se inicia sesión limpia y se lee; se auditable, no delega todo. Se añadió una vista de cómo se llena la sesión 1 y cómo arranca la sesión 2 casi vacía."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 1359,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 1609
+      },
+      "costUsd": 0.020820400000000003
+    }
+  ],
+  "transcript": [
+    {
+      "text": "vamos a representar como Claudio todos los modelos de Inteligencia artificial ocupan la ventana del contexto o el contexto Windows",
+      "at": 1792712675548
+    },
+    {
+      "text": "cuando tú conversas en una nueva sesión con el modelo se ejecuta un turno",
+      "at": 1792712682029
+    },
+    {
+      "text": "un turno es un envío de mensaje que tú le haces al modelo el modelo ocupa un tiempo y tokens para razonar Y luego el modelo te responde eso es un turno",
+      "at": 1792712695877
+    },
+    {
+      "text": "cada vez que tú ejecutas un turno y el modelo responde eso se convierte en contexto y se ocupa ocupa la ventana de contexto un porcentaje",
+      "at": 1792712721126
+    },
+    {
+      "text": "a medida que tú varias veces vas iterando con la Inteligencia artificial y convirtiendo varios turnos va ocupando y va llenando la barra de ventana de contexto",
+      "at": 1792712739394
+    },
+    {
+      "text": "por configuración los modelos tienen o configurado que cuando llegan a cierto tres Judas cierto porcentaje de la ventana de contexto automáticamente compacta toda la conversación",
+      "at": 1792712765574
+    },
+    {
+      "text": "el compactar lo que hace es resume y saca todas las notas importantes de la conversación y los convierte en un contexto más pequeñito para que puedas continuar en la misma sesión con el contexto resumido",
+      "at": 1792712789724
+    },
+    {
+      "text": "por defecto los modelos tienen configurado que al 90% la de la ventana de contexto se ejecuta automáticamente el compactar",
+      "at": 1792712908015
+    },
+    {
+      "text": "sin embargo por experiencia propia una vez tú pasas el 20 o 25% de la ventana de contexto los modelos empiezan a degradar su respuesta y alucinar",
+      "at": 1792712930133
+    },
+    {
+      "text": "es por eso que recomiendo que cuando utilicen cualquier modelo de Inteligencia artificial sigan el siguiente flujo",
+      "at": 1792712949947
+    },
+    {
+      "text": "una vez hayas hechos varios turnos y llegues al 20% de la ventana de contexto",
+      "at": 1792712968105
+    },
+    {
+      "text": "le pidas al modelo que cree un archivo de hand off que compacte todas las decisiones cruciales y la información más importante de la conversación",
+      "at": 1792712981894
+    },
+    {
+      "text": "luego inicias una nueva sesión con la ventana de contexto limpia",
+      "at": 1792712996906
+    },
+    {
+      "text": "y le pides al modelo que lea este archivo de handdoft",
+      "at": 1792713003011
+    },
+    {
+      "text": "con esto inicias una sesión con la ventana con texto limpia sin perder Los decisiones claves que tenías en la conversación anterior",
+      "at": 1792713014023
+    },
+    {
+      "text": "la diferencia del compactar a hacer un hand-uff es que no le delegas al modelo todas las decisiones tú puedes auditar este archivo es hand",
+      "at": 1792713025557
+    },
+    {
+      "text": "grafito toma el flujo recomendado y dibújalo como visualmente se podría ir llenando la ventana de contexto Y cómo funcionan las anduve para cuando se inicia una nueva sesión con el handdoft",
+      "at": 1792713058728
+    }
+  ],
+  "summary": "La ventana de contexto se llena con cada turno; al umbral configurado (por defecto 90%) se compacta automáticamente. Desde el 20-25% los modelos degradan, así que al llegar al 20% se pide un hand off, se inicia sesión limpia y se lee; se auditable, no delega todo. Se añadió una vista de cómo se llena la sesión 1 y cómo arranca la sesión 2 casi vacía.",
+  "totals": {
+    "requests": 17,
+    "costUsd": 0.1628614,
+    "medianVoiceFirstMs": 3045
+  }
+}

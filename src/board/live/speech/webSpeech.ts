@@ -2,6 +2,8 @@ import type { SpeechSource, SpeechState } from "./types";
 
 export const MAX_RETRIES = 5;
 export const BACKOFF_BASE_MS = 300;
+// si el reconocedor nuevo no dispara onstart en este tiempo, se da por colgado
+export const START_TIMEOUT_MS = 4000;
 
 export const ERROR_MESSAGES: Record<string, string> = {
   "not-allowed": "Permiso de micrófono denegado. Permítelo en el candado de la barra de direcciones.",
@@ -29,9 +31,10 @@ export class WebSpeechSource implements SpeechSource {
   private active = false;
   private retries = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private watchdog: ReturnType<typeof setTimeout> | undefined;
   private lastError = "";
 
-  constructor(lang = "es-CL", private ctor: any = getRecognitionCtor(), private setT: typeof setTimeout = setTimeout) {
+  constructor(lang = "es-CL", private ctor: any = getRecognitionCtor(), private setT: typeof setTimeout = setTimeout, private clearT: (t: any) => void = clearTimeout) {
     this.lang = lang;
   }
 
@@ -49,20 +52,59 @@ export class WebSpeechSource implements SpeechSource {
 
   stop() {
     this.active = false;
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = undefined;
-    try { this.rec?.stop(); } catch { /* ya parado */ }
+    this.clearTimers();
+    this.discard(this.rec, true);
     this.rec = null;
     this.onState("idle");
   }
 
+  private clearTimers() {
+    if (this.timer !== undefined) this.clearT(this.timer);
+    if (this.watchdog !== undefined) this.clearT(this.watchdog);
+    this.timer = undefined;
+    this.watchdog = undefined;
+  }
+
+  // suelta una instancia: sin handlers (sus eventos tardíos no cuentan) y la aborta
+  private discard(r: any, gentle = false) {
+    if (!r) return;
+    r.onstart = r.onresult = r.onerror = r.onend = null;
+    try { gentle && r.stop ? r.stop() : r.abort?.(); } catch { /* ya parada */ }
+  }
+
+  private scheduleRestart() {
+    if (!this.active) return;
+    if (this.lastError !== "no-speech" && this.retries >= MAX_RETRIES) {
+      this.active = false;
+      this.onState("error", (ERROR_MESSAGES[this.lastError] ?? "El reconocimiento se detuvo") + " Se agotaron los reintentos; pulsa Hablar otra vez.");
+      return;
+    }
+    // el silencio (no-speech) es normal: reinicia sin gastar reintentos
+    const delay = this.lastError === "no-speech" ? BACKOFF_BASE_MS : BACKOFF_BASE_MS * 2 ** this.retries++;
+    this.onState("restarting", this.lastError ? ERROR_MESSAGES[this.lastError] : undefined);
+    if (this.timer !== undefined) this.clearT(this.timer);
+    this.timer = this.setT(() => { this.timer = undefined; if (this.active) this.spawn(); }, delay);
+  }
+
   private spawn() {
+    // nunca dos instancias vivas
+    this.discard(this.rec);
+    this.rec = null;
+    if (this.watchdog !== undefined) this.clearT(this.watchdog);
+    this.watchdog = undefined;
     const r = new this.ctor();
+    const mine = () => this.rec === r;
     r.continuous = true;
     r.interimResults = true;
     r.lang = this.lang;
-    r.onstart = () => this.onState("listening");
+    r.onstart = () => {
+      if (!mine()) return;
+      if (this.watchdog !== undefined) this.clearT(this.watchdog);
+      this.watchdog = undefined;
+      this.onState("listening");
+    };
     r.onresult = (ev: any) => {
+      if (!mine()) return;
       this.retries = 0;
       this.lastError = "";
       let interim = "";
@@ -74,28 +116,43 @@ export class WebSpeechSource implements SpeechSource {
       this.onInterim(interim.trim());
     };
     r.onerror = (ev: any) => {
+      if (!mine()) return;
       const code: string = ev?.error ?? "unknown";
       if (code === "aborted") return;
       this.lastError = code;
       if (FATAL.has(code)) {
         this.active = false;
+        this.clearTimers();
         this.onState("error", ERROR_MESSAGES[code] ?? `Error de voz: ${code}`);
       }
     };
     r.onend = () => {
+      if (!mine()) return;
       this.onInterim("");
-      if (!this.active) return;
-      if (this.lastError !== "no-speech" && this.retries >= MAX_RETRIES) {
-        this.active = false;
-        this.onState("error", (ERROR_MESSAGES[this.lastError] ?? "El reconocimiento se detuvo") + " Se agotaron los reintentos; pulsa Hablar otra vez.");
-        return;
-      }
-      // el silencio (no-speech) es normal: reinicia sin gastar reintentos
-      const delay = this.lastError === "no-speech" ? BACKOFF_BASE_MS : BACKOFF_BASE_MS * 2 ** this.retries++;
-      this.onState("restarting", this.lastError ? ERROR_MESSAGES[this.lastError] : undefined);
-      this.timer = this.setT(() => { if (this.active) this.spawn(); }, delay);
+      if (this.watchdog !== undefined) this.clearT(this.watchdog);
+      this.watchdog = undefined;
+      this.scheduleRestart();
     };
     this.rec = r;
-    try { r.start(); } catch { /* InvalidStateError: onend reintentará */ }
+    // si onstart no llega, la instancia está colgada: se descarta y cuenta como reintento
+    this.watchdog = this.setT(() => {
+      this.watchdog = undefined;
+      if (!mine() || !this.active) return;
+      this.discard(r);
+      this.rec = null;
+      this.lastError = "";
+      this.scheduleRestart();
+    }, START_TIMEOUT_MS);
+    try {
+      r.start();
+    } catch {
+      // start() que lanza no dispara onend: reprogramar a mano
+      if (this.watchdog !== undefined) this.clearT(this.watchdog);
+      this.watchdog = undefined;
+      this.discard(r);
+      this.rec = null;
+      this.lastError = "";
+      this.scheduleRestart();
+    }
   }
 }

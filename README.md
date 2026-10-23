@@ -40,7 +40,7 @@ Tablero hecho a mano (SVG + rough.js) que se dibuja trazo a trazo mientras se "d
 
 - `ops.ts`: vocabulario de 16 operaciones (tipos TS + JSON Schema con forma de herramienta de Anthropic en `OP_TOOLS`), sin coordenadas. Reutilizable en el servidor.
 - `model.ts`: `applyOp(board, op) -> {board, warnings}`; las operaciones inválidas se ignoran con aviso.
-- `layout.ts`: zonas (pistas `place`, filas que envuelven, sin solapes) y contenido (elkjs para flow/system, d3-hierarchy para mindmap, filas para list/compare); conexiones entre zonas y notas con curvas bézier que esquivan cajas.
+- `layout.ts`: zonas (pistas `place`, filas que envuelven, sin solapes) y contenido (elkjs para flow/system, d3-hierarchy para mindmap, columnas por profundidad para tree, filas para list/compare); conexiones entre zonas y notas con curvas bézier que esquivan cajas.
 - `tree.ts` + `animator.ts`: árbol de render, diff -> tareas (draw/update/delete en secuencia, movimientos en paralelo) y velocidad según la cola (1x con <=2 pendientes, hasta 4x, instantáneo por encima de 12).
 - `render/visuals.ts` y `render/engine.ts`: formas rough con semilla fija por id, trazo animado, lápiz, resaltador, tweens y cámara (`camera.ts`).
 - `player.ts` y `scripts/`: reloj virtual, subtítulos y latencia simulada de 1,5–3 s; guiones `arquitectura.ts` y `proceso.ts`.
@@ -74,7 +74,8 @@ Latencia: cada petición registra **voz→1.ª figura** (ms desde el último fin
 
 - Atajo: `/?mode=claude`.
 - **Zona `scale`** (barra con umbrales): `create_zone` kind `scale` (+ `min_label`/`max_label`), `add_mark` (`at` 0-100, `label`, `note`, `tone`) y `set_level` (relleno hasta `at`). Guion "Ventana de contexto".
-- **Forma del dibujo**: selector Auto / Mapa / Flujo / Escala / Sistema / Lista / Comparar; viaja como `shape` en `POST /api/board` y el servidor lo añade al mensaje de usuario (no al prompt de sistema, que está en caché).
+- **Zona `tree`** (jerarquía de izquierda a derecha): `create_zone` kind `tree` y `add_branch` (`label`, `note`, `parent`; sin `parent` es raíz y varias raíces se apilan). Cada profundidad es una columna cuyo ancho sale de su etiqueta más ancha; conectores de codo. Borrar un nodo hace subir a sus hijos un nivel (como mindmap). Guion "Tipos de prototipo" (`/?auto=prototipos&speed=2`).
+- **Forma del dibujo**: selector Auto / Mapa / Flujo / Escala / Ciclo / Línea de tiempo / Árbol / Sistema / Lista / Comparar; viaja como `shape` en `POST /api/board` y el servidor lo añade al mensaje de usuario (no al prompt de sistema, que está en caché).
 
 ## Exportar y guardar pruebas
 

@@ -18,7 +18,7 @@ export interface Zone {
   /** Número de orden de creación (colorea la zona de forma estable). */
   n: number;
 }
-export type ElType = "step" | "decision" | "component" | "node" | "item" | "mark" | "stage" | "event" | "span";
+export type ElType = "step" | "decision" | "component" | "node" | "item" | "mark" | "stage" | "event" | "span" | "branch";
 export interface El {
   id: string;
   zone: string;
@@ -67,7 +67,7 @@ export const emptyBoard = (): Board => ({
 export interface ApplyResult { board: Board; warnings: string[] }
 
 const ELEMENT_ZONE: Record<ElType, ZoneKind[]> = {
-  step: ["flow"], decision: ["flow"], component: ["system"], node: ["mindmap"], item: ["list", "compare"], mark: ["scale"], stage: ["cycle"], event: ["timeline"], span: ["timeline"],
+  step: ["flow"], decision: ["flow"], component: ["system"], node: ["mindmap"], item: ["list", "compare"], mark: ["scale"], stage: ["cycle"], event: ["timeline"], span: ["timeline"], branch: ["tree"],
 };
 
 export const findZone = (b: Board, id: string) => b.zones.find((z) => z.id === id);
@@ -171,6 +171,22 @@ export function applyOp(board: Board, op: Op): ApplyResult {
         else el.parent = p.id;
       }
       if (type === "item" && zone.kind === "compare") el.column = i.column === "right" ? "right" : "left";
+      b.els.push(el);
+      return { board: b, warnings };
+    }
+    case "add_branch": {
+      const e = needNew(i.id);
+      if (e) return bad(e);
+      const zone = findZone(b, i.zone);
+      if (!zone) return bad(`zona '${i.zone}' no existe`);
+      if (zone.kind !== "tree") return bad(`no se puede añadir branch a una zona ${zone.kind}`);
+      if (!str(i.label)) return bad("falta label");
+      const el: El = { id: i.id, zone: zone.id, type: "branch", label: i.label, ...(str(i.note) ? { note: i.note } : {}) };
+      if (i.parent !== undefined) {
+        const p = findEl(b, i.parent);
+        if (!p || p.zone !== zone.id || p.type !== "branch") warnings.push(`add_branch: parent '${i.parent}' no es un nodo de la zona; queda como raíz`);
+        else el.parent = p.id;
+      }
       b.els.push(el);
       return { board: b, warnings };
     }
@@ -306,7 +322,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
           else return missing();
           break;
         case "note":
-          if (!el || !["mark", "stage", "event"].includes(el.type)) return missing();
+          if (!el || !["mark", "stage", "event", "branch"].includes(el.type)) return missing();
           el.note = empty ? undefined : i.value;
           break;
         case "when":
