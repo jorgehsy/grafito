@@ -2,6 +2,14 @@
 
 Las notas completas de cada versión están en [Releases](https://github.com/jorgehsy/grafito/releases).
 
+## v0.2.0-alpha.2 · 2026-10-23
+
+- Caja para escribir a Claude si no tienes micrófono: Enter o Enviar manda el texto.
+- Las etiquetas de las flechas ya no quedan encima de los bloques.
+- Los diagramas muy anchos se dibujan de arriba hacia abajo para aprovechar la pantalla.
+- La `ANTHROPIC_API_KEY` del `.env` manda sobre la del shell.
+- Se trabaja en `main` (se retira la rama `alpha-grafitodesign`).
+
 ## v0.2.0-alpha.1 · 2026-10-23
 
 Primera alfa pública.
