@@ -2,3 +2,6 @@
 node_modules
 dist
 .idea
+pruebas/
+.remember/
+.DS_Store

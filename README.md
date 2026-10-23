@@ -1,92 +1,129 @@
-# grafito · Prototipo 1
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+    <img src="docs/logo-light.svg" alt="grafito" width="420">
+  </picture>
+</p>
 
-Convierte un monólogo hablado (en español) en un mapa mental dibujado a mano sobre un lienzo de Excalidraw, de forma incremental. Todavía sin voz: se pega texto y el modo "Simular dictado" lo va soltando frase a frase.
-
-## Uso
-
-1. Abre `.env` y pega tu clave: `ANTHROPIC_API_KEY=sk-ant-...` (la clave solo la lee el servidor, nunca llega al navegador).
-2. `npm install`
-3. `npm run dev`
-4. Abre http://localhost:5173
-
-Si falta la clave o sigue el marcador, la interfaz muestra "Falta la API key en .env".
-
-## Qué hay
-
-- `src/mindmap/model.ts`: modelo puro y `applyOp` (ignora operaciones inválidas y devuelve un aviso).
-- `src/mindmap/layout.ts`: árbol radial con d3-hierarchy, sin solapes.
-- `src/mindmap/render.ts`: mapa a elementos de Excalidraw con ids estables y fundido de entrada.
-- `src/live/scheduler.ts`: una petición en vuelo; lo que llega mientras tanto se junta (`onFinalText`, reutilizable para voz).
-- `server/draw.ts`: `POST /api/draw`, Claude con herramientas en streaming, eventos SSE `op`, `done` y `error`.
-
-## Comandos
-
-`npm test` (vitest) · `npm run typecheck` · `npm run build`
+<p align="center">
+  <strong>Tú hablas. Claude dibuja la pizarra en vivo, trazo a trazo.</strong><br>
+  <sub>Estado: <b>alfa</b> · Voz en español · Hecho con Claude, React y rough.js</sub>
+</p>
 
 ---
 
-# grafito v2 (maqueta sin Claude)
+**grafito** convierte lo que dices en voz alta en un tablero dibujado a mano. Explicas una arquitectura, un proceso o una idea, y mientras hablas aparecen zonas, cajas, flechas, líneas de tiempo, árboles y notas, como si alguien lo dibujara en una pizarra a tu lado.
 
-Tablero hecho a mano (SVG + rough.js) que se dibuja trazo a trazo mientras se "dicta". Esta fase no llama a la API: dos guiones en español mueven el renderizador para juzgar animación y vocabulario. La v1 (Excalidraw) sigue en `/v1.html`.
+> ⚠️ **Fase alfa.** Funciona, pero cambia seguido y puede romperse. Úsalo para probar y danos tu opinión.
 
-## Uso
+## Qué hace
 
-1. `npm install` y `npm run dev` (Vite avisa del puerto; normalmente http://localhost:5173).
-2. `/` es la v2: elige guion (Arquitectura o Proceso), Play / Pausa / Reiniciar, velocidad 0.5x–2x, "Seguir cámara", cola de dibujo y subtítulos sincronizados.
-3. Atajos por URL: `/?auto=arquitectura&speed=2` arranca solo.
-4. Rueda = zoom, arrastrar = mover; la cámara deja de seguir 5 s tras tocarla.
+- 🎙️ **Voz en vivo.** Hablas en español y el tablero se va dibujando mientras hablas.
+- ✍️ **Estilo a mano.** Trazos animados con rough.js, resaltador y cámara que sigue lo nuevo.
+- 🧭 **Formas de dibujo.** Auto, Mapa, Flujo, Escala, Ciclo, Línea de tiempo, Árbol, Sistema, Lista o Comparar.
+- 🪄 **Órdenes por voz.** Di *"Grafito, …"* para pedir cambios: *"Grafito, separa esto en dos diagramas"*.
+- 💾 **Guarda solo.** Cada sesión se guarda en `pruebas/`. Puedes restaurar, importar y exportar (JSON y SVG).
+- 💲 **Costo visible.** Muestra tokens y costo en dólares de cada petición.
+- ▶️ **Modo guion.** Demos sin Claude y sin gastar nada, para ver cómo funciona.
 
-## Estructura (`src/board/`)
+## Qué necesitas
 
-- `ops.ts`: vocabulario de 16 operaciones (tipos TS + JSON Schema con forma de herramienta de Anthropic en `OP_TOOLS`), sin coordenadas. Reutilizable en el servidor.
-- `model.ts`: `applyOp(board, op) -> {board, warnings}`; las operaciones inválidas se ignoran con aviso.
-- `layout.ts`: zonas (pistas `place`, filas que envuelven, sin solapes) y contenido (elkjs para flow/system, d3-hierarchy para mindmap, columnas por profundidad para tree, filas para list/compare); conexiones entre zonas y notas con curvas bézier que esquivan cajas.
-- `tree.ts` + `animator.ts`: árbol de render, diff -> tareas (draw/update/delete en secuencia, movimientos en paralelo) y velocidad según la cola (1x con <=2 pendientes, hasta 4x, instantáneo por encima de 12).
-- `render/visuals.ts` y `render/engine.ts`: formas rough con semilla fija por id, trazo animado, lápiz, resaltador, tweens y cámara (`camera.ts`).
-- `player.ts` y `scripts/`: reloj virtual, subtítulos y latencia simulada de 1,5–3 s; guiones `arquitectura.ts` y `proceso.ts`.
+| Cosa | Detalle |
+| --- | --- |
+| Node.js | 20.19 o más nuevo (recomendado 22+) |
+| Navegador | **Chrome** (o Safari). Firefox no tiene reconocimiento de voz. |
+| Clave de Anthropic | Una API key de [console.anthropic.com](https://console.anthropic.com/). El uso se cobra en tu cuenta. |
+| Micrófono | Para el modo voz. Sin micrófono puedes escribir o pegar texto. |
 
-`npm test` · `npm run typecheck` · `npm run build` (genera `index.html` y `v1.html`).
+## Instalar
 
----
+```bash
+git clone https://github.com/jorgehsy/grafito.git
+cd grafito
+npm install
+cp .env.example .env
+```
 
-# grafito v2 · modo "Claude en vivo"
+Abre `.env` y pega tu clave:
 
-El panel de la v2 tiene un selector **Guion (sin Claude)** / **Claude en vivo**. En el segundo, Claude dibuja el mismo tablero (mismo controlador, animador, resaltador y cámara que los guiones).
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
 
-- **Servidor**: `POST /api/board` (`server/board.ts`) con `{ delta, summary, board, model }`. Las herramientas son `OP_TOOLS` de `src/board/ops.ts` (una sola fuente de verdad), con `eager_input_streaming` y `cache_control` en el prompt de sistema. Cada llamada se valida con ajv antes de emitirla. Eventos SSE: `op` (o `op` con `invalid`), `usage` (entrada/caché desde `message_start`; salida estimada con chars/4 hasta que llega la cifra real), `done` y `error`. `/api/draw` sigue sirviendo a la v1.
-- **Tablero al modelo**: texto compacto (zonas, elementos, conexiones, notas, marcas) en `src/board/live/serialize.ts`; nunca el layout.
-- **Cliente** (`src/board/live/`): `sse.ts` (parser y `streamBoard`), `session.ts` (scheduler: una petición en vuelo y lo que llega mientras tanto se junta), `dictation.ts`, `pricing.ts` (precios por modelo, único sitio) y `LivePanel.tsx`.
-- **Panel**: texto, "Enviar todo", "Simular dictado" (frase a frase, 500–4000 ms), Detener, Limpiar, modelo (`claude-haiku-5-5` o `claude-sonnet-5-5`) y "Usar texto de un guion" para comparar con el dibujo del guion. Medidor siempre visible (petición actual y total de sesión, en $ con 4 decimales; "≈" = estimado) y registro por petición: texto, ms a la primera operación, ms totales, operaciones, tokens, coste y avisos de operaciones inválidas.
-- La entrada de texto pasa por `onFinalText(text)`, donde se enchufará la voz.
-- Modelo por defecto: `claude-sonnet-5-5` (Haiku sigue seleccionable).
+La clave solo la lee el servidor local. Nunca llega al navegador.
 
-### Modo voz (Prototipo 2)
+## Usar
 
-Habla en español y Claude dibuja en vivo. Usa el reconocimiento de voz del navegador (`SpeechRecognition`), así que **requiere Chrome (o Safari)**; en Firefox el panel muestra un aviso y lo demás sigue funcionando.
+1. Arranca todo con un comando:
 
-1. Abre `http://localhost:<puerto>/?mode=claude` (localhost cuenta como contexto seguro; en otra dirección hace falta HTTPS).
-2. Pulsa **🎙️ Hablar** (o la barra espaciadora cuando el foco no esté en un campo de texto) y **permite el micrófono** cuando el navegador lo pida.
-3. Elige idioma en el selector (es-CL por defecto; es-AR, es-MX, es-ES, en-US).
-4. Los parciales salen en gris cursiva; los finales pasan a subtítulos. Los finales se agrupan 800 ms (o al pasar de 250 chars) antes de enviarse; mientras hay una petición en curso, el scheduler junta lo nuevo.
-5. Chrome corta el reconocimiento por silencio o red: se reinicia solo (con espera creciente y tope de 5 reintentos). Los errores (`not-allowed`, `network`, ...) se muestran en español.
+   ```bash
+   npm run dev
+   ```
 
-Latencia: cada petición registra **voz→1.ª figura** (ms desde el último final del lote hasta la primera operación dibujada) y la mediana aparece en el medidor. Código en `src/board/live/speech/` (`SpeechSource` es la interfaz para cambiar a una STT en la nube).
+   Esto levanta dos cosas: el servidor (puerto `8787`) y la web (puerto `5173`).
 
-- Atajo: `/?mode=claude`.
-- **Zona `scale`** (barra con umbrales): `create_zone` kind `scale` (+ `min_label`/`max_label`), `add_mark` (`at` 0-100, `label`, `note`, `tone`) y `set_level` (relleno hasta `at`). Guion "Ventana de contexto".
-- **Zona `tree`** (jerarquía de izquierda a derecha): `create_zone` kind `tree` y `add_branch` (`label`, `note`, `parent`; sin `parent` es raíz y varias raíces se apilan). Cada profundidad es una columna cuyo ancho sale de su etiqueta más ancha; conectores de codo. Borrar un nodo hace subir a sus hijos un nivel (como mindmap). Guion "Tipos de prototipo" (`/?auto=prototipos&speed=2`).
-- **Forma del dibujo**: selector Auto / Mapa / Flujo / Escala / Ciclo / Línea de tiempo / Árbol / Sistema / Lista / Comparar; viaja como `shape` en `POST /api/board` y el servidor lo añade al mensaje de usuario (no al prompt de sistema, que está en caché).
+2. Abre **http://localhost:5173/?mode=claude** en Chrome.
+3. Pulsa **Hablar** (o la barra espaciadora) y permite el micrófono.
+4. Habla. El tablero se dibuja solo.
 
-## Exportar y guardar pruebas
+### Otras formas de usarlo
 
-- **Autosave**: tras cada petición (termine bien o con error) y cada ~10 s mientras hay actividad, el panel envía el registro de la prueba a `POST /api/sessions`, que lo escribe en `pruebas/<AAAA-MM-DD_HH-mm-ss>_<id>.json` (en la raíz del repo; Vite ignora esa carpeta, así que escribir no recarga). Mismo id de sesión = mismo archivo. Además queda una copia en `localStorage`. Si el servidor falla, el panel muestra un aviso pequeño y el dibujo sigue.
-- `GET /api/sessions` lista los archivos (archivo, inicio, peticiones, coste) y `GET /api/sessions/<archivo>` devuelve uno.
-- **Registro** (`version: 1`): `id`, `startedAt`, `updatedAt`, `model`, `shape`, `lang`, `requests[]` (`n`, `model`, `text` completo, `startedAt`, `firstOpMs`, `voiceFirstMs`, `totalMs`, `ops[{name,input}]`, `invalid[]`, `usage{input,cacheRead,cacheWrite,output}`, `costUsd`, `error?`), `transcript[{text,at}]`, `summary`, `totals{requests,costUsd,medianVoiceFirstMs}`.
-- **Restaurar**: al recargar en modo Claude, si hay una prueba sin cerrar aparece el aviso "Restaurar / Descartar". Restaurar repone todas las operaciones de golpe (la cola de dibujo pasa a modo rápido) y reconstruye registro, transcripción, totales y resumen. **Importar** carga un `.json` exportado o de `pruebas/` y lo restaura igual.
-- **Exportar** descarga el `.json` y el tablero como `.svg` (estilos en línea). **Limpiar** empieza una sesión nueva; el archivo anterior se queda en `pruebas/`.
+- **Sin micrófono:** escribe o pega texto en el panel y pulsa **Enviar todo**, o **Simular dictado** para soltarlo frase a frase.
+- **Darle órdenes:** di o escribe *"Grafito"* y luego la orden. Lo anterior se dibuja; lo posterior se toma como instrucción. Si no te gusta el resultado, usa **Deshacer instrucción**.
+- **Elegir la forma:** en **Opciones** eliges la forma del dibujo, el modelo (Sonnet por defecto, Haiku más barato) y el idioma (es-CL, es-AR, es-MX, es-ES, en-US).
+- **Ver costos:** pulsa **F3** o el botón de estadísticas.
+- **Demo sin gastar:** abre **http://localhost:5173/** y elige un guion. Atajo: `/?auto=arquitectura&speed=2`.
+- **Moverte:** rueda del mouse = zoom, arrastrar = mover.
 
-## Instrucciones a Claude
+### Sesiones guardadas
 
-Di "Grafito" y después la orden: "Grafito, separa en dos diagramas la opción sin BFF y con BFF". Lo anterior a la palabra se dibuja como contenido; lo posterior se envía como instrucción (modo `instruction`) y no se dibuja como texto. Vale para voz, "Enviar todo" y "Simular dictado". Con la palabra en el búfer, la voz espera 2 s antes de enviar por si el reconocedor parte la orden.
+- Cada sesión se guarda en `pruebas/` (en tu disco, no se sube a git).
+- Al recargar, puedes **Restaurar** la última sesión.
+- **Exportar** baja un `.json` y el tablero como `.svg`. **Importar** carga un `.json`.
+- **Limpiar** empieza una sesión nueva.
 
-En el registro, la fila lleva "🪄 Instrucción" y "✓ aplicada (N cambios)". **↩ Deshacer instrucción** (visible si hay una aplicada y nada en curso) marca la última como deshecha, limpia el tablero y repone las operaciones de las demás filas; el registro y la transcripción no se tocan. Lo deshecho se guarda (`undone`) y no se repone al restaurar.
+## Privacidad
+
+- Tu texto se envía a la API de Anthropic para dibujar.
+- La voz la transcribe el navegador. En Chrome, el audio pasa por el servicio de voz de Google.
+- Las sesiones quedan en tu disco, en `pruebas/`.
+
+## Problemas comunes
+
+| Pasa esto | Haz esto |
+| --- | --- |
+| "Falta la API key en .env" | Revisa que `.env` tenga tu clave real y reinicia `npm run dev`. |
+| El micrófono no arranca | Usa Chrome, entra por `localhost` y revisa el permiso del micrófono. |
+| "El micrófono se activó en otra pestaña" | Solo una pestaña puede escuchar a la vez. Pulsa Hablar en la pestaña que quieras usar. |
+| No reconoce bien lo que digo | Cambia el idioma en Opciones al de tu país. |
+
+## Para desarrolladores
+
+```bash
+npm test           # pruebas (vitest)
+npm run typecheck  # revisa tipos
+npm run build      # compila para producción
+```
+
+**Cómo funciona, en corto:** la voz se vuelve texto en el navegador. El texto va a `POST /api/board` (`server/board.ts`). Claude responde con *operaciones* (crear zona, agregar caja, conectar, etc.) usando herramientas en streaming. El navegador aplica cada operación al tablero y la anima.
+
+| Carpeta | Qué hay |
+| --- | --- |
+| `server/` | Servidor Express. Habla con Claude y guarda sesiones. |
+| `src/board/ops.ts` | El vocabulario de operaciones. Una sola fuente de verdad para cliente y servidor. |
+| `src/board/model.ts`, `layout.ts` | Estado del tablero y cómo se acomoda en pantalla. |
+| `src/board/animator.ts`, `render/` | Animación de trazos, cámara y estilo a mano. |
+| `src/board/live/` | Panel en vivo, streaming, voz (`speech/`) y precios. |
+| `src/board/scripts/` | Guiones de demo. |
+
+La primera versión (con Excalidraw) sigue en `/v1.html` como referencia. Ya no se mantiene.
+
+## Hoja de ruta
+
+- [ ] Reconocimiento de voz en la nube (para Firefox y mejor precisión)
+- [ ] Más formas de dibujo
+- [ ] Versión publicada en la web, sin instalar nada
+
+## Contribuir
+
+¡Bienvenido! Abre un *issue* con lo que encontraste o lo que te gustaría. Si mandas un *pull request*, corre `npm test` y `npm run typecheck` antes.
