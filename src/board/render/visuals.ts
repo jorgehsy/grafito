@@ -7,22 +7,24 @@ import { LABEL_SIZE, labelRect } from "../layout";
 
 const NS = "http://www.w3.org/2000/svg";
 const gen = rough.generator();
+/** Baja el temblor del trazo: multiplica roughness y bowing finales. */
+const ROUGH_SCALE = 0.62;
 
-export const FILLS = ["#ffd8a8", "#a5d8ff", "#b2f2bb", "#eebefa", "#ffec99", "#ffc9c9"];
+export const FILLS = ["#F7D9B8", "#C3DAF2", "#C9E9CF", "#E4CDF0", "#F4E6A8", "#F3C7C7"];
 /** Nombre en español de cada relleno de FILLS (mismo orden); lo usa el tablero serializado. */
 export const FILL_NAMES = ["naranja", "azul", "verde", "morado", "amarillo", "rojo"];
-export const EDGES = ["#e8590c", "#1971c2", "#2f9e44", "#9c36b5", "#f08c00", "#e03131"];
-export const INK = "#2b2f36";
+export const EDGES = ["#C9622A", "#3E5E8C", "#3E8C4F", "#8A4FA8", "#C48A1C", "#C03A3A"];
+export const INK = "#2A2A2E";
 export const RED = "#e03131";
-export const BLUE = "#1864ab";
-export const PAPER = "#fffdf5";
+export const BLUE = "#3E5E8C";
+export const PAPER = "#F5F3EE";
 export const TONES: Record<string, { ink: string; fill: string }> = {
-  neutral: { ink: INK, fill: "#fff3bf" },
+  neutral: { ink: INK, fill: "#F4E6A8" },
   warn: { ink: "#d9730d", fill: "#ffd43b" },
   danger: { ink: RED, fill: "#ffa8a8" },
   ok: { ink: "#2f9e44", fill: "#b2f2bb" },
 };
-export const FONT_FAMILY = "'Kalam', 'Caveat', cursive";
+export const FONT_FAMILY = "'Patrick Hand', 'Kalam', cursive";
 
 export function hash(s: string): number {
   let h = 2166136261;
@@ -82,7 +84,7 @@ class Builder {
     if (!this.defs) { this.defs = el("defs"); this.v.g.appendChild(this.defs); }
     const id = `m${++maskId}`;
     const mask = el("mask", { id, maskUnits: "userSpaceOnUse", x: -20000, y: -20000, width: 40000, height: 40000 });
-    const mp = el("path", { d, fill: "none", stroke: "#fff", "stroke-width": width + 8, "stroke-linecap": "round" });
+    const mp = el("path", { d, fill: "none", stroke: PAPER, "stroke-width": width + 8, "stroke-linecap": "round" });
     mask.appendChild(mp);
     this.defs.appendChild(mask);
     const shown = el("path", { ...base, "stroke-dasharray": "9 7", mask: `url(#${id})` });
@@ -91,6 +93,8 @@ class Builder {
   }
   rough(kind: "rect" | "ellipse" | "poly" | "path" | "line" | "curve", part: string, args: any[], o: Options, style: { stroke: string; width: number; dash?: boolean; fill?: string; fillOpacity?: number }) {
     const opts: Options = { roughness: 1.3, bowing: 1.2, seed: this.seed(part), strokeWidth: style.width, stroke: style.stroke, ...o };
+    opts.roughness = (opts.roughness ?? 1.3) * ROUGH_SCALE;
+    opts.bowing = (opts.bowing ?? 1.2) * ROUGH_SCALE;
     if (style.fill) { opts.fill = style.fill; opts.fillStyle = (o.fillStyle ?? "hachure"); opts.hachureGap = o.hachureGap ?? 9; opts.fillWeight = o.fillWeight ?? 1.6; }
     let d: Drawable;
     switch (kind) {
@@ -111,7 +115,7 @@ class Builder {
         x: cx, y: y0 + i * lh, "text-anchor": o.anchor ?? "middle", "dominant-baseline": "central",
         "font-family": FONT_FAMILY, "font-size": size, "font-weight": o.weight ?? 400, fill: o.fill ?? INK,
       });
-      if (o.halo) { t.setAttribute("stroke", "#fffdf5"); t.setAttribute("stroke-width", "5"); t.setAttribute("paint-order", "stroke"); t.setAttribute("stroke-linejoin", "round"); }
+      if (o.halo) { t.setAttribute("stroke", PAPER); t.setAttribute("stroke-width", "5"); t.setAttribute("paint-order", "stroke"); t.setAttribute("stroke-linejoin", "round"); }
       const chars: SVGTSpanElement[] = [], offsets: number[] = [];
       let off = 0;
       for (const ch of line) {
@@ -160,19 +164,19 @@ export function buildVisual(item: RItem, geom: Geom): Visual {
   const { w, h } = geom;
   const translates = item.kind === "zone" || item.kind === "element" || item.kind === "emphasis" || item.kind === "question";
   const b = new Builder(item.key, translates);
-  const fill = item.hue >= 0 ? FILLS[item.hue] : "#fff3bf";
+  const fill = item.hue >= 0 ? FILLS[item.hue] : "#F4E6A8";
   const edge = item.hue >= 0 ? EDGES[item.hue] : INK;
   const st = { stroke: INK, width: 2.2 };
 
   if (item.kind === "zone") {
     b.rough("rect", "frame", [3, 3, w - 6, h - 6], { roughness: 1.6, fillStyle: "solid" }, { stroke: edge, width: 2.6, fill, fillOpacity: 0.28 });
     const title = item.data.title ?? "";
-    b.text([title], 26, 28, { size: 26, anchor: "start", weight: 700, fill: INK });
+    b.text([title], 26, 28, { size: 26, anchor: "start", weight: 600, fill: INK });
     b.rough("line", "ul", [24, 46, 24 + Math.min(w - 50, title.length * 13.5), 47], { roughness: 1.4 }, { stroke: edge, width: 2.4 });
     if (item.data.divider !== undefined) {
       b.rough("line", "div", [item.data.divider, 62, item.data.divider, h - 20], { roughness: 1.4 }, { stroke: edge, width: 2 });
-      b.text([item.data.leftTitle ?? ""], (26 + item.data.divider) / 2, 84, { size: 22, weight: 700, fill: edge });
-      b.text([item.data.rightTitle ?? ""], (item.data.divider + w - 26) / 2, 84, { size: 22, weight: 700, fill: edge });
+      b.text([item.data.leftTitle ?? ""], (26 + item.data.divider) / 2, 84, { size: 22, weight: 600, fill: edge });
+      b.text([item.data.rightTitle ?? ""], (item.data.divider + w - 26) / 2, 84, { size: 22, weight: 600, fill: edge });
     }
   } else if (item.kind === "element") {
     const lines = item.data.lines ?? [];
@@ -314,7 +318,7 @@ export function buildVisual(item: RItem, geom: Geom): Visual {
     else if (s === "underline") b.rough("curve", "u", [[[0, 5], [w * 0.3, 8], [w * 0.62, 2], [w, 6]]], { roughness: 1.6 }, r);
     else b.rough("poly", "star", [star(w)], { roughness: 1.2, fillStyle: "solid" }, { stroke: RED, width: 2.4, fill: "#ffd43b" });
   } else if (item.kind === "question") {
-    b.rough("ellipse", "q", [w / 2, h / 2, w, w], { fillStyle: "solid", roughness: 1.3 }, { stroke: RED, width: 2.6, fill: "#fff3bf" });
+    b.rough("ellipse", "q", [w / 2, h / 2, w, w], { fillStyle: "solid", roughness: 1.3 }, { stroke: RED, width: 2.6, fill: "#F4E6A8" });
     b.text(["?"], w / 2, h / 2 + 1, { size: 26, weight: 700, fill: RED });
     if (item.data.lines?.length) b.text(item.data.lines, w + 6, h / 2, { size: 21, anchor: "start", fill: RED });
   } else if (item.kind === "callout") {

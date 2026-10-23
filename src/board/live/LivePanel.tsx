@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { IconBars, IconClose, IconDoc, IconExport, IconGear, IconImport, IconMic, IconStop, IconUndo, IconWand, IconWave } from "../ui/icons";
 import type { BoardController } from "../controller";
 import type { Subtitle } from "../player";
 import { SCRIPTS } from "../scripts";
@@ -36,9 +37,27 @@ interface Props {
   getCtrl(): BoardController | null;
   onSubtitle(s: Subtitle): void;
   onClear(): void;
+  /** Modo "Claude en vivo": los controles de voz, importar, exportar y opciones solo funcionan aquí. */
+  active: boolean;
+  onMode(m: "script" | "claude"): void;
+  modeLocked: boolean;
+  follow: boolean;
+  onFollow(v: boolean): void;
+  summary: string;
+  warnings: string[];
 }
 
-export function LivePanel({ getCtrl, onSubtitle, onClear }: Props) {
+const hhmm = (t: number) => new Date(t).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", hour12: false });
+const readStats = () => { try { return localStorage.getItem("grafito.stats") !== "0"; } catch { return true; } };
+
+export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLocked, follow, onFollow, summary, warnings }: Props) {
+  const [statsOpen, setStatsOpen] = useState(readStats);
+  const [optsOpen, setOptsOpen] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const optsRef = useRef<HTMLDivElement>(null);
+  const gearRef = useRef<HTMLButtonElement>(null);
   const [text, setText] = useState("");
   const [model, setModel] = useState(MODEL_OPTIONS[0]);
   const [interval, setIntervalMs] = useState(1500);
@@ -83,6 +102,7 @@ export function LivePanel({ getCtrl, onSubtitle, onClear }: Props) {
     saveLocal(rec);
     const err = await postRecord(rec);
     setSaveWarn(err ? `No se pudo guardar en pruebas/ (${err}); queda copia en el navegador.` : "");
+    if (!err) setSavedAt(Date.now());
   };
   const saveRef = useRef(saveNow);
   saveRef.current = saveNow;
@@ -148,7 +168,7 @@ export function LivePanel({ getCtrl, onSubtitle, onClear }: Props) {
   toggleMicRef.current = toggleMic;
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.code !== "Space" || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!activeRef.current || e.code !== "Space" || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(el.tagName))) return;
       e.preventDefault();
@@ -157,6 +177,27 @@ export function LivePanel({ getCtrl, onSubtitle, onClear }: Props) {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, []);
+
+  useEffect(() => { try { localStorage.setItem("grafito.stats", statsOpen ? "1" : "0"); } catch { /* sin almacenamiento */ } }, [statsOpen]);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "F3") { e.preventDefault(); setStatsOpen((v) => !v); } };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+  useEffect(() => {
+    if (!optsOpen) return;
+    const down = (e: MouseEvent) => {
+      const n = e.target as Node;
+      if (optsRef.current?.contains(n) || gearRef.current?.contains(n)) return;
+      setOptsOpen(false);
+    };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { setOptsOpen(false); gearRef.current?.focus(); } };
+    document.addEventListener("mousedown", down);
+    document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("mousedown", down); document.removeEventListener("keydown", key); };
+  }, [optsOpen]);
+
+  useEffect(() => { if (!active && speech.current) toggleMicRef.current(); }, [active]);
 
   const sendAll = () => { if (text.trim()) onFinalText(text.trim()); };
   const simulate = () => {
@@ -223,90 +264,124 @@ export function LivePanel({ getCtrl, onSubtitle, onClear }: Props) {
   const listening = mic.state === "listening";
   const micLabel = mic.state === "listening" ? "Escuchando…" : mic.state === "restarting" ? "Reconectando…" : mic.state === "error" ? (mic.detail ?? "Error") : "";
 
+  const lang_label = SPEECH_LANGS.find((l) => l.code === lang)?.label ?? lang;
+
   return (
     <div className="live" data-testid="live-panel">
-      <label className="field">
-        Modelo
-        <select value={model} onChange={(e) => setModel(e.target.value)}>
-          {MODEL_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
-      </label>
-      <label className="field">
-        Forma del dibujo
-        <select data-testid="shape" value={shape} onChange={(e) => setShape(e.target.value)}>
-          {SHAPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </label>
-      <div className="voice" data-testid="voice">
-        <div className="row wrap">
-          <button className={"primary micbtn" + (micOn ? " on" : "")} data-testid="mic" onClick={toggleMic}>
-            {micOn ? "⏹ Detener" : "🎙️ Hablar"}
-          </button>
-          <select aria-label="Idioma" value={lang} disabled={micOn} onChange={(e) => setLang(e.target.value)}>
-            {SPEECH_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
-          </select>
-        </div>
-        <div className={"micstate" + (mic.state === "error" ? " err" : "")} data-testid="mic-state">
-          {listening && <span className="dot" />}{micLabel || "Pulsa Hablar o la barra espaciadora."}
-          {mic.state === "restarting" && mic.detail ? ` (${mic.detail})` : ""}
-        </div>
-      </div>
-      <label className="field">
-        Usar texto de un guion
-        <select value="" onChange={(e) => { if (e.target.value) setText(scriptText(e.target.value)); }}>
-          <option value="">— elegir —</option>
-          {SCRIPTS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-      </label>
-      <textarea data-testid="live-text" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe o pega aquí lo que se va a dictar…" />
-      <div className="row wrap">
-        <button className="primary" onClick={sendAll} disabled={!text.trim()}>Enviar todo</button>
-        <button onClick={simulate} disabled={!text.trim() || dictating}>Simular dictado</button>
-        <button onClick={stop} disabled={!dictating && !busy}>Detener</button>
-        {canUndo && <button onClick={undo} data-testid="undo">↩ Deshacer instrucción</button>}
-        <button onClick={clear}>Limpiar</button>
-        <button onClick={exportAll} disabled={!entries.length} data-testid="export">Exportar</button>
-        <button onClick={() => fileIn.current?.click()} data-testid="import">Importar</button>
+      <nav className="toolbar" aria-label="Controles">
+        <button className={"tb" + (micOn ? " on" : "")} data-testid="mic" aria-pressed={micOn} aria-label={micOn ? "Detener" : "Hablar"} title={micOn ? "Detener (barra espaciadora)" : "Hablar (barra espaciadora)"} disabled={!active} onClick={toggleMic}>
+          {micOn ? <IconStop /> : <IconMic />}
+        </button>
+        <button className="tb" data-testid="import" aria-label="Importar" title="Importar sesión" disabled={!active} onClick={() => fileIn.current?.click()}><IconImport /></button>
         <input ref={fileIn} type="file" accept="application/json,.json" hidden onChange={(e) => void importFile(e.target.files?.[0])} />
-      </div>
-      {pending && (
-        <div className="restore" data-testid="restore-banner">
-          Hay una prueba sin cerrar ({pending.requests.length} peticiones, {fmtUsd(pending.totals?.costUsd ?? 0)}) —{" "}
-          <button onClick={() => restore(pending)}>Restaurar</button> <button onClick={() => { clearLocal(); setPending(null); }}>Descartar</button>
-        </div>
-      )}
-      {saveWarn && <div className="warn savewarn" data-testid="save-warn">⚠ {saveWarn}</div>}
-      <label className="field">
-        Intervalo de dictado: {interval} ms
-        <input type="range" min={500} max={4000} step={100} value={interval} onChange={(e) => setIntervalMs(Number(e.target.value))} />
-      </label>
+        <hr />
+        <button className={"tb mode" + (active ? " sel" : "")} aria-pressed={active} aria-label="Modo Claude en vivo" title="Claude en vivo" disabled={modeLocked} onClick={() => onMode("claude")}><IconWave /></button>
+        <button className={"tb mode" + (!active ? " sel" : "")} aria-pressed={!active} aria-label="Modo Guion" title="Guion (sin Claude)" disabled={modeLocked} onClick={() => onMode("script")}><IconDoc /></button>
+        <hr />
+        <button className="tb" data-testid="undo" aria-label="Deshacer instrucción" title="Deshacer instrucción" disabled={!canUndo} onClick={undo}><IconUndo /></button>
+        <button className="tb" data-testid="export" aria-label="Exportar" title="Exportar JSON y SVG" disabled={!entries.length} onClick={exportAll}><IconExport /></button>
+        <hr />
+        <button ref={gearRef} className={"tb" + (optsOpen ? " on" : "")} aria-pressed={optsOpen} aria-expanded={optsOpen} aria-label="Opciones" title="Opciones" onClick={() => setOptsOpen((v) => !v)}><IconGear /></button>
+        <button className={"tb" + (statsOpen ? " on" : "")} aria-pressed={statsOpen} aria-label="Estadísticas" title="Estadísticas (F3)" onClick={() => setStatsOpen((v) => !v)}><IconBars /></button>
+      </nav>
 
-      <div className="meter" data-testid="meter">
-        <div>
-          <b>Petición{busy ? " (en curso)" : ""}</b>
-          {cur ? (
-            <> · entrada {tok(cur.usage.input_tokens)} · caché leída {tok(cur.usage.cache_read_input_tokens)} · caché escrita {tok(cur.usage.cache_creation_input_tokens)} · salida {cur.usageEstimated ? "≈" : ""}{tok(cur.usage.output_tokens)} · <b>{cur.usageEstimated ? "≈" : ""}{fmtUsd(cur.costUsd)}</b></>
-          ) : " · —"}
-        </div>
-        <div>
-          <b>Sesión</b> · {totals.requests} petición(es) · entrada {tok(tu.input_tokens)} · caché {tok(tu.cache_read_input_tokens)}/{tok(tu.cache_creation_input_tokens)} · salida {tok(tu.output_tokens)} · <b>{fmtUsd(totals.costUsd)}</b> · media {fmtUsd(avg)}/petición
-        </div>
-        <div data-testid="voice-latency"><b>voz→1.ª figura</b> · mediana {voiceMed === null ? "—" : voiceMed + " ms"}</div>
-      </div>
-
-      <div className="log" data-testid="live-log">
-        {entries.slice().reverse().map((e) => (
-          <div key={e.id} className={"logrow" + (e.error ? " err" : "")}>
-            <div><b>#{e.id}</b> {e.mode === "instruction" && <span className="tag">🪄 Instrucción</span>} {e.model.replace("claude-", "")} · “{e.delta.length > 60 ? e.delta.slice(0, 60) + "…" : e.delta}”</div>
-            <div>
-              1.ª op {e.firstOpMs ?? "—"} ms · voz→1.ª figura {e.voiceFirstMs ?? "—"} ms · total {e.totalMs ?? "…"} ms · {e.ops} ops · in {e.usage.input_tokens} / caché {e.usage.cache_read_input_tokens} / out {e.usageEstimated ? "≈" : ""}{e.usage.output_tokens} · {fmtUsd(e.costUsd)}
-            </div>
-            {e.mode === "instruction" && (e.undone ? <div>↩ deshecha</div> : e.done && !e.error && <div>✓ aplicada ({e.ops} cambios)</div>)}
-            {e.warnings.map((w, i) => <div key={i} className="warn">⚠ {w}</div>)}
-            {e.error && <div className="warn">✖ {e.error}</div>}
+      <div className="popover" ref={optsRef} role="dialog" aria-label="Opciones" hidden={!optsOpen}>
+        <label className="field">
+          Modelo
+          <select value={model} onChange={(e) => setModel(e.target.value)}>
+            {MODEL_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          Forma del dibujo
+          <select data-testid="shape" value={shape} onChange={(e) => setShape(e.target.value)}>
+            {SHAPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+        <div className="voice" data-testid="voice">
+          <label className="field">
+            Idioma
+            <select value={lang} disabled={micOn} onChange={(e) => setLang(e.target.value)}>
+              {SPEECH_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+            </select>
+          </label>
+          <div className={"micstate" + (mic.state === "error" ? " err" : "")} data-testid="mic-state" role="status">
+            {listening && <span className="dot" />}{micLabel || "Pulsa Hablar o la barra espaciadora."}
+            {mic.state === "restarting" && mic.detail ? ` (${mic.detail})` : ""}
           </div>
-        ))}
+        </div>
+        <label className="field">
+          Usar texto de un guion
+          <select value="" onChange={(e) => { if (e.target.value) setText(scriptText(e.target.value)); }}>
+            <option value="">— elegir —</option>
+            {SCRIPTS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </label>
+        <textarea data-testid="live-text" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe o pega aquí lo que se va a dictar…" />
+        <div className="row wrap">
+          <button className="pbtn primary" onClick={sendAll} disabled={!active || !text.trim()}>Enviar todo</button>
+          <button className="pbtn" onClick={simulate} disabled={!active || !text.trim() || dictating}>Simular dictado</button>
+          <button className="pbtn" onClick={stop} disabled={!dictating && !busy}>Detener</button>
+          <button className="pbtn" onClick={clear} disabled={!active}>Limpiar</button>
+        </div>
+        <label className="field">
+          Intervalo de dictado: {interval} ms
+          <input type="range" min={500} max={4000} step={100} value={interval} onChange={(e) => setIntervalMs(Number(e.target.value))} />
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} /> Seguir cámara
+        </label>
       </div>
+
+      <div className="toasts">
+        {active && pending && (
+          <div className="toast" data-testid="restore-banner">
+            Hay una prueba sin cerrar ({pending.requests.length} peticiones, {fmtUsd(pending.totals?.costUsd ?? 0)})
+            <button className="pbtn" onClick={() => restore(pending)}>Restaurar</button>
+            <button className="pbtn" onClick={() => { clearLocal(); setPending(null); }}>Descartar</button>
+          </div>
+        )}
+        {saveWarn && <div className="toast warn" data-testid="save-warn" role="alert">{saveWarn}</div>}
+      </div>
+
+      {statsOpen && (
+        <aside className="stats" aria-label="Estadísticas">
+          <header>
+            <span className="ttl">ESTADÍSTICAS</span>
+            <kbd>F3</kbd>
+            <button className="x" aria-label="Cerrar estadísticas" title="Cerrar" onClick={() => setStatsOpen(false)}><IconClose /></button>
+          </header>
+          <div className="grid" data-testid="meter">
+            <div><span>Modelo</span><b>{model.replace("claude-", "")}</b></div>
+            <div><span>Voz → 1.ª figura</span><b className="acc" data-testid="voice-latency">{voiceMed === null ? "—" : voiceMed + " ms"}</b></div>
+            <div><span>Tokens petición{busy ? " (en curso)" : ""}</span><b>{cur ? <>{tok(cur.usage.input_tokens)} in · {cur.usageEstimated ? "≈" : ""}{tok(cur.usage.output_tokens)} out</> : "—"}</b></div>
+            <div><span>Tokens sesión</span><b>{tok(tu.input_tokens)} in · {tok(tu.output_tokens)} out</b></div>
+            <div><span>Caché leída / escrita</span><b>{tok(tu.cache_read_input_tokens)} / {tok(tu.cache_creation_input_tokens)}</b></div>
+            <div><span>Costo</span><b>{cur ? (cur.usageEstimated ? "≈" : "") + fmtUsd(cur.costUsd) : "—"} · {fmtUsd(totals.costUsd)} · {fmtUsd(avg)}/pet.</b></div>
+          </div>
+          <div className="log" data-testid="live-log">
+            {entries.slice().reverse().map((e) => (
+              <div key={e.id} className={"logrow" + (e.error ? " err" : "")}>
+                <div>
+                  <time>{hhmm(e.startedAt)}</time> <b>#{e.id}</b>{" "}
+                  {e.mode === "instruction" && <span className="tag"><IconWand /> instrucción:</span>}{" "}
+                  {e.model.replace("claude-", "")} · “{e.delta.length > 60 ? e.delta.slice(0, 60) + "…" : e.delta}”
+                </div>
+                <div className="dim">
+                  1.ª op {e.firstOpMs ?? "—"} ms · voz→1.ª figura {e.voiceFirstMs ?? "—"} ms · total {e.totalMs ?? "…"} ms · {e.ops} ops · in {e.usage.input_tokens} / caché {e.usage.cache_read_input_tokens} / out {e.usageEstimated ? "≈" : ""}{e.usage.output_tokens} · {fmtUsd(e.costUsd)}
+                </div>
+                {e.mode === "instruction" && (e.undone ? <div className="dim">deshecha</div> : e.done && !e.error && <div className="dim">aplicada ({e.ops} cambios)</div>)}
+                {e.warnings.map((w, i) => <div key={i} className="lwarn">{w}</div>)}
+                {e.error && <div className="lwarn">{e.error}</div>}
+              </div>
+            ))}
+          </div>
+          {summary && <div className="sum"><b>Resumen:</b> {summary}</div>}
+          {warnings.length > 0 && <div className="warns">{warnings.map((w, i) => <div key={i}>{w}</div>)}</div>}
+        </aside>
+      )}
+
+      <div className="corner">{lang_label}{savedAt ? ` · guardado ${hhmm(savedAt)}` : ""}</div>
     </div>
   );
 }

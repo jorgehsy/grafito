@@ -39,23 +39,23 @@ export interface ScaleGeom { bar: Rect; x0: number; w: number; h: number }
 export interface MarkGeom { side: "above" | "below"; stem: Pt[] }
 
 export const FONT = 20;
-export const CHAR_W = 10.6;
+export const CHAR_W = 10.1;
 export const LINE_H = 24;
 export const HEADER = 50;
 export const PAD = 26;
 export const ZONE_GAP = 150;
 export const LABEL_SIZE = 21;
-const LABEL_CW = 10.8;
+const LABEL_CW = 10.3;
 const CALLOUT_SIZE = 24;
-const CALLOUT_CW = 12.8;
+const CALLOUT_CW = 12.2;
 const CALLOUT_LH = 29;
 const ROW_MAX = 2300;
 const COMPARE_TITLE_H = 40;
 export const SCALE_W = 720;
 export const SCALE_BAR_H = 34;
 export const SCALE_STEM = 34;
-const MARK_LABEL_CW = 11.6;
-const MARK_NOTE_CW = 9.6;
+const MARK_LABEL_CW = 11.0;
+const MARK_NOTE_CW = 9.1;
 const MARK_LABEL_LH = 27;
 const MARK_NOTE_LH = 22;
 const MARK_GAP = 14;

@@ -5,6 +5,7 @@ import type { Subtitle } from "./player";
 import { SCRIPTS } from "./scripts";
 import { Engine } from "./render/engine";
 import { LivePanel } from "./live/LivePanel";
+import { IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
 
 type Status = "idle" | "playing" | "paused" | "done";
 
@@ -55,7 +56,6 @@ export function BoardApp() {
   }, []);
 
   useEffect(() => { speedRef.current = speed; if (engine.current) engine.current.userSpeed = speed; }, [speed]);
-  useEffect(() => { subRef.current?.scrollTo({ top: subRef.current.scrollHeight, behavior: "smooth" }); }, [sub]);
 
   const resetAll = useCallback(() => {
     ctrl.current?.reset();
@@ -92,55 +92,69 @@ export function BoardApp() {
   const restart = () => { resetAll(); setStatus("idle"); };
   const toggleFollow = (v: boolean) => { engine.current?.setFollow(v); setFollow(v); };
 
+  const locked = st === "playing" || st === "paused";
+  const changeMode = (m: "script" | "claude") => { if (m === mode) return; resetAll(); setStatus("idle"); setMode(m); };
+  const scriptName = SCRIPTS.find((x) => x.id === scriptId)?.name ?? "";
+  const queued = backlog.pending;
+
   return (
     <div className="v2">
       <div className="canvas2">
         <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" />
         {st === "idle" && mode === "script" && <div className="hint">Elige un guion y pulsa Play para ver el tablero dibujarse mientras se "dicta".</div>}
       </div>
-      <aside className="side">
-        <h1>grafito <small>v2 · {mode === "claude" ? "Claude en vivo" : "maqueta sin Claude"}</small></h1>
-        <div className="row modes">
-          <button className={mode === "script" ? "primary" : ""} disabled={st === "playing" || st === "paused"} onClick={() => { resetAll(); setStatus("idle"); setMode("script"); }}>Guion (sin Claude)</button>
-          <button className={mode === "claude" ? "primary" : ""} disabled={st === "playing" || st === "paused"} onClick={() => { resetAll(); setStatus("idle"); setMode("claude"); }}>Claude en vivo</button>
-        </div>
-        {mode === "script" ? (
-          <>
-        <label className="field">
-          Guion
-          <select value={scriptId} disabled={st === "playing" || st === "paused"} onChange={(e) => setScriptId(e.target.value)}>
+
+      <header className="brand">
+        <Logo />
+        <span className="word">grafito</span>
+        <span className="board">{mode === "claude" ? "Claude en vivo" : scriptName}</span>
+      </header>
+
+      <LivePanel
+        getCtrl={() => ctrl.current}
+        onSubtitle={setSub}
+        onClear={() => { resetAll(); }}
+        active={mode === "claude"}
+        onMode={changeMode}
+        modeLocked={locked}
+        follow={follow}
+        onFollow={toggleFollow}
+        summary={summary}
+        warnings={warnings}
+      />
+
+      {mode === "script" && (
+        <div className="scriptbar" role="group" aria-label="Guion">
+          <select aria-label="Guion" value={scriptId} disabled={locked} onChange={(e) => setScriptId(e.target.value)}>
             {SCRIPTS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-        </label>
-        <div className="row">
-          <button className="primary" onClick={play} disabled={st === "playing"}>{st === "paused" ? "Seguir" : "Play"}</button>
-          <button onClick={pause} disabled={st !== "playing"}>Pausa</button>
-          <button onClick={restart}>Reiniciar</button>
+          {st === "playing" ? (
+            <button className="tb sm" aria-label="Pausa" title="Pausa" onClick={pause}><IconPause /></button>
+          ) : (
+            <button className="tb sm on" aria-label={st === "paused" ? "Seguir" : "Play"} title={st === "paused" ? "Seguir" : "Play"} onClick={play}><IconPlay /></button>
+          )}
+          <button className="tb sm" aria-label="Reiniciar" title="Reiniciar" onClick={restart}><IconRestart /></button>
+          <label className="spd">
+            {speed}x
+            <input type="range" aria-label="Velocidad" min={0.5} max={2} step={0.25} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
+          </label>
         </div>
-        <label className="field">
-          Velocidad: {speed}x
-          <input type="range" min={0.5} max={2} step={0.25} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
-        </label>
-          </>
-        ) : (
-          <LivePanel getCtrl={() => ctrl.current} onSubtitle={setSub} onClear={() => { resetAll(); }} />
-        )}
-        <label className="check">
-          <input type="checkbox" checked={follow} onChange={(e) => toggleFollow(e.target.checked)} /> Seguir cámara
-        </label>
-        <div className="backlog" data-testid="backlog">
-          Cola de dibujo: <b>{backlog.pending}</b> pendiente{backlog.pending === 1 ? "" : "s"}
-          {" · "}{Number.isFinite(backlog.speed) ? `${backlog.speed.toFixed(1)}x` : "al instante"}
-          <div className="bar"><div style={{ width: `${Math.min(100, (backlog.pending / 12) * 100)}%` }} /></div>
+      )}
+
+      <div className="subtitles" data-testid="subtitles" role="status" ref={subRef}>
+        <span className="wv"><IconWave /></span>
+        <div className="txt">
+          {!sub.spoken.length && !sub.current ? (
+            <p className="old">Aquí aparecerá lo que se va diciendo.</p>
+          ) : (
+            <>
+              {sub.spoken.slice(-1).map((t, i) => (sub.current ? <p key={i} className="old">{t}</p> : <p key={i} className="now">{t}</p>))}
+              {sub.current && <p className={sub.interim ? "now interim" : "now"}>{sub.current}</p>}
+            </>
+          )}
+          <div className="backlog" data-testid="backlog">{queued} {queued === 1 ? "frase" : "frases"} en cola</div>
         </div>
-        <div className="subs" ref={subRef} data-testid="subtitles">
-          {sub.spoken.map((t, i) => <p key={i} className="old">{t}</p>)}
-          {sub.current && <p className={sub.interim ? "now interim" : "now"}>{sub.current}</p>}
-          {!sub.spoken.length && !sub.current && <p className="old">Aquí aparecerá lo que se va diciendo.</p>}
-        </div>
-        {summary && <div className="summary"><b>Resumen:</b> {summary}</div>}
-        {warnings.length > 0 && <div className="warns">{warnings.map((w, i) => <div key={i}>{w}</div>)}</div>}
-      </aside>
+      </div>
     </div>
   );
 }
