@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "id": "mvkul0llezoo",
+  "startedAt": 1792752555081,
+  "updatedAt": 1792752565010,
+  "model": "claude-sonnet-5-5",
+  "shape": "auto",
+  "lang": "es-CL",
+  "requests": [
+    {
+      "n": 1,
+      "model": "claude-sonnet-5-5",
+      "text": "vamos a ir a la escuela",
+      "mode": "content",
+      "startedAt": 1792752562994,
+      "firstOpMs": 1704,
+      "voiceFirstMs": 2517,
+      "totalMs": 1704,
+      "ops": [
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "El hablante empieza diciendo que van a ir a la escuela; aún no hay proceso ni arquitectura que dibujar."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 150,
+        "cacheRead": 10062,
+        "cacheWrite": 0,
+        "output": 90
+      },
+      "costUsd": 0.0032124000000000002
+    }
+  ],
+  "transcript": [
+    {
+      "text": "vamos a ir a la escuela",
+      "at": 1792752562188
+    }
+  ],
+  "summary": "El hablante empieza diciendo que van a ir a la escuela; aún no hay proceso ni arquitectura que dibujar.",
+  "totals": {
+    "requests": 1,
+    "costUsd": 0.0032124000000000002,
+    "medianVoiceFirstMs": 2517
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "id": "mvk9lzq8yofp",
+  "startedAt": 1792717328672,
+  "updatedAt": 1792752319012,
+  "model": "claude-sonnet-5-5",
+  "shape": "auto",
+  "lang": "es-CL",
+  "requests": [
+    {
+      "n": 1,
+      "model": "claude-sonnet-5-5",
+      "text": "ven",
+      "mode": "content",
+      "startedAt": 1792718455792,
+      "firstOpMs": 1667,
+      "voiceFirstMs": 2988,
+      "totalMs": 1669,
+      "ops": [
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Aún no se ha dicho nada relevante."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 141,
+        "cacheRead": 0,
+        "cacheWrite": 10062,
+        "output": 63
+      },
+      "costUsd": 0.026067
+    },
+    {
+      "n": 2,
+      "model": "claude-sonnet-5-5",
+      "text": "coño",
+      "mode": "content",
+      "startedAt": 1792752317010,
+      "firstOpMs": 1651,
+      "voiceFirstMs": 3252,
+      "totalMs": 1652,
+      "ops": [
+        {
+          "name": "update_summary",
+          "input": {
+            "text": "Aún no se ha dicho nada relevante."
+          }
+        }
+      ],
+      "invalid": [],
+      "usage": {
+        "input": 152,
+        "cacheRead": 0,
+        "cacheWrite": 10062,
+        "output": 63
+      },
+      "costUsd": 0.026089
+    }
+  ],
+  "transcript": [
+    {
+      "text": "ven",
+      "at": 1792718454516
+    },
+    {
+      "text": "coño",
+      "at": 1792752315424
+    }
+  ],
+  "summary": "Aún no se ha dicho nada relevante.",
+  "totals": {
+    "requests": 2,
+    "costUsd": 0.052156,
+    "medianVoiceFirstMs": 3120
+  }
+}

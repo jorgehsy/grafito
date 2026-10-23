@@ -342,6 +342,8 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
           </div>
         )}
         {saveWarn && <div className="toast warn" data-testid="save-warn" role="alert">{saveWarn}</div>}
+        {mic.state === "error" && <div className="toast warn" data-testid="mic-error" role="alert">{mic.detail ?? "Error de voz"}</div>}
+        {mic.state === "restarting" && <div className="toast" role="status">Reconectando el micrófono…{mic.detail ? ` (${mic.detail})` : ""}</div>}
       </div>
 
       {statsOpen && (
@@ -381,7 +383,7 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
         </aside>
       )}
 
-      <div className="corner">{lang_label}{savedAt ? ` · guardado ${hhmm(savedAt)}` : ""}</div>
+      <div className="corner">{listening && <span className="dot" />}{listening ? "Escuchando · " : ""}{lang_label}{savedAt ? ` · guardado ${hhmm(savedAt)}` : ""}</div>
     </div>
   );
 }

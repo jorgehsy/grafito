@@ -89,7 +89,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .spd { display: flex; align-items: center; gap: 6px; color: var(--humo); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 .spd input { width: 80px; }
 
-.corner { position: fixed; right: 20px; bottom: 12px; font-size: 12px; color: var(--humo); z-index: 4; }
+.corner { position: fixed; right: 20px; bottom: 12px; font-size: 12px; color: var(--humo); z-index: 4; display: flex; align-items: center; gap: 6px; }
 
 @media (max-width: 1100px) {
   .subtitles { width: min(760px, calc(100% - 140px)); left: calc(50% + 40px); bottom: 84px; }

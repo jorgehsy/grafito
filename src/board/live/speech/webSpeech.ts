@@ -34,7 +34,8 @@ export class WebSpeechSource implements SpeechSource {
   private watchdog: ReturnType<typeof setTimeout> | undefined;
   private lastError = "";
 
-  constructor(lang = "es-CL", private ctor: any = getRecognitionCtor(), private setT: typeof setTimeout = setTimeout, private clearT: (t: any) => void = clearTimeout) {
+  // setTimeout/clearTimeout van envueltos: llamados como this.setT(...) con `this` = la clase, Chrome lanza "Illegal invocation"
+  constructor(lang = "es-CL", private ctor: any = getRecognitionCtor(), private setT: typeof setTimeout = ((f: any, ms?: number) => setTimeout(f, ms)) as typeof setTimeout, private clearT: (t: any) => void = (t) => clearTimeout(t)) {
     this.lang = lang;
   }
 
