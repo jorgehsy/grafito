@@ -250,6 +250,8 @@ interface ZoneLocal {
   marks?: Record<string, MarkGeom>;
   spans?: Record<string, SpanGeom>;
   labels?: Record<string, Rect>;
+  /** flow/system: dirección que usó ELK */
+  dir?: "RIGHT" | "DOWN";
 }
 
 const elk = new ELK();
@@ -263,14 +265,14 @@ function longestSegmentMid(pts: Pt[]): Pt {
   return mid;
 }
 
-async function layoutElk(zone: Zone, els: El[], conns: Conn[], extraObs: Rect[]): Promise<ZoneLocal> {
+async function layoutElk(zone: Zone, els: El[], conns: Conn[], extraObs: Rect[], dir: "RIGHT" | "DOWN" = "RIGHT"): Promise<ZoneLocal> {
   const sizes = Object.fromEntries(els.map((e) => [e.id, elSize(e)]));
   const hasLabels = conns.some((c) => c.label);
   const graph = {
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
-      "elk.direction": "RIGHT",
+      "elk.direction": dir,
       "elk.edgeRouting": "ORTHOGONAL",
       "elk.spacing.nodeNode": "46",
       "elk.layered.spacing.nodeNodeBetweenLayers": hasLabels ? "120" : "70",
@@ -282,26 +284,39 @@ async function layoutElk(zone: Zone, els: El[], conns: Conn[], extraObs: Rect[])
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
       "elk.separateConnectedComponents": "true",
       "elk.spacing.componentComponent": "50",
+      // ELK reserva hueco para cada etiqueta: así no caen encima de las cajas
+      "elk.edgeLabels.placement": "CENTER",
+      "elk.spacing.edgeLabel": "6",
     },
     children: els.map((e) => ({ id: e.id, width: sizes[e.id].w, height: sizes[e.id].h })),
-    edges: conns.map((c) => ({ id: c.id, sources: [c.from], targets: [c.to] })),
+    edges: conns.map((c) => {
+      if (!c.label) return { id: c.id, sources: [c.from], targets: [c.to] };
+      const r = labelRect({ x: 0, y: 0, text: c.label });
+      return { id: c.id, sources: [c.from], targets: [c.to], labels: [{ id: `${c.id}:l`, text: c.label, width: r.w, height: r.h }] };
+    }),
   };
   const res: any = await elk.layout(graph as any);
-  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {} };
+  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {}, dir };
   for (const ch of res.children) out.els[ch.id] = { x: ch.x, y: ch.y, w: ch.width, h: ch.height };
   for (const e of res.edges ?? []) {
     const s = e.sections?.[0];
     if (!s) continue;
     const pts: Pt[] = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint].map((p: Pt) => ({ x: p.x, y: p.y }));
-    const c = conns.find((x) => x.id === e.id)!;
     out.edges[e.id] = { kind: "poly", pts };
+  }
+  const elkLabel = new Map<string, Pt>();
+  for (const e of res.edges ?? []) {
+    const l = e.labels?.[0];
+    if (l && l.x !== undefined) elkLabel.set(e.id, { x: l.x + l.width / 2, y: l.y + l.height / 2 });
   }
   const obs = [...Object.values(out.els), ...extraObs.map((r) => ({ ...r }))];
   const taken: Rect[] = [];
+  const free = (r: Rect) => !obs.some((o) => overlaps(r, o, 2)) && !taken.some((o) => overlaps(r, o, 4));
   for (const c of conns) {
     const g = out.edges[c.id];
     if (!g || !c.label) continue;
-    const m = placeLabel(g, c.label, obs, taken);
+    const at = elkLabel.get(c.id);
+    const m = at && free(labelRect({ ...at, text: c.label })) ? at : placeLabel(g, c.label, obs, taken);
     g.label = { x: m.x, y: m.y, text: c.label };
     taken.push(labelRect(g.label));
   }
@@ -640,11 +655,32 @@ function layoutStack(zone: Zone, els: El[]): ZoneLocal {
 }
 
 /** El círculo de énfasis depende de la posición final: se calcula con un primer pase de ELK. */
+/** Proporción ancho/alto a la que apuntamos: la de una pantalla apaisada. */
+const TARGET_ASPECT = 1.6;
+/** Por debajo de este ancho, izquierda→derecha siempre vale (se lee mejor). */
+const MAX_RIGHT_W = 1000;
+function contentBox(z: ZoneLocal): Rect {
+  return union([...Object.values(z.els), ...Object.values(z.edges).flatMap((g) => (g.label ? [labelRect(g.label)] : []))]);
+}
+const aspectMiss = (r: Rect) => Math.abs(Math.log(r.w / Math.max(1, r.h) / TARGET_ASPECT));
+
+/** Izquierda→derecha salvo que quede demasiado ancho y de arriba→abajo aproveche mejor el alto disponible. */
+async function layoutElkBest(zone: Zone, els: El[], conns: Conn[], extraObs: Rect[], dir?: "RIGHT" | "DOWN"): Promise<ZoneLocal> {
+  if (dir) return layoutElk(zone, els, conns, extraObs, dir);
+  const right = await layoutElk(zone, els, conns, extraObs, "RIGHT");
+  const rb = contentBox(right);
+  if (rb.w <= MAX_RIGHT_W) return right;
+  const down = await layoutElk(zone, els, conns, extraObs, "DOWN");
+  return aspectMiss(contentBox(down)) < aspectMiss(rb) ? down : right;
+}
+
 async function layoutElkWithEmph(zone: Zone, els: El[], conns: Conn[], circled: string[]): Promise<ZoneLocal> {
-  const first = await layoutElk(zone, els, conns, []);
+  const first = await layoutElkBest(zone, els, conns, []);
   if (!circled.length) return first;
   const extra = circled.flatMap((id) => (first.els[id] ? [emphRect(first.els[id])] : []));
-  return layoutElk(zone, els, conns, extra);
+  // misma dirección que la primera pasada, para que el hueco del énfasis caiga donde corresponde
+  const dir = first.dir;
+  return layoutElkBest(zone, els, conns, extra, dir);
 }
 
 const cache = new Map<string, ZoneLocal>();

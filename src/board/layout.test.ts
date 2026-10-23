@@ -194,3 +194,29 @@ describe("scale", () => {
     expect(b.map.get("m0")!.sig).toBe(a.map.get("m0")!.sig);
   });
 });
+
+describe("etiquetas de arista en flujos con textos largos", () => {
+  // Sesión real (auth con BFF): las etiquetas eran más anchas que el hueco entre capas y caían sobre las cajas.
+  const board = finalBoard([
+  op.create_zone({"id":"auth_bff","kind":"system","title":"Autenticación con BFF"}),
+  op.add_component({"zone":"auth_bff","id":"bff","label":"BFF (Backend for Frontend)","type":"service"}),
+  op.add_component({"zone":"auth_bff","id":"usuario","label":"Usuario","type":"actor"}),
+  op.add_component({"zone":"auth_bff","id":"sitio","label":"Sitio público","type":"client"}),
+  op.connect({"id":"c_usuario_sitio","from":"usuario","to":"sitio","label":"click en login"}),
+  op.add_component({"zone":"auth_bff","id":"cognito","label":"Cognito","type":"external"}),
+  op.connect({"id":"c_sitio_cognito","from":"sitio","to":"cognito","label":"petición de login"}),
+  op.connect({"id":"c_usuario_cognito","from":"usuario","to":"cognito","label":"ingresa credenciales"}),
+  op.connect({"id":"c_cognito_sitio","from":"cognito","to":"sitio","label":"retorna con código"}),
+  op.connect({"id":"c_sitio_bff","from":"sitio","to":"bff","label":"envía token para cambiarlo por cookies"}),
+  ]);
+
+  it("ninguna etiqueta pisa una caja ni otra etiqueta", async () => {
+    const lay = await computeLayout(board);
+    const labels = Object.entries(lay.edges).flatMap(([id, g]) => (g.label ? [[id, labelRect(g.label)] as [string, Rect]] : []));
+    expect(labels.length).toBe(5);
+    for (const [id, l] of labels) {
+      for (const [eid, r] of Object.entries(lay.els)) expect(overlaps(l, r), `${id} sobre ${eid}`).toBe(false);
+      for (const [oid, o] of labels) if (oid !== id) expect(overlaps(l, o), `${id} sobre ${oid}`).toBe(false);
+    }
+  });
+});
