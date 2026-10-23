@@ -1,0 +1,11 @@
+# Agrupa las notas automáticas de cada release según la etiqueta del PR.
+changelog:
+  categories:
+    - title: ✨ Novedades
+      labels: [feature, enhancement]
+    - title: 🐛 Arreglos
+      labels: [bug, fix]
+    - title: 📚 Documentación
+      labels: [documentation]
+    - title: Otros cambios
+      labels: ["*"]

@@ -10,6 +10,12 @@
   <sub>Estado: <b>alfa</b> · Voz en español · Hecho con Claude, React y rough.js</sub>
 </p>
 
+<p align="center">
+  <a href="https://github.com/jorgehsy/grafito/releases"><img src="https://img.shields.io/github/v/release/jorgehsy/grafito?include_prereleases&label=versi%C3%B3n" alt="Versión"></a>
+  <a href="https://github.com/jorgehsy/grafito/actions/workflows/ci.yml"><img src="https://github.com/jorgehsy/grafito/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/jorgehsy/grafito" alt="Licencia MIT"></a>
+</p>
+
 ---
 
 **grafito** convierte lo que dices en voz alta en un tablero dibujado a mano. Explicas una arquitectura, un proceso o una idea, y mientras hablas aparecen zonas, cajas, flechas, líneas de tiempo, árboles y notas, como si alguien lo dibujara en una pizarra a tu lado.
@@ -36,6 +42,8 @@
 | Micrófono | Para el modo voz. Sin micrófono puedes escribir o pegar texto. |
 
 ## Instalar
+
+Puedes bajar la última versión desde [Releases](https://github.com/jorgehsy/grafito/releases) (archivo `grafito-vX.Y.Z-source.tar.gz`) o clonar el repositorio:
 
 ```bash
 git clone https://github.com/jorgehsy/grafito.git
@@ -118,6 +126,22 @@ npm run build      # compila para producción
 
 La primera versión (con Excalidraw) sigue en `/v1.html` como referencia. Ya no se mantiene.
 
+### Versiones y releases
+
+Las versiones siguen [SemVer](https://semver.org/lang/es/). Mientras sea alfa llevan el sufijo `-alpha.N` y salen marcadas como *pre-release*. Los cambios de cada versión están en [CHANGELOG.md](CHANGELOG.md).
+
+- **CI** (`.github/workflows/ci.yml`): en cada push a `main` y en cada PR corre tipos, pruebas y build.
+- **Release** (`.github/workflows/release.yml`): al subir una etiqueta `v*` vuelve a probar, compila y crea el release en GitHub con notas automáticas y dos archivos (código fuente y `dist/` compilado).
+
+Para publicar una versión nueva:
+
+```bash
+npm version prerelease --preid alpha   # 0.2.0-alpha.1 → 0.2.0-alpha.2 (crea commit y etiqueta)
+git push --follow-tags
+```
+
+Usa `npm version minor` o `npm version patch` cuando salga de alfa.
+
 ## Hoja de ruta
 
 - [ ] Reconocimiento de voz en la nube (para Firefox y mejor precisión)
@@ -127,3 +151,7 @@ La primera versión (con Excalidraw) sigue en `/v1.html` como referencia. Ya no 
 ## Contribuir
 
 ¡Bienvenido! Abre un *issue* con lo que encontraste o lo que te gustaría. Si mandas un *pull request*, corre `npm test` y `npm run typecheck` antes.
+
+## Licencia
+
+[MIT](LICENSE) © 2026 Jorge Simoes

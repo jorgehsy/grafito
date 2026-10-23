@@ -1,0 +1,22 @@
+name: 🐛 Algo no funciona
+description: Reporta un error
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: Qué pasó
+      description: Qué hiciste, qué esperabas y qué pasó en cambio.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Versión de grafito
+      placeholder: v0.2.0-alpha.1
+  - type: input
+    attributes:
+      label: Navegador y sistema
+      placeholder: Chrome 140 en macOS
+  - type: textarea
+    attributes:
+      label: Errores en consola o en el panel
+      render: text
