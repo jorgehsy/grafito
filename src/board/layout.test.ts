@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyOps, emptyBoard } from "./model";
 import { op } from "./ops";
-import { bezierAt, clearLayoutCache, computeLayout, labelRect, overlaps } from "./layout";
+import { bezierAt, clearLayoutCache, computeLayout, labelLines, labelRect, overlaps } from "./layout";
 import type { EdgeGeom, Pt } from "./layout";
 import type { Rect } from "./layout";
 import { SCRIPTS } from "./scripts";
@@ -218,5 +218,17 @@ describe("etiquetas de arista en flujos con textos largos", () => {
       for (const [eid, r] of Object.entries(lay.els)) expect(overlaps(l, r), `${id} sobre ${eid}`).toBe(false);
       for (const [oid, o] of labels) if (oid !== id) expect(overlaps(l, o), `${id} sobre ${oid}`).toBe(false);
     }
+  });
+});
+
+describe("labelLines", () => {
+  it("deja las etiquetas cortas en una línea", () => {
+    expect(labelLines("click en login")).toEqual(["click en login"]);
+  });
+  it("parte las largas en dos líneas parejas", () => {
+    expect(labelLines("envía token para cambiarlo por cookies")).toEqual(["envía token para", "cambiarlo por cookies"]);
+  });
+  it("no parte una sola palabra larga", () => {
+    expect(labelLines("autenticaciónfederadaconcognito")).toEqual(["autenticaciónfederadaconcognito"]);
   });
 });

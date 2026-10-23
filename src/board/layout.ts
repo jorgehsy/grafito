@@ -45,6 +45,9 @@ export const HEADER = 50;
 export const PAD = 26;
 export const ZONE_GAP = 150;
 export const LABEL_SIZE = 21;
+export const LABEL_LH = 24;
+/** Etiquetas de flecha más largas que esto se parten en dos líneas. */
+const LABEL_MAX_1LINE = 22;
 const LABEL_CW = 10.3;
 const CALLOUT_SIZE = 24;
 const CALLOUT_CW = 12.2;
@@ -81,6 +84,14 @@ export function wrapText(text: string, max: number): string[] {
   return lines.length ? lines : [""];
 }
 const maxLen = (lines: string[]) => Math.max(...lines.map((l) => [...l].length));
+/** Etiqueta de flecha: una línea si es corta; si no, dos lo más parejas posible (corte en el espacio más cercano a la mitad). */
+export function labelLines(text: string): string[] {
+  const t = text.trim();
+  if ([...t].length <= LABEL_MAX_1LINE) return [t];
+  let cut = -1;
+  for (let i = 0; i < t.length; i++) if (t[i] === " " && (cut < 0 || Math.abs(i - t.length / 2) < Math.abs(cut - t.length / 2))) cut = i;
+  return cut < 0 ? [t] : [t.slice(0, cut), t.slice(cut + 1)];
+}
 
 /** Líneas visibles de un elemento (el icono va delante de la primera). */
 export function elLines(e: El): string[] {
@@ -145,7 +156,8 @@ export function overlaps(a: Rect, b: Rect, m = 0): boolean {
 const inflate = (r: Rect, m: number): Rect => ({ x: r.x - m, y: r.y - m, w: r.w + 2 * m, h: r.h + 2 * m });
 /** Caja (con parche de fondo) de una etiqueta de arista centrada en (x, y). */
 export function labelRect(l: { x: number; y: number; text: string }): Rect {
-  const w = [...l.text].length * LABEL_CW + 14, h = LABEL_SIZE + 8;
+  const lines = labelLines(l.text);
+  const w = maxLen(lines) * LABEL_CW + 14, h = lines.length * LABEL_LH + 8;
   return { x: l.x - w / 2, y: l.y - h / 2, w, h };
 }
 /** Elipse de énfasis alrededor de un elemento: holgada para no cortar sus esquinas. */

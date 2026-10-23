@@ -3,7 +3,7 @@ import rough from "roughjs";
 import type { Options } from "roughjs/bin/core";
 import type { Drawable } from "roughjs/bin/core";
 import type { Geom, RItem } from "../tree";
-import { LABEL_SIZE, labelRect } from "../layout";
+import { LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "../layout";
 
 const NS = "http://www.w3.org/2000/svg";
 const gen = rough.generator();
@@ -309,7 +309,7 @@ export function buildVisual(item: RItem, geom: Geom): Visual {
       const lr = labelRect({ x: geom.lab.x, y: geom.lab.y, text: item.data.label });
       const patch = el("rect", { x: lr.x, y: lr.y, width: lr.w, height: lr.h, rx: 6, fill: PAPER, opacity: 0.96 });
       b.v.g.appendChild(patch); b.v.fills.push(patch);
-      b.text([item.data.label], geom.lab.x, geom.lab.y + 1, { size: LABEL_SIZE, halo: true, fill: "#343a40" });
+      b.text(labelLines(item.data.label), geom.lab.x, geom.lab.y + 1, { size: LABEL_SIZE, lineH: LABEL_LH, halo: true, fill: "#343a40" });
     }
   } else if (item.kind === "emphasis") {
     const s = item.data.variant;
