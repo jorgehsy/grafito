@@ -1,4 +1,6 @@
-import "dotenv/config";
+import { config } from "dotenv";
+// La key del .env manda sobre la que venga del shell (p. ej. ~/.bash_profile).
+config({ override: true });
 import express from "express";
 import { drawHandler } from "./draw";
 import { boardHandler } from "./board";

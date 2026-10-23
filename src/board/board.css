@@ -75,7 +75,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .stats .warns { font-size: 11px; color: #F0A59E; max-height: 70px; overflow: auto; }
 
 /* subtítulos */
-.subtitles { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); width: min(760px, calc(100% - 420px)); display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--hueso); border-radius: 14px; box-shadow: var(--sombra); font-size: 16px; line-height: 1.4; z-index: 5; }
+.subtitles { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); width: min(760px, calc(100% - 420px)); display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--hueso); border-radius: 14px; box-shadow: var(--sombra); font-size: 16px; line-height: 1.4; z-index: 5; }
 .subtitles .wv { color: var(--pizarra); flex: none; margin-top: 1px; }
 .subtitles .txt { flex: 1; min-width: 0; }
 .subtitles p { margin: 0 0 4px; }
@@ -92,6 +92,13 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .corner { position: fixed; right: 20px; bottom: 12px; font-size: 12px; color: var(--humo); z-index: 4; display: flex; align-items: center; gap: 6px; }
 
 @media (max-width: 1100px) {
-  .subtitles { width: min(760px, calc(100% - 140px)); left: calc(50% + 40px); bottom: 84px; }
+  .subtitles { width: min(760px, calc(100% - 140px)); left: calc(50% + 40px); bottom: 136px; }
   .toasts { max-width: calc(100% - 140px); }
+}
+
+/* escribir en vez de hablar (por si no hay micrófono) */
+.typebar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: min(760px, calc(100% - 420px)); display: flex; gap: 8px; z-index: 5; }
+.typebar input { flex: 1; min-width: 0; font-size: 14px; color: var(--grafito); border: 1px solid var(--hueso); border-radius: 12px; padding: 9px 12px; background: #fff; box-shadow: var(--sombra); }
+@media (max-width: 1100px) {
+  .typebar { width: min(760px, calc(100% - 140px)); left: calc(50% + 40px); bottom: 72px; }
 }

@@ -166,6 +166,16 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
     micLock.current?.claim();
     src.start();
   };
+  // Texto escrito (sin micrófono): entra como un final de voz y cierra el diálogo, igual que detener el mic.
+  const [typed, setTyped] = useState("");
+  const sendTyped = () => {
+    const t = typed.trim();
+    if (!t || !activeRef.current) return;
+    spoken.current.push(t); transcript.current.push({ text: t, at: Date.now() }); dirty.current = true;
+    onSubtitle({ spoken: [...spoken.current], current: "" });
+    grouper.push(t); grouper.flush();
+    setTyped("");
+  };
   const toggleMicRef = useRef(toggleMic);
   toggleMicRef.current = toggleMic;
   // otra pestaña reclamó el mic: soltarlo aquí y avisar
@@ -344,6 +354,13 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
           <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} /> Seguir cámara
         </label>
       </div>
+
+      {active && (
+        <form className="typebar" data-testid="typebar" onSubmit={(e) => { e.preventDefault(); sendTyped(); }}>
+          <input data-testid="type-input" aria-label="Escribir a Claude" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="¿Sin micrófono? Escribe aquí y pulsa Enter…" />
+          <button className="pbtn primary" type="submit" disabled={!typed.trim()}>Enviar</button>
+        </form>
+      )}
 
       <div className="toasts">
         {active && pending && (
