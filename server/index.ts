@@ -3,7 +3,7 @@ import { config } from "dotenv";
 config({ override: true });
 import express from "express";
 import { drawHandler } from "./draw";
-import { boardHandler } from "./board";
+import { boardHandler, hasApiKey } from "./board";
 import { createSessionsHandlers } from "./sessions";
 
 const app = express();
@@ -14,7 +14,7 @@ const sessions = createSessionsHandlers();
 app.post("/api/sessions", sessions.save);
 app.get("/api/sessions", sessions.list);
 app.get("/api/sessions/:file", sessions.get);
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, hasKey: hasApiKey() }));
 
 const port = Number(process.env.PORT ?? 8787);
 app.listen(port, () => console.log(`[grafito] servidor en http://localhost:${port}`));

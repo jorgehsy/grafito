@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IconBars, IconClose, IconDoc, IconExport, IconGear, IconImport, IconMic, IconStop, IconUndo, IconWand, IconWave } from "../ui/icons";
+import { IconBars, IconClose, IconDoc, IconExport, IconGear, IconImport, IconMic, IconStop, IconTrash, IconUndo, IconWand, IconWave } from "../ui/icons";
 import type { BoardController } from "../controller";
 import type { Subtitle } from "../player";
-import { SCRIPTS } from "../scripts";
 import { createLiveSession } from "./session";
 import { lastUndoable } from "./session";
 import type { LogEntry, Totals } from "./session";
-import { startDictation } from "./dictation";
 import { fmtUsd, zeroUsage } from "./pricing";
 import { buildRecord, clearLocal, entriesFromRecord, isRecord, loadLocal, median, newSessionId, postRecord, replayOps, saveLocal } from "./record";
 import type { SessionRecord } from "./record";
@@ -32,7 +30,6 @@ const SHAPE_OPTIONS = [
   { value: "compare", label: "Comparar (compare)" },
 ];
 const tok = (n: number) => n.toLocaleString("es");
-const scriptText = (id: string) => SCRIPTS.find((s) => s.id === id)?.script.map((c) => c.text).join(" ") ?? "";
 
 interface Props {
   getCtrl(): BoardController | null;
@@ -46,12 +43,14 @@ interface Props {
   onFollow(v: boolean): void;
   summary: string;
   warnings: string[];
+  showTranscript: boolean;
+  onShowTranscript(v: boolean): void;
 }
 
 const hhmm = (t: number) => new Date(t).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", hour12: false });
 const readStats = () => { try { return localStorage.getItem("grafito.stats") !== "0"; } catch { return true; } };
 
-export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLocked, follow, onFollow, summary, warnings }: Props) {
+export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript }: Props) {
   const [statsOpen, setStatsOpen] = useState(readStats);
   const [optsOpen, setOptsOpen] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -59,19 +58,14 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
   activeRef.current = active;
   const optsRef = useRef<HTMLDivElement>(null);
   const gearRef = useRef<HTMLButtonElement>(null);
-  const [text, setText] = useState("");
   const [model, setModel] = useState(MODEL_OPTIONS[0]);
-  const [interval, setIntervalMs] = useState(1500);
   const [busy, setBusy] = useState(false);
-  const [dictating, setDictating] = useState(false);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [current, setCurrent] = useState<LogEntry | null>(null);
   const [totals, setTotals] = useState<Totals>({ requests: 0, usage: zeroUsage(), costUsd: 0 });
   const [shape, setShape] = useState("auto");
   const shapeRef = useRef(shape);
   const modelRef = useRef(model);
-  const intervalRef = useRef(interval);
-  const dict = useRef<{ stop(): void } | null>(null);
   const spoken = useRef<string[]>([]);
   const [lang, setLang] = useState("es-CL");
   const [mic, setMic] = useState<{ state: SpeechState; detail?: string }>({ state: "idle" });
@@ -89,7 +83,6 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
   langRef.current = lang;
   modelRef.current = model;
   shapeRef.current = shape;
-  intervalRef.current = interval;
 
   const makeRecord = () =>
     buildRecord(
@@ -131,15 +124,7 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-  useEffect(() => { (window as any).__live = session; return () => { dict.current?.stop(); speech.current?.stop(); session.stop(); }; }, [session]);
-
-  // Punto de entrada de texto final (la voz se conectará aquí).
-  const onFinalText = (t: string) => {
-    spoken.current.push(t);
-    transcript.current.push({ text: t, at: Date.now() });
-    onSubtitle({ spoken: [...spoken.current], current: "" });
-    session.onFinalText(t);
-  };
+  useEffect(() => { (window as any).__live = session; return () => { speech.current?.stop(); session.stop(); }; }, [session]);
 
   const grouper = useMemo(
     () => createGrouper((t, at) => { voiceAt.current = at; session.onFinalText(t); }),
@@ -221,15 +206,8 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
 
   useEffect(() => { if (!active && speech.current) toggleMicRef.current(); }, [active]);
 
-  const sendAll = () => { if (text.trim()) onFinalText(text.trim()); };
-  const simulate = () => {
-    if (!text.trim() || dictating) return;
-    setDictating(true);
-    dict.current = startDictation(text, () => intervalRef.current, onFinalText, () => setDictating(false));
-  };
-  const stop = () => { dict.current?.stop(); grouper.cancel(); setDictating(false); session.stop(); };
   const clear = () => {
-    dict.current?.stop(); setDictating(false); grouper.cancel();
+    grouper.cancel();
     session.reset();
     spoken.current = [];
     transcript.current = [];
@@ -239,7 +217,7 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
   };
 
   const restore = (rec: SessionRecord) => {
-    dict.current?.stop(); setDictating(false); grouper.cancel();
+    grouper.cancel();
     onClear(); // tablero vacío; después se reponen todas las operaciones de golpe (la cola pasa a modo rápido)
     const { entries: es, totals: t } = entriesFromRecord(rec);
     session.restore(es, t);
@@ -302,6 +280,7 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
         <hr />
         <button className="tb" data-testid="undo" aria-label="Deshacer instrucción" title="Deshacer instrucción" disabled={!canUndo} onClick={undo}><IconUndo /></button>
         <button className="tb" data-testid="export" aria-label="Exportar" title="Exportar JSON y SVG" disabled={!entries.length} onClick={exportAll}><IconExport /></button>
+        <button className="tb" data-testid="clear" aria-label="Limpiar" title="Limpiar tablero" disabled={!active} onClick={clear}><IconTrash /></button>
         <hr />
         <button ref={gearRef} className={"tb" + (optsOpen ? " on" : "")} aria-pressed={optsOpen} aria-expanded={optsOpen} aria-label="Opciones" title="Opciones" onClick={() => setOptsOpen((v) => !v)}><IconGear /></button>
         <button className={"tb" + (statsOpen ? " on" : "")} aria-pressed={statsOpen} aria-label="Estadísticas" title="Estadísticas (F3)" onClick={() => setStatsOpen((v) => !v)}><IconBars /></button>
@@ -320,38 +299,17 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
             {SHAPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </label>
-        <div className="voice" data-testid="voice">
-          <label className="field">
-            Idioma
-            <select value={lang} disabled={micOn} onChange={(e) => setLang(e.target.value)}>
-              {SPEECH_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
-            </select>
-          </label>
-          <div className={"micstate" + (mic.state === "error" ? " err" : "")} data-testid="mic-state" role="status">
-            {listening && <span className="dot" />}{micLabel || "Pulsa Hablar o la barra espaciadora."}
-            {mic.state === "restarting" && mic.detail ? ` (${mic.detail})` : ""}
-          </div>
-        </div>
         <label className="field">
-          Usar texto de un guion
-          <select value="" onChange={(e) => { if (e.target.value) setText(scriptText(e.target.value)); }}>
-            <option value="">— elegir —</option>
-            {SCRIPTS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          Idioma
+          <select data-testid="lang" value={lang} disabled={micOn} onChange={(e) => setLang(e.target.value)}>
+            {SPEECH_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
           </select>
-        </label>
-        <textarea data-testid="live-text" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Escribe o pega aquí lo que se va a dictar…" />
-        <div className="row wrap">
-          <button className="pbtn primary" onClick={sendAll} disabled={!active || !text.trim()}>Enviar todo</button>
-          <button className="pbtn" onClick={simulate} disabled={!active || !text.trim() || dictating}>Simular dictado</button>
-          <button className="pbtn" onClick={stop} disabled={!dictating && !busy}>Detener</button>
-          <button className="pbtn" onClick={clear} disabled={!active}>Limpiar</button>
-        </div>
-        <label className="field">
-          Intervalo de dictado: {interval} ms
-          <input type="range" min={500} max={4000} step={100} value={interval} onChange={(e) => setIntervalMs(Number(e.target.value))} />
         </label>
         <label className="check">
           <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} /> Seguir cámara
+        </label>
+        <label className="check">
+          <input type="checkbox" data-testid="show-transcript" checked={showTranscript} onChange={(e) => onShowTranscript(e.target.checked)} /> Mostrar transcripción
         </label>
       </div>
 

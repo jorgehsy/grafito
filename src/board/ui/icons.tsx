@@ -21,6 +21,8 @@ export const IconClose = () => <Svg size={16}><path d="M6 6l12 12M18 6L6 18" /><
 export const IconWand = () => <Svg size={14}><path d="M15 4V2M15 10V8M11 6H9M21 6h-2M18 3l-1 1M18 9l-1-1M4 20L16 8l-1-1L3 19z" /></Svg>;
 export const IconPlay = () => <Svg><path d="M7 4l13 8-13 8z" /></Svg>;
 export const IconPause = () => <Svg><path d="M8 5v14M16 5v14" /></Svg>;
+export const IconTrash = () => <Svg><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></Svg>;
+export const IconChevron = ({ up }: { up?: boolean }) => <Svg size={16}><path d={up ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6"} /></Svg>;
 export const IconRestart = () => <Svg><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" /></Svg>;
 
 export function Logo() {
