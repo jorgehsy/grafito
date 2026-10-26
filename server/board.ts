@@ -95,6 +95,11 @@ export function isRetryable(status: unknown): boolean {
   return !(status >= 400 && status < 500 && status !== 429);
 }
 
+/** Hay una API key utilizable en el entorno (no vacía ni la de ejemplo). */
+export function hasApiKey(key = process.env.ANTHROPIC_API_KEY): key is string {
+  return !!key && key.trim() !== "" && !key.includes(PLACEHOLDER);
+}
+
 export async function boardHandler(req: Request, res: Response) {
   const key = process.env.ANTHROPIC_API_KEY;
   res.writeHead(200, {
@@ -102,7 +107,7 @@ export async function boardHandler(req: Request, res: Response) {
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
   });
-  if (!key || key.trim() === "" || key.includes(PLACEHOLDER)) {
+  if (!hasApiKey(key)) {
     sse(res, "error", { message: "Falta la API key en .env" });
     return res.end();
   }

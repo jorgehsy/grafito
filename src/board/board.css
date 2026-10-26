@@ -14,7 +14,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .hint { position: absolute; inset: 0; display: grid; place-items: center; color: var(--humo); font-size: 20px; padding: 40px; text-align: center; pointer-events: none; }
 
 /* marca */
-.brand { position: fixed; top: 16px; left: 16px; display: flex; align-items: center; gap: 10px; pointer-events: none; z-index: 5; }
+.brand { position: fixed; top: 16px; left: 16px; min-height: 44px; display: flex; align-items: center; gap: 10px; pointer-events: none; z-index: 6; }
 .brand .word { font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 700; font-size: 20px; }
 .brand .board { color: var(--humo); font-size: 13px; }
 
@@ -42,9 +42,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .pbtn.primary { background: var(--grafito); color: var(--papel); border-color: var(--grafito); }
 .pbtn:disabled { opacity: .4; cursor: default; }
 .check { font-size: 13px; display: flex; gap: 8px; align-items: center; }
-.voice { display: flex; flex-direction: column; gap: 6px; }
-.micstate { font-size: 12px; display: flex; align-items: center; gap: 6px; min-height: 16px; color: var(--humo); }
-.micstate.err { color: #B3392F; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: #D1453B; animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: .5; } }
 @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
@@ -81,10 +78,15 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .subtitles p { margin: 0 0 4px; }
 .subtitles .old { color: var(--humo); }
 .subtitles .now.interim { color: var(--humo); font-style: italic; }
+.subtitles[hidden] { display: none; }
 .backlog { font-size: 13px; color: var(--humo); }
 
-/* guion */
-.scriptbar { position: fixed; left: 96px; bottom: 28px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #fff; border: 1px solid var(--hueso); border-radius: 14px; box-shadow: var(--sombra); z-index: 6; font-size: 13px; }
+/* pestaña para mostrar u ocultar la transcripción */
+.notch { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 56px; height: 16px; display: grid; place-items: center; padding: 0; border: 1px solid var(--hueso); border-bottom: 0; border-radius: 10px 10px 0 0; background: #fff; color: var(--humo); cursor: pointer; z-index: 6; box-shadow: 0 -2px 8px rgba(42,42,46,0.06); }
+.notch:hover { color: var(--grafito); }
+
+/* guion: controles en la cabecera, junto a la marca */
+.scriptbar { display: flex; align-items: center; gap: 6px; margin-left: 6px; padding: 3px 8px 3px 4px; background: #fff; border: 1px solid var(--hueso); border-radius: 14px; box-shadow: var(--sombra); font-size: 13px; pointer-events: auto; }
 .scriptbar select { font-size: 13px; border: 1px solid var(--hueso); border-radius: 12px; padding: 6px 10px; background: #fff; color: var(--grafito); max-width: 180px; }
 .spd { display: flex; align-items: center; gap: 6px; color: var(--humo); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 .spd input { width: 80px; }
@@ -93,6 +95,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 
 @media (max-width: 1100px) {
   .subtitles { width: min(760px, calc(100% - 140px)); left: calc(50% + 40px); bottom: 136px; }
+  .notch { left: calc(50% + 40px); }
   .toasts { max-width: calc(100% - 140px); }
 }
 

@@ -5,9 +5,13 @@ import type { Subtitle } from "./player";
 import { SCRIPTS } from "./scripts";
 import { Engine } from "./render/engine";
 import { LivePanel } from "./live/LivePanel";
-import { IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
+import { IconChevron, IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
 
 type Status = "idle" | "playing" | "paused" | "done";
+type Mode = "script" | "claude";
+
+const urlMode = (): Mode | null => { const m = new URLSearchParams(location.search).get("mode"); return m === "claude" || m === "script" ? m : null; };
+const readTranscript = () => { try { return localStorage.getItem("grafito.transcript") !== "0"; } catch { return true; } };
 
 export function BoardApp() {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -26,7 +30,9 @@ export function BoardApp() {
   const [sub, setSub] = useState<Subtitle>({ spoken: [], current: "" });
   const [warnings, setWarnings] = useState<string[]>([]);
   const [summary, setSummary] = useState("");
-  const [mode, setMode] = useState<"script" | "claude">(() => (new URLSearchParams(location.search).get("mode") === "claude" ? "claude" : "script"));
+  // Sin ?mode= en la URL, el modo por defecto depende de si el servidor tiene API key: en vivo si la hay, guion si no.
+  const [mode, setMode] = useState<Mode | null>(urlMode);
+  const [showTranscript, setShowTranscript] = useState(readTranscript);
 
   const setStatus = (s: Status) => { status.current = s; setSt(s); };
 
@@ -54,6 +60,19 @@ export function BoardApp() {
     return () => { cancelAnimationFrame(raf); e.dispose(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (mode) return;
+    let alive = true;
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((h) => h?.hasKey === true, () => false)
+      .then((key) => { if (alive) setMode((m) => m ?? (key ? "claude" : "script")); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => { try { localStorage.setItem("grafito.transcript", showTranscript ? "1" : "0"); } catch { /* sin almacenamiento */ } }, [showTranscript]);
 
   useEffect(() => { speedRef.current = speed; if (engine.current) engine.current.userSpeed = speed; }, [speed]);
 
@@ -93,8 +112,7 @@ export function BoardApp() {
   const toggleFollow = (v: boolean) => { engine.current?.setFollow(v); setFollow(v); };
 
   const locked = st === "playing" || st === "paused";
-  const changeMode = (m: "script" | "claude") => { if (m === mode) return; resetAll(); setStatus("idle"); setMode(m); };
-  const scriptName = SCRIPTS.find((x) => x.id === scriptId)?.name ?? "";
+  const changeMode = (m: Mode) => { if (m === mode) return; resetAll(); setStatus("idle"); setMode(m); };
   const queued = backlog.pending;
 
   return (
@@ -107,7 +125,24 @@ export function BoardApp() {
       <header className="brand">
         <Logo />
         <span className="word">grafito</span>
-        <span className="board">{mode === "claude" ? "Claude en vivo" : scriptName}</span>
+        {mode === "claude" && <span className="board">Claude en vivo</span>}
+        {mode === "script" && (
+          <div className="scriptbar" role="group" aria-label="Guion">
+            <select aria-label="Guion" value={scriptId} disabled={locked} onChange={(e) => setScriptId(e.target.value)}>
+              {SCRIPTS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            {st === "playing" ? (
+              <button className="tb sm" aria-label="Pausa" title="Pausa" onClick={pause}><IconPause /></button>
+            ) : (
+              <button className="tb sm on" aria-label={st === "paused" ? "Seguir" : "Play"} title={st === "paused" ? "Seguir" : "Play"} onClick={play}><IconPlay /></button>
+            )}
+            <button className="tb sm" aria-label="Reiniciar" title="Reiniciar" onClick={restart}><IconRestart /></button>
+            <label className="spd">
+              {speed}x
+              <input type="range" aria-label="Velocidad" min={0.5} max={2} step={0.25} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
+            </label>
+          </div>
+        )}
       </header>
 
       <LivePanel
@@ -121,27 +156,15 @@ export function BoardApp() {
         onFollow={toggleFollow}
         summary={summary}
         warnings={warnings}
+        showTranscript={showTranscript}
+        onShowTranscript={setShowTranscript}
       />
 
-      {mode === "script" && (
-        <div className="scriptbar" role="group" aria-label="Guion">
-          <select aria-label="Guion" value={scriptId} disabled={locked} onChange={(e) => setScriptId(e.target.value)}>
-            {SCRIPTS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          {st === "playing" ? (
-            <button className="tb sm" aria-label="Pausa" title="Pausa" onClick={pause}><IconPause /></button>
-          ) : (
-            <button className="tb sm on" aria-label={st === "paused" ? "Seguir" : "Play"} title={st === "paused" ? "Seguir" : "Play"} onClick={play}><IconPlay /></button>
-          )}
-          <button className="tb sm" aria-label="Reiniciar" title="Reiniciar" onClick={restart}><IconRestart /></button>
-          <label className="spd">
-            {speed}x
-            <input type="range" aria-label="Velocidad" min={0.5} max={2} step={0.25} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
-          </label>
-        </div>
-      )}
+      <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? "Ocultar transcripción" : "Mostrar transcripción"} title={showTranscript ? "Ocultar transcripción" : "Mostrar transcripción"} onClick={() => setShowTranscript((v) => !v)}>
+        <IconChevron up={!showTranscript} />
+      </button>
 
-      <div className="subtitles" data-testid="subtitles" role="status" ref={subRef}>
+      <div className="subtitles" data-testid="subtitles" role="status" ref={subRef} hidden={!showTranscript}>
         <span className="wv"><IconWave /></span>
         <div className="txt">
           {!sub.spoken.length && !sub.current ? (
