@@ -2,6 +2,10 @@
 
 Las notas completas de cada versión están en [Releases](https://github.com/jorgehsy/grafito/releases).
 
+## v0.2.0-alpha.3 · 2026-10-26
+
+- Las etiquetas de flecha largas (más de 22 caracteres) se parten en dos líneas, y el espacio reservado coincide con lo dibujado.
+
 ## v0.2.0-alpha.2 · 2026-10-23
 
 - Caja para escribir a Claude si no tienes micrófono: Enter o Enviar manda el texto.
