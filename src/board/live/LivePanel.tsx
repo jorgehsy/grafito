@@ -15,6 +15,7 @@ import { createMicLock, MIC_TAKEN_MESSAGE } from "./speech/micLock";
 import { createGrouper } from "./speech/grouper";
 import { SPEECH_LANGS } from "./speech/types";
 import { ShapeGallery, SHAPE_OPTIONS } from "./ShapeGallery";
+import { LangTiles, ModelTiles, ViewTiles } from "./OptionTiles";
 import type { SpeechSource, SpeechState } from "./speech/types";
 
 const MODEL_OPTIONS = ["claude-sonnet-5-5", "claude-haiku-5-5"];
@@ -276,28 +277,22 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
       </nav>
 
       <div className="popover" ref={optsRef} role="dialog" aria-label="Opciones" hidden={!optsOpen}>
-        <label className="field">
+        <div className="field">
           Modelo
-          <select value={model} onChange={(e) => setModel(e.target.value)}>
-            {MODEL_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </label>
+          <ModelTiles value={model} onChange={setModel} />
+        </div>
         <div className="field">
           Forma del dibujo
           <ShapeGallery value={shape} onChange={setShape} />
         </div>
-        <label className="field">
+        <div className="field">
           Idioma
-          <select data-testid="lang" value={lang} disabled={micOn} onChange={(e) => setLang(e.target.value)}>
-            {SPEECH_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
-          </select>
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={follow} onChange={(e) => onFollow(e.target.checked)} /> Seguir cámara
-        </label>
-        <label className="check">
-          <input type="checkbox" data-testid="show-transcript" checked={showTranscript} onChange={(e) => onShowTranscript(e.target.checked)} /> Mostrar transcripción
-        </label>
+          <LangTiles value={lang} onChange={setLang} disabled={micOn} />
+        </div>
+        <div className="field">
+          Vista
+          <ViewTiles follow={follow} onFollow={onFollow} showTranscript={showTranscript} onShowTranscript={onShowTranscript} />
+        </div>
       </div>
 
       {active && (

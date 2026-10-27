@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /** Bocetos de 48×32 en trazo fino: lo justo para reconocer la forma de un vistazo. */
-const T = ({ children }: { children: ReactNode }) => (
+export const T = ({ children }: { children: ReactNode }) => (
   <svg viewBox="0 0 48 32" width="100%" height="32" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {children}
   </svg>
