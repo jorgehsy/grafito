@@ -15,7 +15,8 @@ import { createMicLock, MIC_TAKEN_MESSAGE } from "./speech/micLock";
 import { createGrouper } from "./speech/grouper";
 import { SPEECH_LANGS } from "./speech/types";
 import { ShapeGallery, SHAPE_OPTIONS } from "./ShapeGallery";
-import { LangTiles, ModelTiles, ViewTiles } from "./OptionTiles";
+import { CatalogTiles, LangTiles, ModelTiles, ViewTiles } from "./OptionTiles";
+import { loadCatalogs, saveCatalogs } from "./catalogs";
 import type { SpeechSource, SpeechState } from "./speech/types";
 
 const MODEL_OPTIONS = ["claude-sonnet-5-5", "claude-haiku-5-5"];
@@ -55,6 +56,8 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
   const [totals, setTotals] = useState<Totals>({ requests: 0, usage: zeroUsage(), costUsd: 0 });
   const [shape, setShape] = useState("auto");
   const shapeRef = useRef(shape);
+  const [catalogs, setCatalogs] = useState<string[]>(loadCatalogs);
+  const catalogsRef = useRef(catalogs);
   const modelRef = useRef(model);
   const spoken = useRef<string[]>([]);
   const [lang, setLang] = useState("es-CL");
@@ -73,6 +76,7 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
   langRef.current = lang;
   modelRef.current = model;
   shapeRef.current = shape;
+  catalogsRef.current = catalogs;
 
   const makeRecord = () =>
     buildRecord(
@@ -107,6 +111,7 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
         submit: (ops) => getCtrl()!.submit(ops),
         getModel: () => modelRef.current,
         getShape: () => shapeRef.current,
+        getCatalogs: () => catalogsRef.current,
         getVoiceAt: () => { const v = voiceAt.current; voiceAt.current = null; return v; },
         onLog: (e, c, t) => { latest.current.entries = e; latest.current.totals = t; dirty.current = true; setEntries(e); setCurrent(c); setTotals(t); if (!c) flushSoon(); },
         onBusy: (b) => { latest.current.busy = b; setBusy(b); },
@@ -284,6 +289,10 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
         <div className="field">
           Forma del dibujo
           <ShapeGallery value={shape} onChange={setShape} />
+        </div>
+        <div className="field">
+          Iconos
+          <CatalogTiles value={catalogs} onChange={(v) => { setCatalogs(v); saveCatalogs(v); }} />
         </div>
         <div className="field">
           Idioma

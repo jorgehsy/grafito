@@ -2,6 +2,12 @@
 
 Las notas completas de cada versión están en [Releases](https://github.com/jorgehsy/grafito/releases).
 
+## v0.2.0-alpha.4 · 2026-10-27
+
+- Iconos de AWS: actívalos en Opciones → Iconos, y Claude pone el icono oficial (Lambda, S3, Cognito… 40 servicios) junto a las cajas que son servicios de AWS.
+- Los iconos son de AWS y no están bajo la licencia MIT (ver `src/iconos/aws/AVISO.md`).
+- Panel de opciones en tarjetas: Modelo, Idioma y Vista.
+
 ## v0.2.0-alpha.3 · 2026-10-26
 
 - Las etiquetas de flecha largas (más de 22 caracteres) se parten en dos líneas, y el espacio reservado coincide con lo dibujado.

@@ -2,6 +2,7 @@
 // Tipos TS + un JSON Schema por operación, con forma de herramienta de Anthropic
 // ({name, description, input_schema}) para reutilizarlas tal cual en el servidor.
 // Ninguna operación lleva coordenadas.
+import { AWS_PREFIJO_CATALOGO, SERVICIOS_AWS } from "../iconos/aws/servicios";
 
 export type ZoneKind = "flow" | "system" | "list" | "compare" | "mindmap" | "scale" | "cycle" | "timeline" | "tree";
 export type MarkTone = "neutral" | "warn" | "danger" | "ok";
@@ -20,9 +21,9 @@ export interface OpInputs {
     center_label?: string;
     place?: { relation: "right_of" | "below"; of: string };
   };
-  add_step: { zone: string; id: string; label: string; icon?: string; after?: string };
-  add_decision: { zone: string; id: string; question: string; after?: string };
-  add_component: { zone: string; id: string; label: string; type: ComponentType; icon?: string };
+  add_step: { zone: string; id: string; label: string; icon?: string; service?: string; after?: string };
+  add_decision: { zone: string; id: string; question: string; service?: string; after?: string };
+  add_component: { zone: string; id: string; label: string; type: ComponentType; icon?: string; service?: string };
   add_node: { zone: string; id: string; label: string; parent?: string };
   add_item: { zone: string; id: string; text: string; column?: "left" | "right" };
   add_branch: { zone: string; id: string; label: string; parent?: string; note?: string };
@@ -39,6 +40,8 @@ export interface OpInputs {
   update_text: { id: string; field: TextField; value: string };
   delete: { id: string };
   move_to_zone: { id: string; zone: string };
+  /** Icono de servicio de cualquier elemento; `service` vacío lo quita. */
+  set_service: { id: string; service: string };
   update_summary: { text: string };
 }
 
@@ -283,3 +286,34 @@ export const OP_TOOLS: ToolDef[] = [
 export const OP_SCHEMAS: Record<OpName, ToolDef["input_schema"]> = Object.fromEntries(
   OP_TOOLS.map((t) => [t.name, t.input_schema]),
 ) as Record<OpName, ToolDef["input_schema"]>;
+
+// ---- Catálogos de iconos (opcionales) ----
+// Apagado, Claude no recibe nada del catálogo: toolsFor([]) devuelve OP_TOOLS tal cual.
+
+/** Catálogos de iconos que el servidor conoce (hoy solo AWS). */
+export const CATALOG_IDS = [AWS_PREFIJO_CATALOGO] as const;
+const SERVICE_TOOLS: OpName[] = ["add_step", "add_decision", "add_component"];
+
+/** Ids de servicio (sin prefijo de catálogo) que Claude puede mandar con los catálogos dados. */
+export function serviceIdsFor(catalogs: readonly string[]): string[] {
+  return catalogs.includes(AWS_PREFIJO_CATALOGO) ? SERVICIOS_AWS.map((s) => s.id) : [];
+}
+
+export function toolsFor(catalogs: readonly string[]): ToolDef[] {
+  const ids = serviceIdsFor(catalogs);
+  if (!ids.length) return OP_TOOLS;
+  const service = { type: "string", enum: ids, description: "Servicio de AWS (icono). Solo si el hablante lo nombra o no hay duda." };
+  const patched = OP_TOOLS.map((t) =>
+    SERVICE_TOOLS.includes(t.name) ? { ...t, input_schema: { ...t.input_schema, properties: { ...t.input_schema.properties, service } } } : t,
+  );
+  return [
+    ...patched.slice(0, -1),
+    tool(
+      "set_service",
+      "Pone o cambia el icono de servicio de AWS de un elemento ya dibujado (cualquier tipo). service vacío lo quita.",
+      { id: id("Id del elemento."), service: { type: "string", enum: [...ids, ""], description: "Id del servicio; vacío para quitarlo." } },
+      ["id", "service"],
+    ),
+    patched[patched.length - 1], // update_summary sigue al final
+  ];
+}

@@ -18,7 +18,8 @@
     "dev:web": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "iconos:aws": "tsx scripts/iconos-aws.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",

@@ -76,6 +76,35 @@ describe("SSE", () => {
   });
 });
 
+const idle = async (s: { isBusy(): boolean }) => { for (let k = 0; k < 50; k++) { await new Promise((r) => setTimeout(r, 5)); if (!s.isBusy()) break; } };
+
+describe("catálogos en el pedido", () => {
+  it("streamBoard manda catalogs en el body", async () => {
+    let body: any;
+    const f = (async (_u: string, init: any) => { body = JSON.parse(init.body); return mockFetch([ev("done", { usage: zeroUsage(), timings: { first_op_ms: null, total_ms: 1 }, ops: 0, model: "m" })])("" as any); }) as unknown as typeof fetch;
+    await streamBoard({ delta: "d", summary: "", board: "", model: "m", catalogs: ["aws"] }, { onOp() {}, onInvalid() {}, onDone() {}, onError() {} }, undefined, f);
+    expect(body.catalogs).toEqual(["aws"]);
+  });
+  it("la sesión manda [] por defecto y serializa con service según getCatalogs", async () => {
+    const bodies: any[] = [];
+    const f = (async (_u: string, init: any) => { bodies.push(JSON.parse(init.body)); return mockFetch([ev("done", { usage: zeroUsage(), timings: { first_op_ms: null, total_ms: 1 }, ops: 0, model: "m" })])("" as any); }) as unknown as typeof fetch;
+    const { board } = applyOps(emptyBoard(), [
+      { name: "create_zone", input: { id: "z", kind: "flow", title: "Z" } },
+      { name: "add_step", input: { zone: "z", id: "fn", label: "Función", service: "lambda" } },
+    ]);
+    let cats: string[] | undefined;
+    const mk = () => createLiveSession({ getBoard: () => board, submit: async () => {}, getModel: () => "claude-haiku-5-5", getCatalogs: cats ? () => cats! : undefined, onLog() {}, fetchImpl: f });
+    const s1 = mk(); s1.onFinalText("uno."); await idle(s1);
+    cats = ["aws"];
+    const s2 = mk(); s2.onFinalText("dos."); await idle(s2);
+    expect(bodies[0].catalogs).toEqual([]);
+    expect(bodies[0].board).toContain("fn");
+    expect(bodies[0].board).not.toContain("service:");
+    expect(bodies[1].catalogs).toEqual(["aws"]);
+    expect(bodies[1].board).toContain(" service:lambda");
+  });
+});
+
 describe("sesión en vivo", () => {
   it("una petición en vuelo, junta fragmentos, registra uso y coste", async () => {
     const bodies: any[] = [];
@@ -156,5 +185,21 @@ describe("dictado y validación", () => {
     expect(t).toContain("nivel:60");
     expect(t).toContain("m (mark)");
     expect(t).toContain("at:20 tone:warn");
+  });
+});
+
+describe("serializeBoard con service", () => {
+  const b = applyOps(emptyBoard(), [
+    op.create_zone({ id: "app", kind: "system", title: "Arq" }),
+    op.add_component({ zone: "app", id: "fn", label: "Fn", type: "service", service: "lambda" }),
+    op.add_component({ zone: "app", id: "db", label: "BD", type: "database" }),
+  ]).board;
+  it("catálogo prendido muestra service:<id> sin prefijo; apagado u omitido no lo muestra", () => {
+    const on = serializeBoard(b, { catalog: true });
+    expect(on).toContain('- fn (component/service) "Fn" @app service:lambda');
+    expect(on).not.toContain("aws:");
+    expect(on.match(/service:/g)).toHaveLength(1); // db no tiene
+    expect(serializeBoard(b, { catalog: false })).not.toContain("service:");
+    expect(serializeBoard(b)).not.toContain("service:");
   });
 });

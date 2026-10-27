@@ -1,5 +1,6 @@
 // Modelo puro del tablero v2. Sin React, sin coordenadas.
 import { MARK_TONES, TEXT_FIELDS, ZONE_KINDS } from "./ops";
+import { AWS_PREFIJO_CATALOGO, SERVICIOS_AWS } from "../iconos/aws/servicios";
 import type { ComponentType, EmphasisStyle, MarkTone, Op, ZoneKind } from "./ops";
 
 export interface Zone {
@@ -25,6 +26,8 @@ export interface El {
   type: ElType;
   label: string;
   icon?: string;
+  /** Icono de servicio con el catálogo delante (`aws:lambda`). Independiente de `icon`. */
+  service?: string;
   comp?: ComponentType;
   after?: string;
   parent?: string;
@@ -102,6 +105,13 @@ function str(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
+/** Id de servicio conocido (`lambda` o `aws:lambda`) -> valor guardado (`aws:lambda`); null si es desconocido. */
+export function parseService(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const id = v.trim().replace(new RegExp(`^${AWS_PREFIJO_CATALOGO}:`), "");
+  return SERVICIOS_AWS.some((s) => s.id === id) ? `${AWS_PREFIJO_CATALOGO}:${id}` : null;
+}
+
 function inRange(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100;
 }
@@ -157,7 +167,13 @@ export function applyOp(board: Board, op: Op): ApplyResult {
         if (!["actor", "client", "service", "database", "queue", "storage", "external"].includes(i.type)) return bad("type de componente inválido");
         el.comp = i.type;
       }
-      if (str(i.icon) && (type === "step" || type === "component")) el.icon = i.icon;
+      const svc = type === "step" || type === "decision" || type === "component" ? parseService(i.service) : null;
+      if (str(i.service) && (type === "step" || type === "decision" || type === "component") && !svc) {
+        warnings.push(`${op.name}: service '${i.service}' desconocido; se ignora`);
+      }
+      if (svc) el.service = svc;
+      // con servicio válido el emoji se ignora (ticket 04)
+      if (str(i.icon) && !svc && (type === "step" || type === "component")) el.icon = i.icon;
       if (type === "step" || type === "decision") {
         if (i.after !== undefined) {
           const prev = findEl(b, i.after);
@@ -301,6 +317,17 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const co = b.callouts.find((x) => x.id === i.id);
       if (co) { co.text = i.label; return { board: b, warnings }; }
       return bad(`id '${i.id}' no existe`);
+    }
+    case "set_service": {
+      if (typeof i.service !== "string") return bad("falta service");
+      const el = findEl(b, i.id);
+      if (!el) return bad(findZone(b, i.id) ? `'${i.id}' es una zona; set_service sólo vale para elementos` : `id '${i.id}' no existe`);
+      if (!i.service.trim()) { delete el.service; return { board: b, warnings }; }
+      const svc = parseService(i.service);
+      if (!svc) return bad(`service '${i.service}' desconocido; se ignora`);
+      // el emoji `icon` (si lo hay) se queda: el texto no cambia, no se redibuja
+      el.service = svc;
+      return { board: b, warnings };
     }
     case "update_text": {
       if (typeof i.value !== "string") return bad("falta value");

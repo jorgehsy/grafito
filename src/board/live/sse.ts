@@ -41,7 +41,7 @@ export interface BoardHandlers {
 }
 
 export async function streamBoard(
-  body: { delta: string; summary: string; board: string; model: string; shape?: string; mode?: "content" | "instruction" },
+  body: { delta: string; summary: string; board: string; model: string; shape?: string; mode?: "content" | "instruction"; catalogs?: string[] },
   h: BoardHandlers,
   signal?: AbortSignal,
   fetchImpl: typeof fetch = fetch,

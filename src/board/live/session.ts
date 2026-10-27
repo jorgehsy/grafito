@@ -50,6 +50,8 @@ export interface SessionDeps {
   getModel(): string;
   /** "auto" o un ZoneKind: forma preferida para zonas nuevas. */
   getShape?(): string;
+  /** Catálogos de iconos prendidos (p. ej. ["aws"]). Por defecto [] = apagado. */
+  getCatalogs?(): string[];
   /** Instante (Date.now) del último final de voz del lote que se va a enviar; null si no es voz. */
   getVoiceAt?(): number | null;
   onLog(entries: LogEntry[], current: LogEntry | null, totals: Totals): void;
@@ -93,8 +95,9 @@ export function createLiveSession(d: SessionDeps): LiveSession {
       e.usageEstimated = !!u.estimated;
       e.costUsd = costUsd(model, e.usage);
     };
+    const catalogs = d.getCatalogs?.() ?? [];
     await streamBoard(
-      { delta, summary: d.getBoard().summary, board: serializeBoard(d.getBoard()), model, shape: d.getShape?.() ?? "auto", mode },
+      { delta, summary: d.getBoard().summary, board: serializeBoard(d.getBoard(), { catalog: catalogs.length > 0 }), model, shape: d.getShape?.() ?? "auto", mode, catalogs },
       {
         onOp(o) {
           if (e.firstOpMs === null) { e.firstOpMs = Date.now() - t0; if (voiceAt !== null) e.voiceFirstMs = Date.now() - voiceAt; }

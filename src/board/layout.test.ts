@@ -6,6 +6,7 @@ import type { EdgeGeom, Pt } from "./layout";
 import type { Rect } from "./layout";
 import { SCRIPTS } from "./scripts";
 import { buildTree } from "./tree";
+import { diffTrees } from "./animator";
 
 const finalBoard = (ops: Parameters<typeof applyOps>[1]) => applyOps(emptyBoard(), ops).board;
 
@@ -230,5 +231,22 @@ describe("labelLines", () => {
   });
   it("no parte una sola palabra larga", () => {
     expect(labelLines("autenticaciónfederadaconcognito")).toEqual(["autenticaciónfederadaconcognito"]);
+  });
+});
+
+describe("service no cambia la firma de render", () => {
+  it("set_service sobre un elemento ya dibujado no genera update (ni mueve la caja) y deja service en data", async () => {
+    const before = finalBoard([
+      op.create_zone({ id: "s", kind: "system", title: "S" }),
+      op.add_component({ zone: "s", id: "fn", label: "Fn", type: "service", icon: "⚡" }),
+    ]);
+    const after = applyOps(before, [op.set_service({ id: "fn", service: "lambda" })]).board;
+    const t0 = buildTree(before, await computeLayout(before));
+    const t1 = buildTree(after, await computeLayout(after));
+    expect(t1.map.get("fn")!.sig).toBe(t0.map.get("fn")!.sig);
+    expect(t1.map.get("fn")!.geom).toEqual(t0.map.get("fn")!.geom);
+    expect(t1.map.get("fn")!.data.lines![0]).toContain("⚡");
+    expect(t1.map.get("fn")!.data.service).toBe("aws:lambda");
+    expect(diffTrees(t0, t1)).toEqual({ sequential: [], moves: [] });
   });
 });

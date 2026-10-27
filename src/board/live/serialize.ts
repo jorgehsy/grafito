@@ -4,7 +4,12 @@ import { FILL_NAMES } from "../render/visuals";
 
 const q = (s: string) => JSON.stringify(s);
 
-export function serializeBoard(b: Board): string {
+export interface SerializeOpts {
+  /** Catálogo de iconos prendido: se muestra ` service:lambda` por elemento. Apagado: no se muestra. */
+  catalog?: boolean;
+}
+
+export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
   if (!b.zones.length && !b.els.length) return "(tablero vacío)";
   const out: string[] = [];
   out.push("ZONAS");
@@ -34,6 +39,7 @@ export function serializeBoard(b: Board): string {
     if (e.column) l += ` col:${e.column}`;
     if (e.after) l += ` after:${e.after}`;
     if (e.parent) l += ` parent:${e.parent}`;
+    if (opts.catalog && e.service) l += ` service:${e.service.slice(e.service.indexOf(":") + 1)}`;
     out.push(l);
   }
   if (b.conns.length) {

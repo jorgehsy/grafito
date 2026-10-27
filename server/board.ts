@@ -1,15 +1,43 @@
 import Anthropic from "@anthropic-ai/sdk";
 import Ajv from "ajv";
 import type { Request, Response } from "express";
-import { OP_TOOLS, ZONE_KINDS } from "../src/board/ops";
+import { CATALOG_IDS, ZONE_KINDS, toolsFor } from "../src/board/ops";
+import { AWS_PREFIJO_CATALOGO, SERVICIOS_AWS } from "../src/iconos/aws/servicios";
 
 export const MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"] as const;
 const PLACEHOLDER = "pega-tu-clave-aqui";
 
-// Una sola fuente de verdad: las herramientas son OP_TOOLS (src/board/ops.ts).
-const TOOLS = OP_TOOLS.map((t) => ({ ...t, eager_input_streaming: true }));
+// Una sola fuente de verdad: las herramientas son OP_TOOLS (src/board/ops.ts); con un catálogo
+// prendido, toolsFor(catalogs) les suma `service` y set_service. Una versión cacheada por conjunto.
 const ajv = new (Ajv as any)({ strict: false, allErrors: false });
-const validators = new Map<string, any>(OP_TOOLS.map((t) => [t.name, ajv.compile(t.input_schema)]));
+const toolSets = new Map<string, { tools: any[]; validators: Map<string, any> }>();
+
+function toolSetFor(catalogs: readonly string[]) {
+  const key = normalizeCatalogs(catalogs).join(",");
+  let set = toolSets.get(key);
+  if (!set) {
+    const defs = toolsFor(catalogs);
+    set = {
+      tools: defs.map((t) => ({ ...t, eager_input_streaming: true })),
+      validators: new Map<string, any>(defs.map((t) => [t.name, ajv.compile(t.input_schema)])),
+    };
+    toolSets.set(key, set);
+  }
+  return set;
+}
+
+/** Ordenados y sin repetir, para que {["aws"]} y {["aws","aws"]} compartan caché. */
+export function normalizeCatalogs(catalogs: readonly string[]): string[] {
+  return [...new Set(catalogs)].sort();
+}
+
+/** `catalogs` del body: arreglo de ids conocidos (o ausente = apagado). Devuelve el error o null. */
+export function validateCatalogs(raw: unknown): string | null {
+  if (raw === undefined) return null;
+  if (!Array.isArray(raw)) return `Catálogos inválidos: ${JSON.stringify(raw)}`;
+  const bad = raw.find((c) => typeof c !== "string" || !(CATALOG_IDS as readonly string[]).includes(c));
+  return bad === undefined ? null : `Catálogo inválido: ${JSON.stringify(bad)}`;
+}
 
 export const BOARD_SYSTEM_PROMPT = `Eres un dibujante silencioso en vivo. Una persona da una charla sobre procesos/flujos y arquitectura técnica; el texto llega por fragmentos (con muletillas y repeticiones). Dibujas en un tablero de pizarra mediante llamadas a herramientas. Nunca escribes texto fuera de las herramientas. No das coordenadas: el tablero se coloca solo.
 
@@ -46,8 +74,22 @@ TABLERO ACTUAL: (tablero vacío)
 FRAGMENTO: "El cliente hace el pedido en la web y la API lo guarda en la base de datos."
 Llamadas: create_zone{id:"app",kind:"system",title:"Pedidos"}; add_component{zone:"app",id:"cliente",label:"Cliente",type:"actor"}; add_component{zone:"app",id:"web",label:"Web",type:"client"}; add_component{zone:"app",id:"api",label:"API",type:"service"}; add_component{zone:"app",id:"db",label:"Base de datos",type:"database"}; connect{id:"c1",from:"cliente",to:"web"}; connect{id:"c2",from:"web",to:"api"}; connect{id:"c3",from:"api",to:"db",label:"guarda pedido"}; update_summary{text:"El cliente pide por la web; la API guarda el pedido en la base de datos."}`;
 
-export function validateOp(name: string, input: unknown): string | null {
-  const v = validators.get(name);
+// Bloque extra del prompt cuando el catálogo AWS está prendido. La lista sale de servicios.ts.
+function awsPromptBlock(): string {
+  const lista = SERVICIOS_AWS.map((s) => (s.sinonimos?.length ? `${s.id} (también: ${s.sinonimos.join(", ")})` : s.id)).join("; ");
+  return `Iconos de servicio de AWS: add_step, add_decision y add_component admiten service, y set_service lo pone o cambia (o lo quita con service vacío) en cualquier elemento ya dibujado, p. ej. "esa API en realidad es API Gateway" o "a la caja API ponle icono de API Gateway". Ids válidos: ${lista}.
+- Marca service SOLO si el hablante nombra el servicio ("Lambda", "un bucket de S3") o no hay duda. Si solo lo deduces ("una función serverless"), no marques.
+- Las palabras genéricas ("una base de datos", "una cola", "un servidor") no llevan icono. Solo hay icono de servicio, nunca de recurso.
+- Un elemento con service no necesita icon.`;
+}
+
+/** Prompt del sistema: bloque base + bloque del catálogo si está prendido. Apagado = BOARD_SYSTEM_PROMPT tal cual. */
+export function systemPromptFor(catalogs: readonly string[]): string {
+  return catalogs.includes(AWS_PREFIJO_CATALOGO) ? `${BOARD_SYSTEM_PROMPT}\n\n${awsPromptBlock()}` : BOARD_SYSTEM_PROMPT;
+}
+
+export function validateOp(name: string, input: unknown, catalogs: readonly string[] = []): string | null {
+  const v = toolSetFor(catalogs).validators.get(name);
   if (!v) return `herramienta desconocida "${name}"`;
   if (!input || typeof input !== "object") return "entrada no es un objeto";
   if (!v(input)) {
@@ -77,14 +119,14 @@ export function buildUserText(a: { board?: unknown; summary?: unknown; delta: st
 export type ParsedBlock = { ok: true; name: string; input: unknown } | { ok: false; name: string; warning: string; invalid: true };
 
 // Parsea y valida un bloque tool_use ya completo. Buffer vacío = {}.
-export function parseToolBlock(name: string, json: string): ParsedBlock {
+export function parseToolBlock(name: string, json: string, catalogs: readonly string[] = []): ParsedBlock {
   let input: unknown;
   try {
     input = json.trim() === "" ? {} : JSON.parse(json);
   } catch {
     return { ok: false, invalid: true, name, warning: `${name}: JSON mal formado (se omitió)` };
   }
-  const bad = validateOp(name, input);
+  const bad = validateOp(name, input, catalogs);
   if (bad) return { ok: false, invalid: true, name, warning: `${name}: ${bad}` };
   return { ok: true, name, input };
 }
@@ -111,7 +153,7 @@ export async function boardHandler(req: Request, res: Response) {
     sse(res, "error", { message: "Falta la API key en .env" });
     return res.end();
   }
-  const { delta, summary, board, model, shape, mode: rawMode } = req.body ?? {};
+  const { delta, summary, board, model, shape, mode: rawMode, catalogs: rawCatalogs } = req.body ?? {};
   if (typeof delta !== "string" || !delta.trim()) {
     sse(res, "error", { message: "El texto está vacío" });
     return res.end();
@@ -124,6 +166,12 @@ export async function boardHandler(req: Request, res: Response) {
     sse(res, "error", { message: `Modo inválida: ${JSON.stringify(rawMode)}` });
     return res.end();
   }
+  const badCatalogs = validateCatalogs(rawCatalogs);
+  if (badCatalogs) {
+    sse(res, "error", { message: badCatalogs });
+    return res.end();
+  }
+  const catalogs = normalizeCatalogs(rawCatalogs ?? []);
   const mode: BoardMode = rawMode === "instruction" ? "instruction" : "content";
   const useModel = (MODELS as readonly string[]).includes(model) ? model : MODELS[0];
 
@@ -146,8 +194,8 @@ export async function boardHandler(req: Request, res: Response) {
   const params: any = {
     model: useModel,
     max_tokens: mode === "instruction" ? 8192 : 4096,
-    system: [{ type: "text", text: BOARD_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-    tools: TOOLS,
+    system: [{ type: "text", text: systemPromptFor(catalogs), cache_control: { type: "ephemeral" } }],
+    tools: toolSetFor(catalogs).tools,
     tool_choice: { type: "auto" },
     output_config: { effort: mode === "instruction" ? "medium" : "low" },
     messages: [{ role: "user", content: userText }],
@@ -180,7 +228,7 @@ export async function boardHandler(req: Request, res: Response) {
         const b = blocks.get(ev.index);
         if (!b) continue;
         blocks.delete(ev.index);
-        const r = parseToolBlock(b.name, b.buf);
+        const r = parseToolBlock(b.name, b.buf, catalogs);
         if (!r.ok) {
           sse(res, "op", { invalid: true, name: r.name, warning: r.warning });
           continue;

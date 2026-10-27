@@ -8,6 +8,7 @@ import type { Cam, View } from "../camera";
 import { geomEqual } from "../tree";
 import type { Geom, RItem, RenderTree } from "../tree";
 import { emptyTree } from "../tree";
+import { addServiceIcon, enterSello, hideSello, planEntrada, removeSello } from "./sello";
 import { buildVisual, hideForDraw, hideText, measure, RED, showAll } from "./visuals";
 import type { Visual } from "./visuals";
 
@@ -124,12 +125,17 @@ export class Engine implements Sink, Executor {
     if (!isFinite(speed)) { showAll(vis); s.busy = false; return; }
     const sp = speed * this.userSpeed;
     hideForDraw(vis);
-    await this.drawStrokes(s, sp);
-    await this.frame(240 / sp, (p) => {
-      for (const f of vis.fills) f.style.opacity = String(p * parseFloat(f.getAttribute("opacity") ?? "1"));
-    });
-    for (const f of vis.fills) f.style.opacity = "";
-    await this.writeText(s, sp);
+    hideSello(vis);
+    for (const { fase } of planEntrada("dibujar", !!vis.sello?.length, sp)) {
+      if (fase === "trazo") await this.drawStrokes(s, sp);
+      else if (fase === "relleno") {
+        await this.frame(240 / sp, (p) => {
+          for (const f of vis.fills) f.style.opacity = String(p * parseFloat(f.getAttribute("opacity") ?? "1"));
+        });
+        for (const f of vis.fills) f.style.opacity = "";
+      } else if (fase === "sello") await enterSello(vis, (d, fn) => this.frame(d, fn), sp);
+      else await this.writeText(s, sp);
+    }
     this.hidePen();
     s.busy = false;
   }
@@ -144,13 +150,16 @@ export class Engine implements Sink, Executor {
     const sp = speed * this.userSpeed;
     if (!instant) await this.strike(s, sp);
     const vis = buildVisual(t, s.geom);
+    const nuevo = vis.sello?.length && t.data.service !== s.item.data.service;
     s.layer.replaceChild(vis.g, s.vis.g);
     s.vis = vis;
     s.item = { ...t, geom: s.geom };
     this.highlight(s);
     if (!instant) {
       hideText(vis);
+      if (nuevo) hideSello(vis);
       await this.writeText(s, sp);
+      if (nuevo) await enterSello(vis, (d, fn) => this.frame(d, fn), sp);
       this.hidePen();
     }
     s.busy = false;
@@ -222,6 +231,7 @@ export class Engine implements Sink, Executor {
     for (const [key, s] of this.shown) {
       const t = this.target.map.get(key);
       if (!t || s.busy) continue;
+      if ((s.item.data.service ?? "") !== (t.data.service ?? "")) { void this.restamp(s, t); continue; }
       const differs = !geomEqual(s.geom, t.geom) || s.item.hue !== t.hue;
       if (s.tween && !geomEqual(s.tween.to, t.geom)) s.tween = differs ? { from: s.geom, to: t.geom, t0: this.clock, dur: 450 / this.userSpeed } : undefined;
       else if (!s.tween && differs) {
@@ -236,6 +246,22 @@ export class Engine implements Sink, Executor {
         if (done) s.tween = undefined;
       } else if (s.item.hue !== t.hue) this.applyGeom(s, s.geom, t.hue);
     }
+  }
+
+  /** set_service sobre algo ya dibujado: no se tacha ni se redibuja; el sello salta encima (o se quita). */
+  private async restamp(s: Shown, t: RItem) {
+    s.busy = true;
+    removeSello(s.vis);
+    s.item = { ...s.item, data: { ...s.item.data, service: t.data.service } };
+    addServiceIcon(s.vis, s.item, s.geom);
+    const conSello = !!s.vis.sello?.length;
+    const speed = Number.isFinite(this.userSpeed) ? this.userSpeed : 1;
+    try {
+      for (const { fase } of planEntrada("set_service", conSello, speed)) {
+        if (fase === "sello") { hideSello(s.vis); await enterSello(s.vis, (d, fn) => this.frame(d, fn), speed); }
+      }
+    } catch { /* cancelado: el sello queda como esté */ }
+    s.busy = false;
   }
 
   private applyGeom(s: Shown, g: Geom, hue: number) {

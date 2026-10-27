@@ -4,6 +4,7 @@ import type { Options } from "roughjs/bin/core";
 import type { Drawable } from "roughjs/bin/core";
 import type { Geom, RItem } from "../tree";
 import { LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "../layout";
+import { addServiceIcon } from "./sello";
 
 const NS = "http://www.w3.org/2000/svg";
 const gen = rough.generator();
@@ -41,6 +42,8 @@ export interface Visual {
   texts: TextRun[];
   /** true: las formas están en coordenadas locales y g lleva translate(geom.x, geom.y) */
   translates: boolean;
+  /** Sello de servicio (icono de AWS) montado en la esquina. */
+  sello?: SVGGElement[];
 }
 
 let maskId = 0;
@@ -329,6 +332,7 @@ export function buildVisual(item: RItem, geom: Geom): Visual {
     arrowHead(b, "head", p[3], p[2], BLUE, 2.2);
   }
 
+  addServiceIcon(b.v, item, geom);
   if (translates) b.v.g.setAttribute("transform", `translate(${geom.x} ${geom.y})`);
   return b.v;
 }

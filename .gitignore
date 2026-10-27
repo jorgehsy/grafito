@@ -5,3 +5,5 @@ dist
 pruebas/
 .remember/
 .DS_Store
+
+.scratch/

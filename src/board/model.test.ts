@@ -209,3 +209,66 @@ describe("scale", () => {
     });
   });
 });
+
+describe("service (icono de servicio)", () => {
+  const svcBoard = () =>
+    applyOps(emptyBoard(), [
+      op.create_zone({ id: "f", kind: "flow", title: "Flujo" }),
+      op.create_zone({ id: "s", kind: "system", title: "Sistema" }),
+      op.create_zone({ id: "l", kind: "list", title: "Lista" }),
+    ]).board;
+
+  it("service en add_step, add_component y add_decision guarda aws:<id>", () => {
+    const r = applyOps(svcBoard(), [
+      op.add_step({ zone: "f", id: "a", label: "A", service: "lambda" }),
+      op.add_decision({ zone: "f", id: "d", question: "¿Ok?", service: "api-gateway" }),
+      op.add_component({ zone: "s", id: "fn", label: "Fn", type: "service", service: "s3" }),
+    ]);
+    expect(r.warnings).toEqual([]);
+    expect(r.board.els.map((e) => e.service)).toEqual(["aws:lambda", "aws:api-gateway", "aws:s3"]);
+  });
+  it("con service válido el emoji icon se ignora; sin service se conserva", () => {
+    const r = applyOps(svcBoard(), [
+      op.add_step({ zone: "f", id: "a", label: "A", icon: "⚡", service: "lambda" }),
+      op.add_step({ zone: "f", id: "b", label: "B", icon: "⚡" }),
+    ]).board;
+    expect(r.els[0]).toMatchObject({ service: "aws:lambda" });
+    expect(r.els[0].icon).toBeUndefined();
+    expect(r.els[1].icon).toBe("⚡");
+  });
+  it("id desconocido se ignora con aviso y el elemento se crea normal", () => {
+    for (const bad of ["inventado", "aws:inventado"]) {
+      const r = applyOps(svcBoard(), [op.add_step({ zone: "f", id: "a", label: "A", icon: "⚡", service: bad })]);
+      expect(r.warnings).toHaveLength(1);
+      expect(r.warnings[0]).toMatch(/service/);
+      expect(r.board.els[0]).toMatchObject({ id: "a", icon: "⚡" });
+      expect(r.board.els[0].service).toBeUndefined();
+    }
+  });
+  it("set_service pone, cambia y quita en caja, rombo y paso", () => {
+    let b = applyOps(svcBoard(), [
+      op.add_step({ zone: "f", id: "p", label: "P" }),
+      op.add_decision({ zone: "f", id: "d", question: "¿?" }),
+      op.add_component({ zone: "s", id: "c", label: "C", type: "database" }),
+      op.add_item({ zone: "l", id: "it", text: "x" }),
+    ]).board;
+    for (const id of ["p", "d", "c", "it"]) {
+      b = applyOp(b, op.set_service({ id, service: "lambda" })).board;
+      expect(b.els.find((e) => e.id === id)!.service).toBe("aws:lambda");
+      b = applyOp(b, op.set_service({ id, service: "aws:dynamodb" })).board;
+      expect(b.els.find((e) => e.id === id)!.service).toBe("aws:dynamodb");
+      b = applyOp(b, op.set_service({ id, service: "" })).board;
+      expect(b.els.find((e) => e.id === id)!.service).toBeUndefined();
+    }
+  });
+  it("set_service desconocido, id inexistente o zona: aviso y sin cambios; conserva el emoji", () => {
+    const b = applyOps(svcBoard(), [op.add_step({ zone: "f", id: "p", label: "P", icon: "⚡", service: "s3" })]).board;
+    for (const bad of [op.set_service({ id: "p", service: "inventado" }), op.set_service({ id: "zzz", service: "s3" }), op.set_service({ id: "f", service: "s3" })]) {
+      const r = applyOp(b, bad);
+      expect(r.warnings).toHaveLength(1);
+      expect(r.board).toEqual(b);
+    }
+    const withIcon = applyOps(svcBoard(), [op.add_step({ zone: "f", id: "q", label: "Q", icon: "⚡" }), op.set_service({ id: "q", service: "lambda" })]).board;
+    expect(withIcon.els[0]).toMatchObject({ icon: "⚡", service: "aws:lambda" });
+  });
+});

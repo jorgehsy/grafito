@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { emptyBoard } from "../model";
+import { applyOps, emptyBoard } from "../model";
+import { op } from "../ops";
 import type { Op } from "../ops";
 import { createLiveSession } from "./session";
 import type { LogEntry, Totals } from "./session";
@@ -96,5 +97,25 @@ describe("registro de sesión", () => {
     delete old.requests[1].mode; delete old.requests[1].undone;
     expect(entriesFromRecord(old).entries[1]).toMatchObject({ mode: "content" });
     expect(entriesFromRecord(old).entries[1].undone).toBeUndefined();
+  });
+});
+
+describe("service en exportar -> importar", () => {
+  it("las ops con service se reaplican y dan aws:lambda con el catálogo apagado", () => {
+    const mk = (id: number, opList: Op[]): LogEntry => ({
+      id, model: "m", delta: "t", mode: "content", startedAt: 0, firstOpMs: 1, voiceFirstMs: null, totalMs: 2, ops: opList.length, opList,
+      usage: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      usageEstimated: false, costUsd: 0, warnings: [], done: true,
+    });
+    const entries = [
+      mk(1, [op.create_zone({ id: "s", kind: "system", title: "S" }), op.add_component({ zone: "s", id: "fn", label: "Fn", type: "service", service: "lambda" })]),
+      mk(2, [op.add_component({ zone: "s", id: "db", label: "BD", type: "database" }), op.set_service({ id: "db", service: "dynamodb" })]),
+    ];
+    const tot = { requests: 2, usage: entries[0].usage, costUsd: 0 };
+    const rec = buildRecord({ id: "a", startedAt: 0, model: "m", lang: "es-CL", transcript: [], summary: "" }, entries, tot);
+    const back = entriesFromRecord(JSON.parse(JSON.stringify(rec)));
+    const board = applyOps(emptyBoard(), replayOps(back.entries));
+    expect(board.warnings).toEqual([]);
+    expect(board.board.els.map((e) => e.service)).toEqual(["aws:lambda", "aws:dynamodb"]);
   });
 });

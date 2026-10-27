@@ -9,6 +9,8 @@ export interface Geom { x: number; y: number; w: number; h: number; pts?: Pt[]; 
 export interface ItemData {
   variant?: string; // tipo de paso/componente, estilo de énfasis o de arista
   lines?: string[];
+  /** Icono de servicio (`aws:lambda`). No entra en `sig`: set_service no redibuja. */
+  service?: string;
   title?: string;
   leftTitle?: string;
   rightTitle?: string;
@@ -97,7 +99,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       const x0 = sp ? sp.x0 - r.x : 0, bw = sp ? sp.x1 - sp.x0 : r.w;
       items.push({
         key: e.id, kind: "element", sig: JSON.stringify(["span", lines, tone, Math.round(x0), Math.round(bw)]), hue: zoneN.get(e.zone) ?? 0,
-        geom: { ...r }, data: { variant: "span", lines, tone, x0, barW: bw },
+        geom: { ...r }, data: { variant: "span", lines, tone, x0, barW: bw, service: e.service },
       });
       continue;
     }
@@ -105,7 +107,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       const noteLines = markNoteLines(e);
       items.push({
         key: e.id, kind: "element", sig: JSON.stringify([variant, lines, noteLines]), hue: zoneN.get(e.zone) ?? 0,
-        geom: { ...r }, data: { variant, lines, noteLines },
+        geom: { ...r }, data: { variant, lines, noteLines, service: e.service },
       });
       const w = lay.labels[`when:${e.id}`];
       if (e.type === "event" && e.when && w) {
@@ -128,7 +130,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       const tone = e.tone ?? "neutral";
       items.push({
         key: e.id, kind: "element", sig: JSON.stringify([variant, lines, noteLines, tone]), hue: zoneN.get(e.zone) ?? 0,
-        geom: { ...r }, data: { variant, lines, noteLines, tone },
+        geom: { ...r }, data: { variant, lines, noteLines, tone, service: e.service },
       });
       const mg = lay.marks[e.id];
       if (mg) {
@@ -139,7 +141,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       }
       continue;
     }
-    items.push({ key: e.id, kind: "element", sig: JSON.stringify([variant, lines]), hue: zoneN.get(e.zone) ?? 0, geom: { ...r }, data: { variant, lines } });
+    items.push({ key: e.id, kind: "element", sig: JSON.stringify([variant, lines]), hue: zoneN.get(e.zone) ?? 0, geom: { ...r }, data: { variant, lines, service: e.service } });
   }
   // corchetes de un árbol
   for (const [key, g] of Object.entries(lay.edges)) {

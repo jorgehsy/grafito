@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { T } from "./ShapeGallery";
+import { ICONOS_AWS } from "../../iconos/aws";
+import { SERVICIOS_AWS } from "../../iconos/aws/servicios";
 
 interface Tile { value: string; label: string; sub?: string; thumb: ReactNode }
 
@@ -111,6 +113,40 @@ export function ViewTiles({ follow, onFollow, showTranscript, onShowTranscript }
           <span>{t.label}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+interface Catalog { id: string; label: string; title: string; samples: string[] }
+
+/** Un catálogo de iconos por tarjeta; más catálogos = más entradas aquí. */
+const CATALOGS: Catalog[] = [
+  { id: "aws", label: "AWS", title: `Lambda, S3, Cognito… ${SERVICIOS_AWS.length} servicios`, samples: ["lambda", "s3", "dynamodb"] },
+];
+
+/** Tarjetas independientes (varias pueden ir prendidas); value = ids de catálogos prendidos. */
+export function CatalogTiles({ value, onChange }: { value: string[]; onChange(v: string[]): void }) {
+  return (
+    <div className="shapes" style={{ gridTemplateColumns: "repeat(3, 1fr)" }} data-testid="catalogs">
+      {CATALOGS.map((c) => {
+        const on = value.includes(c.id);
+        return (
+          <button
+            key={c.id}
+            type="button"
+            aria-pressed={on}
+            data-testid={`catalog-${c.id}`}
+            title={c.title}
+            className={"shape catalog" + (on ? " sel on" : "")}
+            onClick={() => onChange(on ? value.filter((x) => x !== c.id) : [...value, c.id])}
+          >
+            <span className="samples" aria-hidden="true">
+              {c.samples.map((s) => <i key={s} dangerouslySetInnerHTML={{ __html: ICONOS_AWS[s] ?? "" }} />)}
+            </span>
+            <span>{c.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

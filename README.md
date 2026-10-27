@@ -30,6 +30,7 @@
 - 🪄 **Órdenes por voz.** Di *"Grafito, …"* para pedir cambios: *"Grafito, separa esto en dos diagramas"*.
 - 💾 **Guarda solo.** Cada sesión se guarda en `pruebas/`. Puedes restaurar, importar y exportar (JSON y SVG).
 - 💲 **Costo visible.** Muestra tokens y costo en dólares de cada petición.
+- ☁️ **Iconos de AWS.** Prende el catálogo en Opciones → Iconos y Claude pone el icono oficial (Lambda, S3, Cognito… 40 servicios) junto a las cajas que son servicios de AWS.
 - ▶️ **Modo guion.** Demos sin Claude y sin gastar nada, para ver cómo funciona.
 
 ## Qué necesitas
@@ -111,6 +112,7 @@ La clave solo la lee el servidor local. Nunca llega al navegador.
 npm test           # pruebas (vitest)
 npm run typecheck  # revisa tipos
 npm run build      # compila para producción
+npm run iconos:aws <zip>  # reinstala los iconos de AWS desde el paquete oficial
 ```
 
 **Cómo funciona, en corto:** la voz se vuelve texto en el navegador. El texto va a `POST /api/board` (`server/board.ts`). Claude responde con *operaciones* (crear zona, agregar caja, conectar, etc.) usando herramientas en streaming. El navegador aplica cada operación al tablero y la anima.
@@ -154,4 +156,8 @@ Usa `npm version minor` o `npm version patch` cuando salga de alfa.
 
 ## Licencia
 
-[MIT](LICENSE) © 2026 Jorge Simoes
+[MIT](LICENSE) © 2026 Jorge Simoes, excepto los iconos de `src/iconos/aws/` (ver [AVISO.md](src/iconos/aws/AVISO.md)).
+
+Amazon Web Services, AWS y los iconos de sus servicios son marcas de Amazon.com, Inc. o sus filiales. Grafito no está afiliado a AWS ni cuenta con su respaldo.
+
+<sub>Amazon Web Services, AWS and the related service icons are trademarks of Amazon.com, Inc. or its affiliates. Grafito is not affiliated with or endorsed by AWS.</sub>
