@@ -14,21 +14,10 @@ import { WebSpeechSource, UNAVAILABLE_MESSAGE } from "./speech/webSpeech";
 import { createMicLock, MIC_TAKEN_MESSAGE } from "./speech/micLock";
 import { createGrouper } from "./speech/grouper";
 import { SPEECH_LANGS } from "./speech/types";
+import { ShapeGallery, SHAPE_OPTIONS } from "./ShapeGallery";
 import type { SpeechSource, SpeechState } from "./speech/types";
 
 const MODEL_OPTIONS = ["claude-sonnet-5-5", "claude-haiku-5-5"];
-const SHAPE_OPTIONS = [
-  { value: "auto", label: "Auto" },
-  { value: "mindmap", label: "Mapa (mindmap)" },
-  { value: "flow", label: "Flujo (flow)" },
-  { value: "scale", label: "Escala (scale)" },
-  { value: "cycle", label: "Ciclo (cycle)" },
-  { value: "tree", label: "Árbol (tree)" },
-  { value: "timeline", label: "Línea de tiempo (timeline)" },
-  { value: "system", label: "Sistema (system)" },
-  { value: "list", label: "Lista (list)" },
-  { value: "compare", label: "Comparar (compare)" },
-];
 const tok = (n: number) => n.toLocaleString("es");
 
 interface Props {
@@ -293,12 +282,10 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
             {MODEL_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </label>
-        <label className="field">
+        <div className="field">
           Forma del dibujo
-          <select data-testid="shape" value={shape} onChange={(e) => setShape(e.target.value)}>
-            {SHAPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </label>
+          <ShapeGallery value={shape} onChange={setShape} />
+        </div>
         <label className="field">
           Idioma
           <select data-testid="lang" value={lang} disabled={micOn} onChange={(e) => setLang(e.target.value)}>
