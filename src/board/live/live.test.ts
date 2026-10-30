@@ -6,7 +6,6 @@ import { serializeBoard } from "./serialize";
 import { createSseParser, streamBoard } from "./sse";
 import { createLiveSession } from "./session";
 import { costUsd, PRICING, fmtUsd, zeroUsage } from "./pricing";
-import { splitSentences } from "./dictation";
 import { OP_TOOLS } from "../ops";
 import { validateOp } from "../../../server/board";
 
@@ -150,9 +149,6 @@ describe("coste", () => {
 });
 
 describe("dictado y validación", () => {
-  it("separa frases", () => {
-    expect(splitSentences("Hola mundo. ¿Qué tal? Bien.")).toEqual(["Hola mundo.", "¿Qué tal?", "Bien."]);
-  });
   it("valida entradas de herramientas con el esquema", () => {
     expect(OP_TOOLS.length).toBe(21);
     expect(validateOp("delete", { id: "a" })).toBeNull();

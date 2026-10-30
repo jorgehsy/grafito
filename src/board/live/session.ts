@@ -1,8 +1,8 @@
 // Sesión en vivo: scheduler (una petición en vuelo, junta lo acumulado) + streamBoard + controlador.
 import type { Board } from "../model";
 import type { Op } from "../ops";
-import { createScheduler } from "../../live/scheduler";
-import type { Scheduler, TextKind } from "../../live/scheduler";
+import { createScheduler } from "./scheduler";
+import type { Scheduler, TextKind } from "./scheduler";
 import { splitInstruction } from "./instruction";
 import { serializeBoard } from "./serialize";
 import { streamBoard } from "./sse";

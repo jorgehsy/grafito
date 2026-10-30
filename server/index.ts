@@ -2,13 +2,11 @@ import { config } from "dotenv";
 // La key del .env manda sobre la que venga del shell (p. ej. ~/.bash_profile).
 config({ override: true });
 import express from "express";
-import { drawHandler } from "./draw";
 import { boardHandler, hasApiKey } from "./board";
 import { createSessionsHandlers } from "./sessions";
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
-app.post("/api/draw", drawHandler);
 app.post("/api/board", boardHandler);
 const sessions = createSessionsHandlers();
 app.post("/api/sessions", sessions.save);
