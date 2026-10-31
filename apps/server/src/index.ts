@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
-// La key del .env manda sobre la que venga del shell (p. ej. ~/.bash_profile).
+// The .env key wins over one inherited from the shell (e.g. ~/.bash_profile).
 config({ override: true, path: fileURLToPath(new URL("../.env", import.meta.url)) });
 import express from "express";
 import { boardHandler, hasApiKey } from "./board";
@@ -16,4 +16,4 @@ app.get("/api/sessions/:file", sessions.get);
 app.get("/api/health", (_req, res) => res.json({ ok: true, hasKey: hasApiKey() }));
 
 const port = Number(process.env.PORT ?? 8787);
-app.listen(port, () => console.log(`[grafito] servidor en http://localhost:${port}`));
+app.listen(port, () => console.log(`[grafito] server at http://localhost:${port}`));

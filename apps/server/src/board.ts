@@ -6,15 +6,15 @@ import { AWS_CATALOG_ID, AWS_SERVICES } from "@grafito/icons";
 export const MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"] as const;
 const PLACEHOLDER = "pega-tu-clave-aqui";
 
-
-/** `catalogs` del body: arreglo de ids conocidos (o ausente = apagado). Devuelve el error o null. */
+/** `catalogs` from the body: an array of known catalog ids (absent = off). Returns the error message or null. */
 export function validateCatalogs(raw: unknown): string | null {
   if (raw === undefined) return null;
-  if (!Array.isArray(raw)) return `Catálogos inválidos: ${JSON.stringify(raw)}`;
+  if (!Array.isArray(raw)) return `Invalid catalogs: ${JSON.stringify(raw)}`;
   const bad = raw.find((c) => typeof c !== "string" || !(CATALOG_IDS as readonly string[]).includes(c));
-  return bad === undefined ? null : `Catálogo inválido: ${JSON.stringify(bad)}`;
+  return bad === undefined ? null : `Invalid catalog: ${JSON.stringify(bad)}`;
 }
 
+// Spanish on purpose: prompt text, translated with the English prompt ticket.
 export const BOARD_SYSTEM_PROMPT = `Eres un dibujante silencioso en vivo. Una persona da una charla sobre procesos/flujos y arquitectura técnica; el texto llega por fragmentos (con muletillas y repeticiones). Dibujas en un tablero de pizarra mediante llamadas a herramientas. Nunca escribes texto fuera de las herramientas. No das coordenadas: el tablero se coloca solo.
 
 Recibes: TABLERO ACTUAL (zonas, elementos, conexiones, notas), RESUMEN y el NUEVO FRAGMENTO. Dibuja SOLO lo que se ha dicho en el fragmento; no inventes componentes ni pasos. Si no aporta nada nuevo, solo actualiza el resumen.
@@ -50,16 +50,17 @@ TABLERO ACTUAL: (tablero vacío)
 FRAGMENTO: "El cliente hace el pedido en la web y la API lo guarda en la base de datos."
 Llamadas: create_zone{id:"app",kind:"system",title:"Pedidos"}; add_component{zone:"app",id:"cliente",label:"Cliente",type:"actor"}; add_component{zone:"app",id:"web",label:"Web",type:"client"}; add_component{zone:"app",id:"api",label:"API",type:"service"}; add_component{zone:"app",id:"db",label:"Base de datos",type:"database"}; connect{id:"c1",from:"cliente",to:"web"}; connect{id:"c2",from:"web",to:"api"}; connect{id:"c3",from:"api",to:"db",label:"guarda pedido"}; update_summary{text:"El cliente pide por la web; la API guarda el pedido en la base de datos."}`;
 
-// Bloque extra del prompt cuando el catálogo AWS está prendido. La lista sale de services.ts.
+// Extra prompt block when the AWS catalog is on. The service list comes from services.ts.
+// Spanish on purpose: prompt text, translated with the English prompt ticket.
 function awsPromptBlock(): string {
-  const lista = AWS_SERVICES.map((s) => (s.synonyms?.length ? `${s.id} (también: ${s.synonyms.join(", ")})` : s.id)).join("; ");
-  return `Iconos de servicio de AWS: add_step, add_decision y add_component admiten service, y set_service lo pone o cambia (o lo quita con service vacío) en cualquier elemento ya dibujado, p. ej. "esa API en realidad es API Gateway" o "a la caja API ponle icono de API Gateway". Ids válidos: ${lista}.
+  const serviceList = AWS_SERVICES.map((s) => (s.synonyms?.length ? `${s.id} (también: ${s.synonyms.join(", ")})` : s.id)).join("; ");
+  return `Iconos de servicio de AWS: add_step, add_decision y add_component admiten service, y set_service lo pone o cambia (o lo quita con service vacío) en cualquier elemento ya dibujado, p. ej. "esa API en realidad es API Gateway" o "a la caja API ponle icono de API Gateway". Ids válidos: ${serviceList}.
 - Marca service SOLO si el hablante nombra el servicio ("Lambda", "un bucket de S3") o no hay duda. Si solo lo deduces ("una función serverless"), no marques.
 - Las palabras genéricas ("una base de datos", "una cola", "un servidor") no llevan icono. Solo hay icono de servicio, nunca de recurso.
 - Un elemento con service no necesita icon.`;
 }
 
-/** Prompt del sistema: bloque base + bloque del catálogo si está prendido. Apagado = BOARD_SYSTEM_PROMPT tal cual. */
+/** System prompt: base block plus the catalog block when a catalog is on. Off = BOARD_SYSTEM_PROMPT unchanged. */
 export function systemPromptFor(catalogs: readonly string[]): string {
   return catalogs.includes(AWS_CATALOG_ID) ? `${BOARD_SYSTEM_PROMPT}\n\n${awsPromptBlock()}` : BOARD_SYSTEM_PROMPT;
 }
@@ -70,7 +71,8 @@ function sse(res: Response, event: string, data: unknown) {
 
 export type BoardMode = "content" | "instruction";
 
-// Texto de usuario que se manda al modelo (puro, para poder probarlo).
+// User text sent to the model. Pure so it can be tested.
+// Spanish on purpose: prompt text, translated with the English prompt ticket.
 export function buildUserText(a: { board?: unknown; summary?: unknown; delta: string; shape?: unknown; mode?: BoardMode }): string {
   const boardText = typeof a.board === "string" && a.board.trim() ? a.board : "(tablero vacío)";
   const summary = a.summary || "(vacío)";
@@ -83,26 +85,26 @@ export function buildUserText(a: { board?: unknown; summary?: unknown; delta: st
 
 export type ParsedBlock = { ok: true; name: string; input: unknown } | { ok: false; name: string; warning: string; invalid: true };
 
-// Parsea y valida un bloque tool_use ya completo. Buffer vacío = {}.
+// Parses and validates a finished tool_use block. An empty buffer means {}.
 export function parseToolBlock(name: string, json: string, catalogs: readonly string[] = []): ParsedBlock {
   let input: unknown;
   try {
     input = json.trim() === "" ? {} : JSON.parse(json);
   } catch {
-    return { ok: false, invalid: true, name, warning: `${name}: JSON mal formado (se omitió)` };
+    return { ok: false, invalid: true, name, warning: `${name}: malformed JSON (skipped)` };
   }
   const bad = validateOp(name, input, catalogs);
   if (bad) return { ok: false, invalid: true, name, warning: `${name}: ${bad}` };
   return { ok: true, name, input };
 }
 
-// Reintentable: error de red/5xx/429, no 4xx (salvo 429).
+// Retryable: network error, 5xx or 429; other 4xx are not.
 export function isRetryable(status: unknown): boolean {
   if (typeof status !== "number") return true;
   return !(status >= 400 && status < 500 && status !== 429);
 }
 
-/** Hay una API key utilizable en el entorno (no vacía ni la de ejemplo). */
+/** There is a usable API key in the environment (not empty, not the example placeholder). */
 export function hasApiKey(key = process.env.ANTHROPIC_API_KEY): key is string {
   return !!key && key.trim() !== "" && !key.includes(PLACEHOLDER);
 }
@@ -115,20 +117,20 @@ export async function boardHandler(req: Request, res: Response) {
     Connection: "keep-alive",
   });
   if (!hasApiKey(key)) {
-    sse(res, "error", { message: "Falta la API key en .env" });
+    sse(res, "error", { message: "Missing API key in .env" });
     return res.end();
   }
   const { delta, summary, board, model, shape, mode: rawMode, catalogs: rawCatalogs } = req.body ?? {};
   if (typeof delta !== "string" || !delta.trim()) {
-    sse(res, "error", { message: "El texto está vacío" });
+    sse(res, "error", { message: "The text is empty" });
     return res.end();
   }
   if (shape !== undefined && shape !== "auto" && !(ZONE_KINDS as readonly string[]).includes(shape)) {
-    sse(res, "error", { message: `Forma inválida: ${JSON.stringify(shape)}` });
+    sse(res, "error", { message: `Invalid shape: ${JSON.stringify(shape)}` });
     return res.end();
   }
   if (rawMode !== undefined && rawMode !== "content" && rawMode !== "instruction") {
-    sse(res, "error", { message: `Modo inválida: ${JSON.stringify(rawMode)}` });
+    sse(res, "error", { message: `Invalid mode: ${JSON.stringify(rawMode)}` });
     return res.end();
   }
   const badCatalogs = validateCatalogs(rawCatalogs);
@@ -149,7 +151,7 @@ export async function boardHandler(req: Request, res: Response) {
 
   const userText = buildUserText({ board, summary, delta, shape, mode });
 
-  // Uso conocido hasta ahora; la salida se estima con chars/4 hasta tener la cifra real.
+  // Usage known so far; output is estimated as chars/4 until the real figure arrives.
   const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
   let streamedChars = 0;
   let lastEmit = 0;
@@ -166,7 +168,7 @@ export async function boardHandler(req: Request, res: Response) {
     messages: [{ role: "user", content: userText }],
   };
 
-  // Una pasada por el stream crudo: un bloque con JSON roto se omite, el resto sigue.
+  // One pass over the raw stream: a block with broken JSON is skipped, the rest go on.
   const attempt = async () => {
     const stream: any = await client.messages.create({ ...params, stream: true }, { signal: abort.signal });
     const blocks = new Map<number, { name: string; buf: string }>();
@@ -216,14 +218,14 @@ export async function boardHandler(req: Request, res: Response) {
     try {
       await attempt();
     } catch (e: any) {
-      // Un solo reintento, sólo si aún no salió ninguna op.
+      // One retry only, and only if no op has been sent yet.
       if (ops > 0 || abort.signal.aborted || !isRetryable(e?.status)) throw e;
       streamedChars = 0;
       realOutput = false;
       await attempt();
     }
-    if (stopReason === "refusal") sse(res, "error", { message: "El modelo rechazó la solicitud (refusal)" });
-    else if (stopReason === "max_tokens") sse(res, "error", { message: "Respuesta cortada por max_tokens" });
+    if (stopReason === "refusal") sse(res, "error", { message: "The model refused the request (refusal)" });
+    else if (stopReason === "max_tokens") sse(res, "error", { message: "Response cut off by max_tokens" });
     sse(res, "done", {
       usage: { ...usage },
       timings: { first_op_ms: firstOp, total_ms: Date.now() - t0 },
@@ -234,7 +236,7 @@ export async function boardHandler(req: Request, res: Response) {
   } catch (e: any) {
     if (!abort.signal.aborted) {
       const status = e?.status ? ` (HTTP ${e.status})` : "";
-      sse(res, "error", { message: `Error al llamar a Claude${status}: ${e?.message ?? e}` });
+      sse(res, "error", { message: `Error calling Claude${status}: ${e?.message ?? e}` });
     }
   }
   res.end();
