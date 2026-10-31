@@ -4,6 +4,8 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 
 ## Unreleased
 
+## v0.2.0-alpha.6 · 2026-10-31
+
 - Mute button: while the mic is on, a button next to the subtitles (or the M key) lets you keep talking without Grafito drawing. Muting first closes the turn, so what you said before still gets drawn.
 - Use your Claude subscription (local only): "plan" models (Sonnet 5.5 and Haiku 5.5) in Options → Model, off by default. Turn on with `GRAFITO_SUBSCRIPTION=1` and a `claude` login or `CLAUDE_CODE_OAUTH_TOKEN`. They show "included in plan" instead of dollars.
 - Models now carry a provider (see `docs/adr/0004-model-providers.md`).

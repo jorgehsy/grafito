@@ -1,7 +1,7 @@
 {
   "name": "grafito",
   "private": true,
-  "version": "0.2.0-alpha.5",
+  "version": "0.2.0-alpha.6",
   "description": "Hablas y Claude dibuja una pizarra en vivo, trazo a trazo.",
   "license": "MIT",
   "repository": {
