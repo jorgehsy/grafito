@@ -295,3 +295,11 @@ _Avoid_: registro, registro de sesión, prueba, log, save file
 **Claude model**:
 Which Claude model answers the requests, chosen by the user.
 _Avoid_: modelo, model (alone; it collides with the board)
+
+**Provider**:
+Where a Claude model runs and how it is billed: `anthropic-api` (the API, paid per token) or `claude-subscription` (the owner's Claude plan, local only). Every model has one, and the server has one adapter per provider.
+_Avoid_: backend, vendor, source
+
+**Plan model**:
+A Claude model served by the `claude-subscription` provider, with an id ending in `@subscription`. It has no price; its cost is shown as "included in plan".
+_Avoid_: subscription model, free model

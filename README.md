@@ -91,6 +91,20 @@ Only the local server reads the key. It never reaches the browser.
 - **Demo at no cost:** open **http://localhost:5173/?mode=demo** and pick a demo. To play one right away: `/?mode=demo&demo=architecture&auto=1&speed=2`.
 - **Move around:** mouse wheel = zoom, drag = pan.
 
+### Use your Claude subscription (local only)
+
+You can run Claude on your own Claude plan instead of the API. It is for your own machine: Anthropic does not allow offering claude.ai login to other people, so never host this for others.
+
+1. Log in with `claude` (Claude Code), or run `claude setup-token` and put the result in `apps/server/.env` as `CLAUDE_CODE_OAUTH_TOKEN`.
+2. Add `GRAFITO_SUBSCRIPTION=1` to `apps/server/.env` and restart.
+3. In Options → Model, pick a **plan** model. It shows tokens and "included in plan", no dollars, and counts against your plan limit.
+
+The API key is never sent on a plan call. If a plan model is not available, Grafito uses the default API model, never the paid twin. The eval can run plan models without the switch:
+
+```bash
+pnpm --filter @grafito/server eval instruction <record.json> "<instruction>" --model claude-sonnet-5-5@subscription
+```
+
 ### Saved sessions
 
 - Each session is saved to `apps/server/sessions/` (on your disk, not uploaded to git).

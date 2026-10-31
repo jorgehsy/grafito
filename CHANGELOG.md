@@ -4,6 +4,10 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 
 ## Unreleased
 
+- Use your Claude subscription (local only): "plan" models (Sonnet 5.5 and Haiku 5.5) in Options → Model, off by default. Turn on with `GRAFITO_SUBSCRIPTION=1` and a `claude` login or `CLAUDE_CODE_OAUTH_TOKEN`. They show "included in plan" instead of dollars.
+- Models now carry a provider (see `docs/adr/0004-model-providers.md`).
+- The eval takes `--model <id>` and runs the board handler in-process, so it no longer needs a running server.
+
 ## v0.2.0-alpha.5 · 2026-10-31
 
 - The first version (Excalidraw mind map, `/api/draw`) is removed.
