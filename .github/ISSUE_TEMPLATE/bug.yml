@@ -1,22 +1,22 @@
-name: 🐛 Algo no funciona
-description: Reporta un error
+name: 🐛 Something is broken
+description: Report a bug
 labels: [bug]
 body:
   - type: textarea
     attributes:
-      label: Qué pasó
-      description: Qué hiciste, qué esperabas y qué pasó en cambio.
+      label: What happened
+      description: What you did, what you expected and what happened instead.
     validations:
       required: true
   - type: input
     attributes:
-      label: Versión de grafito
+      label: grafito version
       placeholder: v0.2.0-alpha.1
   - type: input
     attributes:
-      label: Navegador y sistema
-      placeholder: Chrome 140 en macOS
+      label: Browser and system
+      placeholder: Chrome 140 on macOS
   - type: textarea
     attributes:
-      label: Errores en consola o en el panel
+      label: Errors in the console or in the panel
       render: text

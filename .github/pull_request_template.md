@@ -1,6 +1,5 @@
-## Qué cambia
+## What changes
 
-## Cómo lo probé
+## How I tested it
 
-- [ ] `npm test`
-- [ ] `npm run typecheck`
+- [ ] `pnpm turbo run typecheck lint test build`

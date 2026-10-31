@@ -6,159 +6,165 @@
 </p>
 
 <p align="center">
-  <strong>Tú hablas. Claude dibuja la pizarra en vivo, trazo a trazo.</strong><br>
-  <sub>Estado: <b>alfa</b> · Voz en español · Hecho con Claude, React y rough.js</sub>
+  <strong>You talk. Claude draws the board live, stroke by stroke.</strong><br>
+  <sub>Status: <b>alpha</b> · Voice in Spanish and English · Built with Claude, React and rough.js</sub>
 </p>
 
 <p align="center">
-  <a href="https://github.com/jorgehsy/grafito/releases"><img src="https://img.shields.io/github/v/release/jorgehsy/grafito?include_prereleases&label=versi%C3%B3n" alt="Versión"></a>
+  <a href="https://github.com/jorgehsy/grafito/releases"><img src="https://img.shields.io/github/v/release/jorgehsy/grafito?include_prereleases&label=version" alt="Version"></a>
   <a href="https://github.com/jorgehsy/grafito/actions/workflows/ci.yml"><img src="https://github.com/jorgehsy/grafito/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/jorgehsy/grafito" alt="Licencia MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/jorgehsy/grafito" alt="MIT license"></a>
 </p>
 
 ---
 
-**grafito** convierte lo que dices en voz alta en un tablero dibujado a mano. Explicas una arquitectura, un proceso o una idea, y mientras hablas aparecen zonas, cajas, flechas, líneas de tiempo, árboles y notas, como si alguien lo dibujara en una pizarra a tu lado.
+**grafito** turns what you say out loud into a hand-drawn board. You explain an architecture, a process or an idea, and while you talk, zones, boxes, arrows, timelines, trees and notes appear, as if someone were drawing them on a whiteboard next to you.
 
-> ⚠️ **Fase alfa.** Funciona, pero cambia seguido y puede romperse. Úsalo para probar y danos tu opinión.
+> **Alpha.** It works, but it changes often and can break. Use it to try things out and tell us what you think.
 
-## Qué hace
+## What it does
 
-- 🎙️ **Voz en vivo.** Hablas en español y el tablero se va dibujando mientras hablas.
-- ✍️ **Estilo a mano.** Trazos animados con rough.js, resaltador y cámara que sigue lo nuevo.
-- 🧭 **Formas de dibujo.** Auto, Mapa, Flujo, Escala, Ciclo, Línea de tiempo, Árbol, Sistema, Lista o Comparar.
-- 🪄 **Órdenes por voz.** Di *"Grafito, …"* para pedir cambios: *"Grafito, separa esto en dos diagramas"*.
-- 💾 **Guarda solo.** Cada sesión se guarda en `pruebas/`. Puedes restaurar, importar y exportar (JSON y SVG).
-- 💲 **Costo visible.** Muestra tokens y costo en dólares de cada petición.
-- ☁️ **Iconos de AWS.** Prende el catálogo en Opciones → Iconos y Claude pone el icono oficial (Lambda, S3, Cognito… 40 servicios) junto a las cajas que son servicios de AWS.
-- ▶️ **Modo guion.** Demos sin Claude y sin gastar nada, para ver cómo funciona.
+- **Live voice.** You talk and the board draws itself while you speak.
+- **Hand-drawn style.** Animated strokes with rough.js, a highlighter and a camera that follows what is new.
+- **Drawing shapes.** Auto, Map, Flow, Scale, Cycle, Timeline, Tree, System, List or Compare.
+- **Voice commands.** Say *"Grafito, ..."* to ask for changes: *"Grafito, split this into two diagrams"*.
+- **Saves itself.** Each session is saved to `apps/server/sessions/`. You can restore, import and export (JSON and SVG).
+- **Visible cost.** Shows the tokens and the dollar cost of each request.
+- **AWS icons.** Turn on the catalog in Options → Icons and Claude puts the official icon (Lambda, S3, Cognito... 40 services) next to boxes that are AWS services.
+- **Script mode.** Demos that need no Claude and cost nothing, to see how it works.
 
-## Qué necesitas
+## Language
 
-| Cosa | Detalle |
+One language setting in the app drives the interface, the speech recognition and `<html lang>`. It defaults to your browser language. Change it in Options → Language.
+
+Claude's drawn text is still in Spanish for now. It will follow the language setting once the prompt is translated.
+
+## What you need
+
+| Thing | Detail |
 | --- | --- |
-| Node.js | 20.19 o más nuevo (recomendado 22+) |
-| Navegador | **Chrome** (o Safari). Firefox no tiene reconocimiento de voz. |
-| Clave de Anthropic | Una API key de [console.anthropic.com](https://console.anthropic.com/). El uso se cobra en tu cuenta. |
-| Micrófono | Para el modo voz. Sin micrófono puedes escribir o pegar texto. |
+| Node.js | 20.19 or newer (22+ recommended) |
+| pnpm | Picked up from `package.json` by `corepack enable` |
+| Browser | **Chrome** (or Safari). Firefox has no speech recognition. |
+| Anthropic key | An API key from [console.anthropic.com](https://console.anthropic.com/). Usage is billed to your account. |
+| Microphone | For voice mode. Without one you can type or paste text. |
 
-## Instalar
+## Install
 
-Puedes bajar la última versión desde [Releases](https://github.com/jorgehsy/grafito/releases) (archivo `grafito-vX.Y.Z-source.tar.gz`) o clonar el repositorio:
+You can download the latest version from [Releases](https://github.com/jorgehsy/grafito/releases) (file `grafito-vX.Y.Z-source.tar.gz`) or clone the repository:
 
 ```bash
 git clone https://github.com/jorgehsy/grafito.git
 cd grafito
-npm install
-cp .env.example .env
+corepack enable && pnpm install
+cp apps/server/.env.example apps/server/.env
 ```
 
-Abre `.env` y pega tu clave:
+Open `apps/server/.env` and paste your key:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-La clave solo la lee el servidor local. Nunca llega al navegador.
+Only the local server reads the key. It never reaches the browser.
 
-## Usar
+## Use
 
-1. Arranca todo con un comando:
+1. Start everything with one command:
 
    ```bash
-   npm run dev
+   pnpm dev
    ```
 
-   Esto levanta dos cosas: el servidor (puerto `8787`) y la web (puerto `5173`).
+   This starts two things: the server (port `8787`) and the web app (port `5173`).
 
-2. Abre **http://localhost:5173/?mode=claude** en Chrome.
-3. Pulsa **Hablar** (o la barra espaciadora) y permite el micrófono.
-4. Habla. El tablero se dibuja solo.
+2. Open **http://localhost:5173/?mode=live** in Chrome.
+3. Press **Talk** (or the space bar) and allow the microphone.
+4. Talk. The board draws itself.
 
-### Otras formas de usarlo
+### Other ways to use it
 
-- **Sin micrófono:** escribe o pega texto en el panel y pulsa **Enviar todo**, o **Simular dictado** para soltarlo frase a frase.
-- **Darle órdenes:** di o escribe *"Grafito"* y luego la orden. Lo anterior se dibuja; lo posterior se toma como instrucción. Si no te gusta el resultado, usa **Deshacer instrucción**.
-- **Elegir la forma:** en **Opciones** eliges la forma del dibujo, el modelo (Sonnet por defecto, Haiku más barato) y el idioma (es-CL, es-AR, es-MX, es-ES, en-US).
-- **Ver costos:** pulsa **F3** o el botón de estadísticas.
-- **Demo sin gastar:** abre **http://localhost:5173/** y elige un guion. Atajo: `/?auto=architecture&speed=2`.
-- **Moverte:** rueda del mouse = zoom, arrastrar = mover.
+- **No microphone:** type or paste text in the box and press Enter or **Send**.
+- **Give commands:** say or type *"Grafito"* and then the command. What came before is drawn; what comes after is taken as an instruction. If you do not like the result, use **Undo instruction**.
+- **Pick the shape:** in **Options** you choose the drawing shape, the model (Sonnet by default, Haiku is cheaper) and the language (es-CL, es-AR, es-MX, es-ES, en-US).
+- **See costs:** press **F3** or the stats button.
+- **Demo at no cost:** open **http://localhost:5173/?mode=demo** and pick a demo. To play one right away: `/?mode=demo&demo=architecture&auto=1&speed=2`.
+- **Move around:** mouse wheel = zoom, drag = pan.
 
-### Sesiones guardadas
+### Saved sessions
 
-- Cada sesión se guarda en `pruebas/` (en tu disco, no se sube a git).
-- Nota (monorepo): ahora se guardan en `apps/server/sessions/` y la clave va en `apps/server/.env`.
-- Al recargar, puedes **Restaurar** la última sesión.
-- **Exportar** baja un `.json` y el tablero como `.svg`. **Importar** carga un `.json`.
-- **Limpiar** empieza una sesión nueva.
+- Each session is saved to `apps/server/sessions/` (on your disk, not uploaded to git).
+- On reload, you can **Restore** the last session.
+- **Export** downloads a `.json` and the board as `.svg`. **Import** loads a `.json`.
+- **Clear** starts a new session.
 
-## Privacidad
+## Privacy
 
-- Tu texto se envía a la API de Anthropic para dibujar.
-- La voz la transcribe el navegador. En Chrome, el audio pasa por el servicio de voz de Google.
-- Las sesiones quedan en tu disco, en `pruebas/`.
+- Your text is sent to the Anthropic API to draw.
+- The browser transcribes your voice. In Chrome, the audio goes through Google's speech service.
+- Sessions stay on your disk, in `apps/server/sessions/`.
 
-## Problemas comunes
+## Common problems
 
-| Pasa esto | Haz esto |
+| What happens | What to do |
 | --- | --- |
-| "Falta la API key en .env" | Revisa que `.env` tenga tu clave real y reinicia `npm run dev`. |
-| El micrófono no arranca | Usa Chrome, entra por `localhost` y revisa el permiso del micrófono. |
-| "El micrófono se activó en otra pestaña" | Solo una pestaña puede escuchar a la vez. Pulsa Hablar en la pestaña que quieras usar. |
-| No reconoce bien lo que digo | Cambia el idioma en Opciones al de tu país. |
+| "Missing API key in .env" | Check that `apps/server/.env` has your real key and restart `pnpm dev`. |
+| The microphone does not start | Use Chrome, open the app through `localhost` and check the microphone permission. |
+| "The microphone was activated in another tab" | Only one tab can listen at a time. Press Talk in the tab you want to use. |
+| It does not recognize what I say | Change the language in Options to the one you speak. |
 
-## Para desarrolladores
+## For developers
+
+grafito is a pnpm + Turborepo monorepo. Packages are private and source-only (no build step). See [ARCHITECTURE.md](ARCHITECTURE.md) for the pipeline, [GLOSSARY.md](GLOSSARY.md) for names and [CONTRIBUTING.md](CONTRIBUTING.md) for setup.
 
 ```bash
-npm test           # pruebas (vitest)
-npm run typecheck  # revisa tipos
-npm run build      # compila para producción
-npm run iconos:aws <zip>  # reinstala los iconos de AWS desde el paquete oficial
+pnpm dev                                         # web on :5173, server on :8787
+pnpm turbo run typecheck lint test build         # what CI runs
+pnpm --filter @grafito/server eval instruction <record.json> "<instruction>" [--dry]  # replay a saved session against an instruction
+pnpm --filter @grafito/icons icons:aws <zip>     # reinstall the AWS icons from the official package
 ```
 
-**Cómo funciona, en corto:** la voz se vuelve texto en el navegador. El texto va a `POST /api/board` (`server/board.ts`). Claude responde con *operaciones* (crear zona, agregar caja, conectar, etc.) usando herramientas en streaming. El navegador aplica cada operación al tablero y la anima.
+**How it works, in short:** the voice becomes text in the browser. The text goes to `POST /api/board` (in `apps/server`). Claude answers with *operations* (create zone, add box, connect, etc.) using streaming tools. The browser applies each operation to the board and animates it.
 
-| Carpeta | Qué hay |
+| Package | What is in it |
 | --- | --- |
-| `server/` | Servidor Express. Habla con Claude y guarda sesiones. |
-| `src/board/ops.ts` | El vocabulario de operaciones. Una sola fuente de verdad para cliente y servidor. |
-| `src/board/model.ts`, `layout.ts` | Estado del tablero y cómo se acomoda en pantalla. |
-| `src/board/animator.ts`, `render/` | Animación de trazos, cámara y estilo a mano. |
-| `src/board/live/` | Panel en vivo, streaming, voz (`speech/`) y precios. |
-| `apps/web/src/demos/` | Guiones de demo. |
+| `apps/web` | Vite + React. Rendering engine, live session UI, speech, demos. |
+| `apps/server` | Express + Anthropic. `POST /api/board` (Claude call, streams ops over SSE), saved sessions, eval script. |
+| `packages/contract` | The browser/server contract. Ops and their tool definitions, op validation, pricing. |
+| `packages/board` | The board engine, no DOM. Model (`applyOps`), layout, routing, render tree, animation queue, controller, board text for the prompt. |
+| `packages/icons` | Icon catalogs. AWS curated list, SVGs, NOTICE, fetch script. |
+| `packages/config` | Shared tsconfig bases and the ESLint flat config. |
 
-La primera versión (con Excalidraw) sigue en `/v1.html` como referencia. Ya no se mantiene.
+Demo scripts live in `apps/web/src/demos/`.
 
-### Versiones y releases
+### Versions and releases
 
-Las versiones siguen [SemVer](https://semver.org/lang/es/). Mientras sea alfa llevan el sufijo `-alpha.N` y salen marcadas como *pre-release*. Los cambios de cada versión están en [CHANGELOG.md](CHANGELOG.md).
+Versions follow [SemVer](https://semver.org/). While in alpha they carry the `-alpha.N` suffix and are marked as *pre-release*. The changes of each version are in [CHANGELOG.md](CHANGELOG.md).
 
-- **CI** (`.github/workflows/ci.yml`): en cada push a `main` y en cada PR corre tipos, pruebas y build.
-- **Release** (`.github/workflows/release.yml`): al subir una etiqueta `v*` vuelve a probar, compila y crea el release en GitHub con notas automáticas y dos archivos (código fuente y `dist/` compilado).
+- **CI** (`.github/workflows/ci.yml`): on every push to `main` and every PR it runs types, lint, tests and build.
+- **Release** (`.github/workflows/release.yml`): when a `v*` tag is pushed it checks again, builds and creates the GitHub release with automatic notes and two files (source code and the built `dist/`).
 
-Para publicar una versión nueva:
+To publish a new version, set `version` in the root `package.json`, then:
 
 ```bash
-npm version prerelease --preid alpha   # 0.2.0-alpha.1 → 0.2.0-alpha.2 (crea commit y etiqueta)
+git commit -am "Release v0.2.0-alpha.5"
+git tag v0.2.0-alpha.5
 git push --follow-tags
 ```
 
-Usa `npm version minor` o `npm version patch` cuando salga de alfa.
+## Roadmap
 
-## Hoja de ruta
+- [ ] Cloud speech recognition (for Firefox and better accuracy)
+- [ ] More drawing shapes
+- [ ] A version published on the web, with nothing to install
 
-- [ ] Reconocimiento de voz en la nube (para Firefox y mejor precisión)
-- [ ] Más formas de dibujo
-- [ ] Versión publicada en la web, sin instalar nada
+## Contributing
 
-## Contribuir
+Welcome! Open an *issue* with what you found or what you would like. If you send a *pull request*, run `pnpm turbo run typecheck lint test build` first.
 
-¡Bienvenido! Abre un *issue* con lo que encontraste o lo que te gustaría. Si mandas un *pull request*, corre `npm test` y `npm run typecheck` antes.
+## License
 
-## Licencia
+[MIT](LICENSE) © 2026 Jorge Simoes, except the icons in `packages/icons/src/aws/` (see [NOTICE.md](packages/icons/src/aws/NOTICE.md)).
 
-[MIT](LICENSE) © 2026 Jorge Simoes, excepto los iconos de `packages/icons/src/aws/` (ver [NOTICE.md](packages/icons/src/aws/NOTICE.md)).
+Amazon Web Services, AWS and the related service icons are trademarks of Amazon.com, Inc. or its affiliates. Grafito is not affiliated with or endorsed by AWS.
 
-Amazon Web Services, AWS y los iconos de sus servicios son marcas de Amazon.com, Inc. o sus filiales. Grafito no está afiliado a AWS ni cuenta con su respaldo.
-
-<sub>Amazon Web Services, AWS and the related service icons are trademarks of Amazon.com, Inc. or its affiliates. Grafito is not affiliated with or endorsed by AWS.</sub>

@@ -1,12 +1,12 @@
-name: ✨ Idea o mejora
-description: Propón algo nuevo
+name: ✨ Idea or improvement
+description: Suggest something new
 labels: [enhancement]
 body:
   - type: textarea
     attributes:
-      label: Qué te gustaría
+      label: What would you like
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Para qué te serviría
+      label: What would it help you with

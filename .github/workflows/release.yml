@@ -1,6 +1,6 @@
 name: Release
 
-# Se dispara al subir una etiqueta de versión: `npm version ...` + `git push --follow-tags`.
+# Runs when a version tag is pushed: `git tag vX.Y.Z` + `git push --follow-tags`.
 on:
   push:
     tags: ["v*"]
@@ -22,18 +22,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run typecheck lint test build
-      - name: Comprobar que la etiqueta coincide con package.json
+      - name: Check that the tag matches package.json
         run: |
           pkg="v$(node -p "require('./package.json').version")"
           if [ "$pkg" != "$GITHUB_REF_NAME" ]; then
-            echo "La etiqueta $GITHUB_REF_NAME no coincide con package.json ($pkg)"; exit 1
+            echo "The tag $GITHUB_REF_NAME does not match package.json ($pkg)"; exit 1
           fi
-      - name: Empaquetar
+      - name: Package
         run: |
           name="grafito-${GITHUB_REF_NAME}"
           git archive --format=tar.gz --prefix="$name/" -o "$name-source.tar.gz" "$GITHUB_REF_NAME"
           tar -czf "$name-web-dist.tar.gz" apps/web/dist
-      - name: Crear release
+      - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

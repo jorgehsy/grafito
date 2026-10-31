@@ -1,32 +1,43 @@
-# Cambios
+# Changes
 
-Las notas completas de cada versión están en [Releases](https://github.com/jorgehsy/grafito/releases).
+The full notes for each version are in [Releases](https://github.com/jorgehsy/grafito/releases).
+
+## Unreleased
+
+- The first version (Excalidraw mind map, `/api/draw`) is removed.
+- The repository is a pnpm + Turborepo monorepo (`apps/*`, `packages/*`).
+- The codebase is in English.
+- One language setting drives the UI, the speech recognition and the `lang` sent to the server (which does not use it yet).
+- Saved sessions moved from `pruebas/` to `apps/server/sessions/`.
+- Demos have English ids, the `architecture` demo is in English, and the URL is `?mode=demo&demo=<id>`.
+- New command: `pnpm --filter @grafito/server eval instruction ...`.
+- Server error messages are in English.
 
 ## v0.2.0-alpha.4 · 2026-10-27
 
-- Iconos de AWS: actívalos en Opciones → Iconos, y Claude pone el icono oficial (Lambda, S3, Cognito… 40 servicios) junto a las cajas que son servicios de AWS.
-- Los iconos son de AWS y no están bajo la licencia MIT (ver `packages/icons/src/aws/NOTICE.md`).
-- Panel de opciones en tarjetas: Modelo, Idioma y Vista.
+- AWS icons: turn them on in Options → Icons, and Claude puts the official icon (Lambda, S3, Cognito... 40 services) next to boxes that are AWS services.
+- The icons belong to AWS and are not under the MIT license (see `packages/icons/src/aws/NOTICE.md`).
+- Options panel in cards: Model, Language and View.
 
 ## v0.2.0-alpha.3 · 2026-10-26
 
-- Las etiquetas de flecha largas (más de 22 caracteres) se parten en dos líneas, y el espacio reservado coincide con lo dibujado.
+- Long arrow labels (more than 22 characters) split into two lines, and the reserved space matches what is drawn.
 
 ## v0.2.0-alpha.2 · 2026-10-23
 
-- Caja para escribir a Claude si no tienes micrófono: Enter o Enviar manda el texto.
-- Las etiquetas de las flechas ya no quedan encima de los bloques.
-- Los diagramas muy anchos se dibujan de arriba hacia abajo para aprovechar la pantalla.
-- La `ANTHROPIC_API_KEY` del `.env` manda sobre la del shell.
-- Se trabaja en `main` (se retira la rama `alpha-grafitodesign`).
+- A box to type to Claude if you have no microphone: Enter or Send submits the text.
+- Arrow labels no longer sit on top of blocks.
+- Very wide diagrams are drawn top to bottom to use the screen better.
+- The `ANTHROPIC_API_KEY` in `.env` takes priority over the one in the shell.
+- Work happens on `main` (the `alpha-grafitodesign` branch is retired).
 
 ## v0.2.0-alpha.1 · 2026-10-23
 
-Primera alfa pública.
+First public alpha.
 
-- Nuevo diseño estilo papel como versión oficial.
-- Voz en vivo en español: hablas y Claude dibuja el tablero.
-- Órdenes con "Grafito, …" y Deshacer instrucción.
-- Formas de dibujo: Auto, Mapa, Flujo, Escala, Ciclo, Línea de tiempo, Árbol, Sistema, Lista y Comparar.
-- Sesiones guardadas, Restaurar, Importar y Exportar (JSON y SVG).
-- Candado de micrófono entre pestañas.
+- New paper-style design as the official version.
+- Live voice in Spanish: you talk and Claude draws the board.
+- Commands with "Grafito, ..." and Undo instruction.
+- Drawing shapes: Auto, Map, Flow, Scale, Cycle, Timeline, Tree, System, List and Compare.
+- Saved sessions, Restore, Import and Export (JSON and SVG).
+- Microphone lock between tabs.
