@@ -6,7 +6,7 @@ import type { Board } from "@grafito/board";
 import type { Op } from "@grafito/contract";
 import { serializeBoard } from "@grafito/board";
 import { CATALOG_IDS, costUsd, parseOp } from "@grafito/contract";
-import { buildUserText } from "../src/board";
+import { buildUserText } from "../src/prompt/user-text";
 
 const USAGE = `Usage: pnpm eval <command> [options]
 
