@@ -98,7 +98,7 @@ describe("subscriptionClient", () => {
     const o = q.calls[0];
     expect(o.model).toBe("claude-haiku-5-5");
     expect(o.systemPrompt).toEqual(["board prompt", "__SYSTEM_PROMPT_DYNAMIC_BOUNDARY__", "language line"]);
-    expect(o).toMatchObject({ tools: [], settingSources: [], strictMcpConfig: true, maxTurns: 3, includePartialMessages: true, effort: "low", permissionMode: "dontAsk" });
+    expect(o).toMatchObject({ tools: [], settingSources: [], strictMcpConfig: true, maxTurns: 1, includePartialMessages: true, effort: "low", permissionMode: "dontAsk" });
     expect(o.allowedTools).toEqual(toolDefs([]).map((t) => P + t.name));
     expect(Object.keys(o.mcpServers ?? {})).toEqual(["grafito"]);
   });

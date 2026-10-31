@@ -19,7 +19,8 @@ export interface SubscriptionOptions {
 // The SDK names in-process tools `mcp__<server>__<tool>`; the model sees these names.
 const SERVER = "grafito";
 const PREFIX = `mcp__${SERVER}__`;
-const MAX_TURNS = 3;
+// One turn, like the API adapter: Claude sends every op in one answer. More turns can repeat ops after the "ok" results.
+const MAX_TURNS = 1;
 
 // Anything that would send the call to the paid API (or another provider) instead of the plan.
 const NOT_PLAN_ENV = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"];
