@@ -7,10 +7,11 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 - The first version (Excalidraw mind map, `/api/draw`) is removed.
 - The repository is a pnpm + Turborepo monorepo (`apps/*`, `packages/*`).
 - The codebase is in English.
-- One language setting drives the UI, the speech recognition and the `lang` sent to the server (which does not use it yet).
+- One language setting drives the UI, the speech recognition and the language Claude writes the board in.
 - Saved sessions moved from `pruebas/` to `apps/server/sessions/`.
 - Demos have English ids, the `architecture` demo is in English, and the URL is `?mode=demo&demo=<id>`.
-- New command: `pnpm --filter @grafito/server eval instruction ...`.
+- The prompt to Claude is in English and ends with the language to draw in (prompt version 2).
+- New commands: `pnpm --filter @grafito/server eval instruction ...`, `eval baseline ...` and `eval convert-v1 ...` (turns old session records into version 2 for the eval).
 - Server error messages are in English.
 - **Breaking:** saved sessions from 0.2.0-alpha.4 and earlier no longer load. Session records are now version 2, with clearer field names (`batch`, `warnings`, `speechLang`) and the prompt version of each request.
 

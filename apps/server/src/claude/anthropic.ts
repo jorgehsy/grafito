@@ -19,7 +19,11 @@ export function anthropicClient(apiKey: string): ClaudeClient {
       const params = {
         model: p.model,
         max_tokens: p.maxTokens,
-        system: [{ type: "text" as const, text: p.system, cache_control: { type: "ephemeral" as const } }],
+        system: p.system.map((b) => ({
+          type: "text" as const,
+          text: b.text,
+          ...(b.cache ? { cache_control: { type: "ephemeral" as const } } : {}),
+        })),
         tools: toolDefs(p.catalogs),
         tool_choice: { type: "auto" as const },
         output_config: { effort: p.effort },

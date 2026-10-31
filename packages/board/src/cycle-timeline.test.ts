@@ -104,8 +104,8 @@ describe("serialization", () => {
       op.add_event({ zone: "t", id: "e", label: "Idea", when: "Before", at: 5 }),
       op.add_span({ zone: "t", id: "p", from: 0, to: 40, label: "2 months", tone: "warn" }),
     ]));
-    expect(t).toContain('[cycle] "Cycle" centro:"Window"');
-    expect(t).toContain('a (stage) "Chat" @c nota:"asks"');
+    expect(t).toContain('[cycle] "Cycle" center:"Window"');
+    expect(t).toContain('a (stage) "Chat" @c note:"asks"');
     expect(t).toContain('e (event) "Idea" @t at:5 when:"Before"');
     expect(t).toContain('p (span) "2 months" @t from:0 to:40 tone:warn');
   });
@@ -322,6 +322,6 @@ describe("tree zone", () => {
     expect(txt).toContain("- p (branch)");
     expect(txt).toContain("-   v (branch)");
     expect(txt).toContain("-     f (branch)");
-    expect(txt).toContain('nota:"how it looks"');
+    expect(txt).toContain('note:"how it looks"');
   });
 });

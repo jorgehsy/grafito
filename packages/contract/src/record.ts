@@ -3,7 +3,7 @@
 import { z } from "zod";
 
 /** Bump when the system prompt or the tools Claude sees change; each request records it. */
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 export const OUTDATED_RECORD = "This session was saved by an older grafito and cannot be restored.";
 

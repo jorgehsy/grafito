@@ -6,7 +6,7 @@ import { createBoardHandler } from "./board";
 import type { ClaudeClient } from "../claude/client";
 import { fakeClaude, fail, start, stop, toolBlock } from "../claude/fake";
 import type { FakeAttempt } from "../claude/fake";
-import { systemPromptFor } from "../prompt/system";
+import { systemPrompt } from "../prompt/system";
 
 // Every test goes through POST /api/board on a real ephemeral server, with the fake Claude adapter.
 
@@ -74,14 +74,15 @@ describe("POST /api/board", () => {
 
   it("passes the prompt, model and limits for the request to the client", async () => {
     const fake = fakeClaude([ok]);
-    await post(fake, { delta: "ordénalo", board: "ZONAS\n- a", summary: "s", mode: "instruction", model: "claude-sonnet-5-5", catalogs: ["aws"] });
+    await post(fake, { delta: "ordénalo", board: "ZONES\n- a", summary: "s", mode: "instruction", model: "claude-sonnet-5-5", catalogs: ["aws"], lang: "es-MX" });
     const p = fake.calls[0].params;
-    expect(p).toMatchObject({ model: "claude-sonnet-5-5", maxTokens: 8192, effort: "medium", catalogs: ["aws"], system: systemPromptFor(["aws"]) });
-    expect(p.userText).toContain("INSTRUCCIÓN DEL USUARIO");
+    expect(p).toMatchObject({ model: "claude-sonnet-5-5", maxTokens: 8192, effort: "medium", catalogs: ["aws"], system: systemPrompt({ catalogs: ["aws"], lang: "es-MX" }) });
+    expect(p.userText).toContain("USER INSTRUCTION");
+    expect(p.system.at(-1)).toEqual({ text: "All drawn text must be in Spanish." });
 
     const fake2 = fakeClaude([ok]);
-    await post(fake2, { delta: "hola", model: "made-up" });
-    expect(fake2.calls[0].params).toMatchObject({ model: "claude-haiku-5-5", maxTokens: 4096, effort: "low", catalogs: [], system: systemPromptFor([]) });
+    await post(fake2, { delta: "hola", model: "made-up", lang: "xx-YY" });
+    expect(fake2.calls[0].params).toMatchObject({ model: "claude-haiku-5-5", maxTokens: 4096, effort: "low", catalogs: [], system: systemPrompt({ catalogs: [], lang: "en-US" }) });
   });
 
   it("skips a block with broken JSON with a warning and keeps going", async () => {

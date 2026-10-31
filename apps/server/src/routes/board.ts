@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import { DEFAULT_MODEL, ZONE_KINDS, isModelId, normalizeCatalogs } from "@grafito/contract";
+import { DEFAULT_LANG, DEFAULT_MODEL, ZONE_KINDS, isLang, isModelId, normalizeCatalogs } from "@grafito/contract";
 import { isCatalogId } from "@grafito/icons";
 import type { ClaudeClient } from "../claude/client";
-import { systemPromptFor } from "../prompt/system";
+import { systemPrompt } from "../prompt/system";
 import { buildUserText } from "../prompt/user-text";
 import type { BoardMode } from "../prompt/user-text";
 
@@ -33,7 +33,7 @@ export function createBoardHandler(client: ClaudeClient | null) {
       sse(res, "error", { message: "Missing API key in .env" });
       return res.end();
     }
-    const { delta, summary, board, model, shape, mode: rawMode, catalogs: rawCatalogs } = req.body ?? {};
+    const { delta, summary, board, model, shape, mode: rawMode, catalogs: rawCatalogs, lang: rawLang } = req.body ?? {};
     if (typeof delta !== "string" || !delta.trim()) {
       sse(res, "error", { message: "The text is empty" });
       return res.end();
@@ -54,6 +54,8 @@ export function createBoardHandler(client: ClaudeClient | null) {
     const catalogs = normalizeCatalogs(rawCatalogs ?? []);
     const mode: BoardMode = rawMode === "instruction" ? "instruction" : "content";
     const useModel = isModelId(model) ? model : DEFAULT_MODEL;
+    // Like the model, an unknown language falls back instead of failing the request.
+    const lang = isLang(rawLang) ? rawLang : DEFAULT_LANG;
 
     const t0 = Date.now();
     let firstOp: number | null = null;
@@ -65,7 +67,7 @@ export function createBoardHandler(client: ClaudeClient | null) {
       model: useModel,
       maxTokens: mode === "instruction" ? 8192 : 4096,
       effort: mode === "instruction" ? ("medium" as const) : ("low" as const),
-      system: systemPromptFor(catalogs),
+      system: systemPrompt({ catalogs, lang }),
       userText: buildUserText({ board, summary, delta, shape, mode }),
       catalogs,
     };

@@ -2,17 +2,11 @@ import { useSyncExternalStore } from "react";
 import { en } from "./en";
 import { es } from "./es";
 import { browserStore } from "../storage";
+import { DEFAULT_LANG, LANGS, isLang } from "@grafito/contract";
+import type { Lang } from "@grafito/contract";
 
-/** The one language setting: UI text, speech recognition, `<html lang>` and the `lang` sent to the server. */
-export const LANGS = [
-  { code: "es-CL", label: "Español (Chile)", short: "Chile" },
-  { code: "es-AR", label: "Español (Argentina)", short: "Argentina" },
-  { code: "es-MX", label: "Español (México)", short: "México" },
-  { code: "es-ES", label: "Español (España)", short: "España" },
-  { code: "en-US", label: "English (US)", short: "English US" },
-] as const;
-
-export type Lang = (typeof LANGS)[number]["code"];
+export { LANGS, isLang } from "@grafito/contract";
+export type { Lang } from "@grafito/contract";
 
 type Raw = keyof typeof en;
 /** A message key; plural messages are addressed without their `.one` / `.other` suffix. */
@@ -20,9 +14,6 @@ export type MessageKey = { [K in Raw]: K extends `${infer B}.${"one" | "other"}`
 export type Vars = Record<string, string | number>;
 
 const STORAGE_KEY = "grafito.lang";
-const DEFAULT_LANG: Lang = "en-US";
-
-export const isLang = (x: unknown): x is Lang => LANGS.some((l) => l.code === x);
 
 /** An exact match, else the first supported language with the same primary subtag, else `en-US`. */
 export function matchLang(tag: string | undefined): Lang {

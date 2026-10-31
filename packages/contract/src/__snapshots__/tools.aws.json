@@ -1,14 +1,14 @@
 [
   {
     "name": "create_zone",
-    "description": "Crea una zona (un recuadro temático) en el tablero. Úsala cuando el hablante empieza un tema nuevo. kind: flow = proceso paso a paso; system = arquitectura de componentes; list = lista de puntos; compare = dos columnas comparadas; mindmap = ideas ramificadas; scale = una cantidad que cambia sobre un eje (barra con umbrales: porcentaje, capacidad, tiempo, nivel); cycle = algo que se repite en bucle; timeline = eventos o fases en el tiempo, antes/ahora; tree = una jerarquía o clasificación que crece de izquierda a derecha (categorías con subcategorías, tipos con sus resultados, desgloses). No se dan coordenadas: el tablero coloca la zona. 'place' sólo para pedir vecindad.",
+    "description": "Creates a zone (a topic box) on the board. Use it when the speaker starts a new topic. kind: flow = step-by-step process; system = architecture of components; list = list of items; compare = two columns compared; mindmap = branching ideas; scale = a quantity that changes along an axis (bar with thresholds: percentage, capacity, time, level); cycle = something that repeats in a loop; timeline = events or phases over time, before/now; tree = a hierarchy or classification that grows from left to right (categories with subcategories, types with their outcomes, breakdowns). No coordinates are given: the board places the zone. 'place' only to ask for a neighbor.",
     "input_schema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único y estable, p. ej. 'proceso_pedido'."
+          "description": "Unique, stable identifier, e.g. 'order_process'."
         },
         "kind": {
           "type": "string",
@@ -26,31 +26,31 @@
         },
         "title": {
           "type": "string",
-          "description": "Título corto de la zona."
+          "description": "Short title of the zone."
         },
         "left_title": {
           "type": "string",
-          "description": "Sólo compare: título de la columna izquierda."
+          "description": "Compare only: title of the left column."
         },
         "right_title": {
           "type": "string",
-          "description": "Sólo compare: título de la columna derecha."
+          "description": "Compare only: title of the right column."
         },
         "min_label": {
           "type": "string",
-          "description": "Sólo scale: etiqueta del extremo izquierdo de la barra (por defecto '0%')."
+          "description": "Scale only: label of the left end of the bar (default '0%')."
         },
         "max_label": {
           "type": "string",
-          "description": "Sólo scale: etiqueta del extremo derecho de la barra (por defecto '100%')."
+          "description": "Scale only: label of the right end of the bar (default '100%')."
         },
         "center_label": {
           "type": "string",
-          "description": "Sólo cycle: texto del centro del ciclo, lo que cicla (p. ej. 'Ventana de contexto')."
+          "description": "Cycle only: text in the center of the cycle, what cycles (e.g. 'Context window')."
         },
         "place": {
           "type": "object",
-          "description": "Pista opcional de colocación respecto a otra zona.",
+          "description": "Optional placement hint relative to another zone.",
           "properties": {
             "relation": {
               "type": "string",
@@ -62,7 +62,7 @@
             "of": {
               "type": "string",
               "minLength": 1,
-              "description": "Id de la zona de referencia."
+              "description": "Id of the reference zone."
             }
           },
           "required": [
@@ -83,32 +83,32 @@
   },
   {
     "name": "add_step",
-    "description": "Añade un paso (rectángulo) a una zona flow. 'after' conecta automáticamente con el paso anterior.",
+    "description": "Adds a step (rectangle) to a flow zone. 'after' connects it to the previous step automatically.",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona flow."
+          "description": "Id of a flow zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "label": {
           "type": "string",
-          "description": "Texto breve del paso (2 a 6 palabras)."
+          "description": "Short text of the step (2 to 6 words)."
         },
         "icon": {
           "type": "string",
-          "description": "Emoji opcional."
+          "description": "Optional emoji."
         },
         "after": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento previo al que sigue (dibuja la flecha)."
+          "description": "Id of the previous element it follows (draws the arrow)."
         },
         "service": {
           "type": "string",
@@ -154,7 +154,7 @@
             "amplify",
             "ses"
           ],
-          "description": "Servicio de AWS (icono). Solo si el hablante lo nombra o no hay duda."
+          "description": "AWS service (icon). Only if the speaker names it or there is no doubt."
         }
       },
       "required": [
@@ -168,28 +168,28 @@
   },
   {
     "name": "add_decision",
-    "description": "Añade una decisión (rombo) a una zona flow. Las ramas se conectan después con connect y una etiqueta ('sí', 'no').",
+    "description": "Adds a decision (diamond) to a flow zone. The branches are connected afterwards with connect and a label ('yes', 'no').",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona flow."
+          "description": "Id of a flow zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "question": {
           "type": "string",
-          "description": "Pregunta breve, p. ej. '¿Hay stock?'."
+          "description": "Short question, e.g. 'In stock?'."
         },
         "after": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento previo."
+          "description": "Id of the previous element."
         },
         "service": {
           "type": "string",
@@ -235,7 +235,7 @@
             "amplify",
             "ses"
           ],
-          "description": "Servicio de AWS (icono). Solo si el hablante lo nombra o no hay duda."
+          "description": "AWS service (icon). Only if the speaker names it or there is no doubt."
         }
       },
       "required": [
@@ -249,23 +249,23 @@
   },
   {
     "name": "add_component",
-    "description": "Añade un componente a una zona system. type: actor = persona (muñeco); client = navegador o móvil; service = caja de servicio; database = cilindro; queue = cola o tubería; storage = bucket o carpeta; external = nube punteada de un tercero.",
+    "description": "Adds a component to a system zone. type: actor = person (stick figure); client = browser or phone; service = service box; database = cylinder; queue = queue or pipe; storage = bucket or folder; external = dotted cloud of a third party.",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona system."
+          "description": "Id of a system zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "label": {
           "type": "string",
-          "description": "Nombre breve."
+          "description": "Short name."
         },
         "type": {
           "type": "string",
@@ -281,7 +281,7 @@
         },
         "icon": {
           "type": "string",
-          "description": "Emoji opcional."
+          "description": "Optional emoji."
         },
         "service": {
           "type": "string",
@@ -327,7 +327,7 @@
             "amplify",
             "ses"
           ],
-          "description": "Servicio de AWS (icono). Solo si el hablante lo nombra o no hay duda."
+          "description": "AWS service (icon). Only if the speaker names it or there is no doubt."
         }
       },
       "required": [
@@ -342,28 +342,28 @@
   },
   {
     "name": "add_node",
-    "description": "Añade una idea a una zona mindmap. Sin 'parent' es la idea central (o cuelga de ella).",
+    "description": "Adds an idea to a mindmap zone. Without 'parent' it is the central idea (or hangs from it).",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona mindmap."
+          "description": "Id of a mindmap zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "label": {
           "type": "string",
-          "description": "Idea breve."
+          "description": "Short idea."
         },
         "parent": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del nodo padre."
+          "description": "Id of the parent node."
         }
       },
       "required": [
@@ -377,23 +377,23 @@
   },
   {
     "name": "add_item",
-    "description": "Añade un punto a una zona list o compare. En compare, 'column' elige la columna.",
+    "description": "Adds an item to a list or compare zone. In compare, 'column' picks the column.",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona list o compare."
+          "description": "Id of a list or compare zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "text": {
           "type": "string",
-          "description": "Texto del punto."
+          "description": "Text of the item."
         },
         "column": {
           "type": "string",
@@ -414,32 +414,32 @@
   },
   {
     "name": "add_branch",
-    "description": "Añade un nodo a una zona tree: una caja en la jerarquía. Sin 'parent' es una raíz (varias raíces se apilan); con 'parent' cuelga de ese nodo, en una columna a su derecha. Los hermanos se apilan en el orden en que se añaden y el tablero dibuja los conectores. Los padres antes que los hijos.",
+    "description": "Adds a node to a tree zone: a box in the hierarchy. Without 'parent' it is a root (several roots stack up); with 'parent' it hangs from that node, in a column to its right. Siblings stack in the order they are added and the board draws the connectors. Parents before children.",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona tree."
+          "description": "Id of a tree zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "label": {
           "type": "string",
-          "description": "Nombre breve del nodo (1 a 4 palabras)."
+          "description": "Short name of the node (1 to 4 words)."
         },
         "parent": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del nodo padre (opcional; sin él es raíz)."
+          "description": "Id of the parent node (optional; without it, a root)."
         },
         "note": {
           "type": "string",
-          "description": "Explicación corta debajo de la etiqueta (opcional)."
+          "description": "Short explanation under the label (optional)."
         }
       },
       "required": [
@@ -453,33 +453,33 @@
   },
   {
     "name": "add_mark",
-    "description": "Añade una marca (umbral) a una zona scale: una muesca en la barra con su etiqueta y, debajo, una explicación corta. 'at' es la posición en la barra, de 0 a 100. El tablero evita que las etiquetas se pisen.",
+    "description": "Adds a mark (threshold) to a scale zone: a notch on the bar with its label and, underneath, a short explanation. 'at' is the position on the bar, from 0 to 100. The board keeps labels from overlapping.",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona scale."
+          "description": "Id of a scale zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "at": {
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "Posición en la barra, de 0 a 100."
+          "description": "Position on the bar, from 0 to 100."
         },
         "label": {
           "type": "string",
-          "description": "Etiqueta breve de la marca, p. ej. '20%: empeoran'."
+          "description": "Short label of the mark, e.g. '20%: gets worse'."
         },
         "note": {
           "type": "string",
-          "description": "Explicación corta que se escribe debajo (opcional)."
+          "description": "Short explanation written underneath (optional)."
         },
         "tone": {
           "type": "string",
@@ -489,7 +489,7 @@
             "danger",
             "ok"
           ],
-          "description": "neutral = tinta; warn = ámbar (cuidado); danger = rojo (límite peligroso); ok = verde."
+          "description": "neutral = ink; warn = amber (careful); danger = red (dangerous limit); ok = green."
         }
       },
       "required": [
@@ -504,32 +504,32 @@
   },
   {
     "name": "add_stage",
-    "description": "Añade una etapa a una zona cycle. Las etapas se colocan en círculo en el orden en que se añaden (o tras 'after'), con flechas en sentido horario y la última vuelve a la primera.",
+    "description": "Adds a stage to a cycle zone. Stages are placed in a circle in the order they are added (or after 'after'), with clockwise arrows, and the last one returns to the first.",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona cycle."
+          "description": "Id of a cycle zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "label": {
           "type": "string",
-          "description": "Nombre breve de la etapa (2 a 5 palabras)."
+          "description": "Short name of the stage (2 to 5 words)."
         },
         "note": {
           "type": "string",
-          "description": "Explicación corta debajo (opcional)."
+          "description": "Short explanation underneath (optional)."
         },
         "after": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de la etapa tras la que se inserta (opcional; por defecto al final)."
+          "description": "Id of the stage to insert after (optional; default at the end)."
         }
       },
       "required": [
@@ -543,37 +543,37 @@
   },
   {
     "name": "add_event",
-    "description": "Añade un evento o fase a una zona timeline: una marca sobre el eje del tiempo con 'when' junto a la marca y su etiqueta en una caja arriba o abajo. Sin 'at' los eventos se reparten por igual en el orden en que se añaden; con 'at' (0 a 100) se colocan proporcionalmente.",
+    "description": "Adds an event or phase to a timeline zone: a tick on the time axis with 'when' next to the tick and its label in a box above or below. Without 'at' events are spread evenly in the order they are added; with 'at' (0 to 100) they are placed proportionally.",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona timeline."
+          "description": "Id of a timeline zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "label": {
           "type": "string",
-          "description": "Texto breve del evento."
+          "description": "Short text of the event."
         },
         "when": {
           "type": "string",
-          "description": "Fecha o etiqueta breve junto a la marca: 'Antes', '2024', 'Mes 1' (opcional)."
+          "description": "Date or short tag next to the tick: 'Before', '2024', 'Month 1' (optional)."
         },
         "note": {
           "type": "string",
-          "description": "Explicación corta debajo de la etiqueta (opcional)."
+          "description": "Short explanation under the label (optional)."
         },
         "at": {
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "Posición en el eje, de 0 a 100 (opcional)."
+          "description": "Position on the axis, from 0 to 100 (optional)."
         }
       },
       "required": [
@@ -587,35 +587,35 @@
   },
   {
     "name": "add_span",
-    "description": "Añade a una zona timeline un tramo (llave bajo el eje) que cubre una duración, p. ej. '2 a 3 meses'. 'from' y 'to' son posiciones del eje de 0 a 100, con from < to.",
+    "description": "Adds to a timeline zone a span (brace under the axis) covering a duration, e.g. '2 to 3 months'. 'from' and 'to' are axis positions from 0 to 100, with from < to.",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona timeline."
+          "description": "Id of a timeline zone."
         },
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "from": {
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "Inicio del tramo, de 0 a 100."
+          "description": "Start of the span, from 0 to 100."
         },
         "to": {
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "Final del tramo, de 0 a 100 (mayor que from)."
+          "description": "End of the span, from 0 to 100 (greater than from)."
         },
         "label": {
           "type": "string",
-          "description": "Texto breve del tramo, p. ej. '2 a 3 meses'."
+          "description": "Short text of the span, e.g. '2 to 3 months'."
         },
         "tone": {
           "type": "string",
@@ -625,7 +625,7 @@
             "danger",
             "ok"
           ],
-          "description": "neutral = tinta; warn = ámbar (lento o costoso); danger = rojo; ok = verde (bueno)."
+          "description": "neutral = ink; warn = amber (slow or costly); danger = red; ok = green (good)."
         }
       },
       "required": [
@@ -641,24 +641,24 @@
   },
   {
     "name": "set_level",
-    "description": "Rellena la barra de una zona scale hasta 'at' (0 a 100): el nivel actual, p. ej. 'se va llenando'. Volver a llamarla mueve el nivel.",
+    "description": "Fills the bar of a scale zone up to 'at' (0 to 100): the current level, e.g. 'filling up'. Calling it again moves the level.",
     "input_schema": {
       "type": "object",
       "properties": {
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de una zona scale."
+          "description": "Id of a scale zone."
         },
         "at": {
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "Hasta dónde llega el relleno, de 0 a 100."
+          "description": "How far the fill reaches, from 0 to 100."
         },
         "label": {
           "type": "string",
-          "description": "Texto breve sobre el relleno (opcional), p. ej. 'se va llenando'."
+          "description": "Short text over the fill (optional), e.g. 'filling up'."
         }
       },
       "required": [
@@ -671,28 +671,28 @@
   },
   {
     "name": "connect",
-    "description": "Dibuja una flecha entre dos elementos, dentro de una zona o entre zonas distintas (p. ej. de un paso de un flujo a un componente de una arquitectura).",
+    "description": "Draws an arrow between two elements, inside one zone or across zones (e.g. from a step of a flow to a component of an architecture).",
     "input_schema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único de la conexión."
+          "description": "Unique identifier of the connection."
         },
         "from": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento origen."
+          "description": "Id of the source element."
         },
         "to": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento destino."
+          "description": "Id of the target element."
         },
         "label": {
           "type": "string",
-          "description": "Texto breve sobre la flecha."
+          "description": "Short text over the arrow."
         },
         "style": {
           "type": "string",
@@ -700,11 +700,11 @@
             "solid",
             "dashed"
           ],
-          "description": "dashed = relación opcional, asíncrona o débil."
+          "description": "dashed = optional, asynchronous or weak relation."
         },
         "both_ways": {
           "type": "boolean",
-          "description": "Flecha con punta en ambos extremos."
+          "description": "Arrow with a head at both ends."
         }
       },
       "required": [
@@ -718,14 +718,14 @@
   },
   {
     "name": "emphasize",
-    "description": "Resalta un elemento o zona a mano: círculo, subrayado o estrella. Para lo que el hablante marca como importante.",
+    "description": "Highlights an element or zone by hand: circle, underline or star. For what the speaker marks as important.",
     "input_schema": {
       "type": "object",
       "properties": {
         "target": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento o zona."
+          "description": "Id of the element or zone."
         },
         "style": {
           "type": "string",
@@ -746,18 +746,18 @@
   },
   {
     "name": "mark_question",
-    "description": "Marca un elemento con un signo de interrogación dibujado a mano: duda, punto sin resolver.",
+    "description": "Marks an element with a hand-drawn question mark: a doubt, an unresolved point.",
     "input_schema": {
       "type": "object",
       "properties": {
         "target": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento o zona."
+          "description": "Id of the element or zone."
         },
         "text": {
           "type": "string",
-          "description": "Duda en pocas palabras (opcional)."
+          "description": "The doubt in a few words (optional)."
         }
       },
       "required": [
@@ -769,23 +769,23 @@
   },
   {
     "name": "add_callout",
-    "description": "Añade una nota manuscrita corta con una flecha curva que apunta al elemento.",
+    "description": "Adds a short handwritten note with a curved arrow pointing at the element.",
     "input_schema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Identificador único."
+          "description": "Unique identifier."
         },
         "target": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento o zona señalado."
+          "description": "Id of the element or zone pointed at."
         },
         "text": {
           "type": "string",
-          "description": "Texto muy corto."
+          "description": "Very short text."
         }
       },
       "required": [
@@ -799,18 +799,18 @@
   },
   {
     "name": "update_label",
-    "description": "Cambia el texto de un elemento, zona, conexión o nota (cuando el hablante se corrige).",
+    "description": "Changes the text of an element, zone, connection or callout (when the speaker corrects themselves).",
     "input_schema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Id a modificar."
+          "description": "Id to change."
         },
         "label": {
           "type": "string",
-          "description": "Texto nuevo."
+          "description": "New text."
         }
       },
       "required": [
@@ -823,14 +823,14 @@
   },
   {
     "name": "update_text",
-    "description": "Cambia o BORRA un texto dentro de un elemento sin borrar el elemento. field: label = título de zona, etiqueta de elemento o de conexión; note = nota de una marca, etapa, evento o nodo de árbol; text = texto de una nota manuscrita (callout); when = fecha de un evento. Un value vacío quita el texto opcional (note, when, label de conexión). Úsala en lugar de delete cuando sólo se pide quitar o cambiar un texto.",
+    "description": "Changes or REMOVES a text inside an element without deleting the element. field: label = zone title, element label or connection label; note = note of a mark, stage, event or tree node; text = text of a handwritten note (callout); when = date of an event. An empty value removes the optional text (note, when, connection label). Use it instead of delete when only removing or changing a text is asked.",
     "input_schema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento, zona, conexión o nota."
+          "description": "Id of the element, zone, connection or callout."
         },
         "field": {
           "type": "string",
@@ -843,7 +843,7 @@
         },
         "value": {
           "type": "string",
-          "description": "Texto nuevo; vacío para quitarlo."
+          "description": "New text; empty to remove it."
         }
       },
       "required": [
@@ -857,14 +857,14 @@
   },
   {
     "name": "delete",
-    "description": "Borra un elemento, conexión, nota o zona. Borrar una zona borra todo su contenido; borrar un elemento quita sus conexiones.",
+    "description": "Deletes an element, connection, callout or zone. Deleting a zone deletes all its content; deleting an element removes its connections.",
     "input_schema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Id a borrar."
+          "description": "Id to delete."
         }
       },
       "required": [
@@ -876,19 +876,19 @@
   },
   {
     "name": "move_to_zone",
-    "description": "Mueve un elemento a otra zona (de un tipo compatible).",
+    "description": "Moves an element to another zone (of a compatible kind).",
     "input_schema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento."
+          "description": "Id of the element."
         },
         "zone": {
           "type": "string",
           "minLength": 1,
-          "description": "Id de la zona destino."
+          "description": "Id of the target zone."
         }
       },
       "required": [
@@ -901,14 +901,14 @@
   },
   {
     "name": "set_service",
-    "description": "Pone o cambia el icono de servicio de AWS de un elemento ya dibujado (cualquier tipo). service vacío lo quita.",
+    "description": "Puts on or changes the AWS service icon of an element already drawn (any type). An empty service removes it.",
     "input_schema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
-          "description": "Id del elemento."
+          "description": "Id of the element."
         },
         "service": {
           "type": "string",
@@ -955,7 +955,7 @@
             "ses",
             ""
           ],
-          "description": "Id del servicio; vacío para quitarlo."
+          "description": "Service id; empty to remove it."
         }
       },
       "required": [
@@ -968,13 +968,13 @@
   },
   {
     "name": "update_summary",
-    "description": "Actualiza el resumen de una o dos frases de todo lo dicho hasta ahora.",
+    "description": "Updates the one or two sentence summary of everything said so far.",
     "input_schema": {
       "type": "object",
       "properties": {
         "text": {
           "type": "string",
-          "description": "Resumen."
+          "description": "Summary."
         }
       },
       "required": [

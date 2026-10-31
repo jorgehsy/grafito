@@ -75,7 +75,7 @@ describe("requests", () => {
     release();
     await settled(h, 2);
     expect(h.requests.map((b) => b.delta)).toEqual(["one.", "two. three."]);
-    expect(h.requests[0].board).toBe("(tablero vacío)");
+    expect(h.requests[0].board).toBe("(empty board)");
     expect(h.board().summary).toBe("r1");
     expect(h.state().transcript.map((x) => x.text)).toEqual(["one.", "two.", "three."]);
     expect(h.state().totals.requests).toBe(2);

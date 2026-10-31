@@ -18,7 +18,7 @@ const mockFetch = (chunks: string[]): typeof fetch =>
 
 describe("serializeBoard", () => {
   it("empty and with content", () => {
-    expect(serializeBoard(emptyBoard())).toBe("(tablero vacío)");
+    expect(serializeBoard(emptyBoard())).toBe("(empty board)");
     let b = emptyBoard();
     const ops: Op[] = [
       op.create_zone({ id: "app", kind: "system", title: "Arch" }),
@@ -30,13 +30,13 @@ describe("serializeBoard", () => {
     ];
     for (const o of ops) b = applyOp(b, o).board;
     const s = serializeBoard(b);
-    expect(s).toContain('- app [system] "Arch" color:naranja');
+    expect(s).toContain('- app [system] "Arch" color:orange');
     b = applyOp(b, op.create_zone({ id: "z2", kind: "list", title: "L" })).board;
-    expect(serializeBoard(b)).toContain('- z2 [list] "L" color:azul');
+    expect(serializeBoard(b)).toContain('- z2 [list] "L" color:blue');
     expect(s).toContain('- api (component/service) "API" @app');
     expect(s).toContain('- c1: api -> db "saves" dashed');
     expect(s).toContain('- n1 -> api "Node"');
-    expect(s).toContain("MARCAS db:star");
+    expect(s).toContain("ANNOTATIONS db:star");
     expect(s).not.toContain("{");
   });
 });
@@ -111,7 +111,7 @@ describe("fragments", () => {
       op.add_mark({ zone: "e", id: "m", at: 20, label: "20%", note: "mal", tone: "warn" }),
     ]).board;
     const t = serializeBoard(b);
-    expect(t).toContain("nivel:60");
+    expect(t).toContain("level:60");
     expect(t).toContain("m (mark)");
     expect(t).toContain("at:20 tone:warn");
   });

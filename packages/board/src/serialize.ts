@@ -9,34 +9,33 @@ export interface SerializeOpts {
   catalog?: boolean;
 }
 
-// Spanish on purpose: prompt text, translated with the English prompt ticket.
 export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
-  if (!b.zones.length && !b.elements.length) return "(tablero vacío)";
+  if (!b.zones.length && !b.elements.length) return "(empty board)";
   const out: string[] = [];
-  out.push("ZONAS");
+  out.push("ZONES");
   for (const z of b.zones) {
     let l = `- ${z.id} [${z.kind}] ${q(z.title)}`;
     if (z.leftTitle || z.rightTitle) l += ` (${z.leftTitle ?? ""} | ${z.rightTitle ?? ""})`;
     if (z.kind === "scale") {
       l += ` (${z.minLabel ?? "0%"} .. ${z.maxLabel ?? "100%"})`;
-      if (z.level) l += ` nivel:${z.level.at}${z.level.label ? " " + q(z.level.label) : ""}`;
+      if (z.level) l += ` level:${z.level.at}${z.level.label ? " " + q(z.level.label) : ""}`;
     }
-    if (z.kind === "cycle" && z.centerLabel) l += ` centro:${q(z.centerLabel)}`;
+    if (z.kind === "cycle" && z.centerLabel) l += ` center:${q(z.centerLabel)}`;
     if (z.place) l += ` place:${z.place.relation} ${z.place.of}`;
     l += ` color:${FILL_NAMES[z.n % FILL_NAMES.length]}`;
     out.push(l);
   }
-  out.push("ELEMENTOS");
+  out.push("ELEMENTS");
   for (const e of b.elements) {
     const kind = e.type === "component" ? `component/${e.comp ?? "service"}` : e.type;
     // tree nodes: indent by depth so the hierarchy shows
     let depth = 0;
     for (let p = e.type === "branch" ? e.parent : undefined; p && depth < 20; depth++) p = b.elements.find((x) => x.id === p)?.parent;
     let l = `- ${"  ".repeat(depth)}${e.id} (${kind}) ${q(e.label)} @${e.zone}`;
-    if (e.type === "mark") l += ` at:${e.at} tone:${e.tone ?? "neutral"}${e.note ? " nota:" + q(e.note) : ""}`;
-    if (e.type === "event") l += `${e.at !== undefined ? ` at:${e.at}` : ""}${e.when ? " when:" + q(e.when) : ""}${e.note ? " nota:" + q(e.note) : ""}`;
+    if (e.type === "mark") l += ` at:${e.at} tone:${e.tone ?? "neutral"}${e.note ? " note:" + q(e.note) : ""}`;
+    if (e.type === "event") l += `${e.at !== undefined ? ` at:${e.at}` : ""}${e.when ? " when:" + q(e.when) : ""}${e.note ? " note:" + q(e.note) : ""}`;
     if (e.type === "span") l += ` from:${e.at} to:${e.to} tone:${e.tone ?? "neutral"}`;
-    if ((e.type === "stage" || e.type === "branch") && e.note) l += ` nota:${q(e.note)}`;
+    if ((e.type === "stage" || e.type === "branch") && e.note) l += ` note:${q(e.note)}`;
     if (e.column) l += ` col:${e.column}`;
     if (e.after) l += ` after:${e.after}`;
     if (e.parent) l += ` parent:${e.parent}`;
@@ -44,18 +43,18 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
     out.push(l);
   }
   if (b.connections.length) {
-    out.push("CONEXIONES");
+    out.push("CONNECTIONS");
     for (const c of b.connections) {
       out.push(`- ${c.id}: ${c.from} ${c.both ? "<->" : "->"} ${c.to}${c.label ? " " + q(c.label) : ""}${c.style === "dashed" ? " dashed" : ""}`);
     }
   }
   if (b.callouts.length) {
-    out.push("NOTAS");
+    out.push("CALLOUTS");
     for (const c of b.callouts) out.push(`- ${c.id} -> ${c.target} ${q(c.text)}`);
   }
   const marks: string[] = [];
   for (const e of b.emphasis) marks.push(`${e.target}:${e.style}`);
   for (const k of b.questions) marks.push(`${k.target}:?`);
-  if (marks.length) out.push("MARCAS " + marks.join(", "));
+  if (marks.length) out.push("ANNOTATIONS " + marks.join(", "));
   return out.join("\n");
 }

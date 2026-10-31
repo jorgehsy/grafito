@@ -8,12 +8,18 @@ export interface Usage {
   cache_creation_input_tokens: number;
 }
 
+/** One block of the system prompt. `cache` ends the cached prefix (tools + system so far) at this block. */
+export interface SystemBlock {
+  text: string;
+  cache?: boolean;
+}
+
 /** One board request to Claude. The tools sent, and the ops accepted, follow `catalogs`. */
 export interface ClaudeParams {
   model: string;
   maxTokens: number;
   effort: "low" | "medium";
-  system: string;
+  system: readonly SystemBlock[];
   userText: string;
   catalogs: readonly string[];
 }

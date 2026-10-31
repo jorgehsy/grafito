@@ -16,7 +16,7 @@ Everything below is in order: do it top to bottom and run `pnpm turbo run typech
    - Add valid and invalid cases for each new op.
    - The tool snapshots change because the tool text changed. Regenerate them (`pnpm --filter @grafito/contract test -u`) and review the diff.
 3. **Prompt** (`apps/server/src/prompt/system.ts`, `system.test.ts`)
-   - Add a line to the "Elegir el tipo de zona" list saying when to pick the kind.
+   - Add a line to the "Choosing the zone kind" list saying when to pick the kind.
    - `system.test.ts` pins the hash of the prompt and of the tool definitions. Update both hashes and bump `PROMPT_VERSION` in `packages/contract`, since saved sessions stamp it.
 4. **Board model** (`packages/board/src/model.ts`)
    - Add the new element type to `ElementType`, and its fields to `Element` or `Zone` if needed.
@@ -55,7 +55,7 @@ Stages stacked top to bottom, each narrower than the last, with a conversion not
 
 1. `ops.ts`: `ZONE_KINDS` gets `"funnel"`; add `add_layer: z.strictObject({ zone: id(...), id: id(...), label: text(...), note: str(...).optional() })`; add its tool description and mention `funnel` in the `create_zone` description.
 2. `parse.test.ts`: `ok("add_layer", { zone: "f", id: "l", label: "Visits" })` is true; a missing `label` is false. Regenerate the tool snapshots.
-3. `system.ts`: `- funnel: cantidades que se reducen paso a paso (conversión). add_layer añade cada capa de arriba abajo.` Update the two hashes in `system.test.ts` and bump `PROMPT_VERSION`.
+3. `system.ts`: `- funnel: quantities that shrink step by step (conversion). add_layer adds each layer from top to bottom.` Update the two hashes in `system.test.ts` and bump `PROMPT_VERSION`.
 4. `model.ts`: `ElementType` gets `"layer"`; `ELEMENT_ZONE` gets `layer: ["funnel"]`; `applyOp` gets `case "add_layer"` modelled on `add_stage`, rejecting zones that are not `funnel`; `derivedConnections` skips `layer` so no implicit arrows appear.
 5. `layout/funnel.ts`: `layoutFunnel` stacks the layers, each `elementSize` narrower than the previous, centred on one axis, returning a `ZoneLocal`. `geometry.ts`: `elementSize` gets `case "layer"`. `zones.ts`: `else if (zone.kind === "funnel") content = layoutFunnel(zone, elements);`.
 6. `tree.ts`: `layer` elements emit `variant: "layer"` items with `lines`; the `sig` includes the lines and the width.
