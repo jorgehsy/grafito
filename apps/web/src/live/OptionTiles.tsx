@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { T } from "./ShapeGallery";
-import { ICONOS_AWS } from "../icons/aws";
+import { AWS_ICONS } from "../icons/aws";
 import { AWS_SERVICES } from "@grafito/icons";
 
 interface Tile { value: string; label: string; sub?: string; thumb: ReactNode }
@@ -141,7 +141,7 @@ export function CatalogTiles({ value, onChange }: { value: string[]; onChange(v:
             onClick={() => onChange(on ? value.filter((x) => x !== c.id) : [...value, c.id])}
           >
             <span className="samples" aria-hidden="true">
-              {c.samples.map((s) => <i key={s} dangerouslySetInnerHTML={{ __html: ICONOS_AWS[s] ?? "" }} />)}
+              {c.samples.map((s) => <i key={s} dangerouslySetInnerHTML={{ __html: AWS_ICONS[s] ?? "" }} />)}
             </span>
             <span>{c.label}</span>
           </button>

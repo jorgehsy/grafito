@@ -2,7 +2,7 @@
 
 Grafito listens to a talk and draws it live. Claude never draws anything itself: it emits **ops** (small, coordinate-free changes to the board), and the browser lays out and animates the result. Terms in bold are defined in [`GLOSSARY.md`](GLOSSARY.md); decisions are in [`docs/adr/`](docs/adr/).
 
-Some file and identifier names are still Spanish (for example `sello.ts` for the service stamp). They are being renamed to the glossary terms.
+Some file and identifier names are still Spanish (for example `scripts/arquitectura.ts` for a demo). They are being renamed to the glossary terms.
 
 ## Package map
 

@@ -116,6 +116,6 @@ describe("service en exportar -> importar", () => {
     const back = entriesFromRecord(JSON.parse(JSON.stringify(rec)));
     const board = applyOps(emptyBoard(), replayOps(back.entries));
     expect(board.warnings).toEqual([]);
-    expect(board.board.els.map((e) => e.service)).toEqual(["aws:lambda", "aws:dynamodb"]);
+    expect(board.board.elements.map((e) => e.service)).toEqual(["aws:lambda", "aws:dynamodb"]);
   });
 });

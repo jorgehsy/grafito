@@ -45,7 +45,7 @@ class Heap {
 
 export interface RouterInput {
   bounds: Rect;
-  els: Rect[];
+  elements: Rect[];
   zones: Rect[];
   /** zones that are "expensive" to cross (headers with the title) */
   headers: Rect[];
@@ -63,7 +63,7 @@ class Grid {
     this.rows = Math.ceil((inp.bounds.h + 2 * pad) / G) + 1;
     this.blocked = new Uint8Array(this.cols * this.rows);
     this.cost = new Float32Array(this.cols * this.rows).fill(1);
-    for (const r of inp.els) {
+    for (const r of inp.elements) {
       this.paint(r, margin, (c) => { this.blocked[c]++; });
       this.paint(r, 30, (c) => { this.cost[c] += 1.2; });
     }
@@ -96,7 +96,7 @@ export class Router {
   private used: Float32Array;
   private grids: Grid[];
   constructor(private inp: RouterInput) {
-    const probe = new Grid({ ...inp, els: [], zones: [], headers: [] }, 0, new Float32Array(0));
+    const probe = new Grid({ ...inp, elements: [], zones: [], headers: [] }, 0, new Float32Array(0));
     this.used = new Float32Array(probe.cols * probe.rows);
     this.grids = [12, 6, 1].map((m) => new Grid(inp, m, this.used));
   }

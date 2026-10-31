@@ -9,8 +9,9 @@ export interface SerializeOpts {
   catalog?: boolean;
 }
 
+// Spanish on purpose: prompt text, translated with the English prompt ticket.
 export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
-  if (!b.zones.length && !b.els.length) return "(tablero vacío)";
+  if (!b.zones.length && !b.elements.length) return "(tablero vacío)";
   const out: string[] = [];
   out.push("ZONAS");
   for (const z of b.zones) {
@@ -26,11 +27,11 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
     out.push(l);
   }
   out.push("ELEMENTOS");
-  for (const e of b.els) {
+  for (const e of b.elements) {
     const kind = e.type === "component" ? `component/${e.comp ?? "service"}` : e.type;
     // tree nodes: indent by depth so the hierarchy shows
     let depth = 0;
-    for (let p = e.type === "branch" ? e.parent : undefined; p && depth < 20; depth++) p = b.els.find((x) => x.id === p)?.parent;
+    for (let p = e.type === "branch" ? e.parent : undefined; p && depth < 20; depth++) p = b.elements.find((x) => x.id === p)?.parent;
     let l = `- ${"  ".repeat(depth)}${e.id} (${kind}) ${q(e.label)} @${e.zone}`;
     if (e.type === "mark") l += ` at:${e.at} tone:${e.tone ?? "neutral"}${e.note ? " nota:" + q(e.note) : ""}`;
     if (e.type === "event") l += `${e.at !== undefined ? ` at:${e.at}` : ""}${e.when ? " when:" + q(e.when) : ""}${e.note ? " nota:" + q(e.note) : ""}`;
@@ -42,9 +43,9 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
     if (opts.catalog && e.service) l += ` service:${e.service.slice(e.service.indexOf(":") + 1)}`;
     out.push(l);
   }
-  if (b.conns.length) {
+  if (b.connections.length) {
     out.push("CONEXIONES");
-    for (const c of b.conns) {
+    for (const c of b.connections) {
       out.push(`- ${c.id}: ${c.from} ${c.both ? "<->" : "->"} ${c.to}${c.label ? " " + q(c.label) : ""}${c.style === "dashed" ? " dashed" : ""}`);
     }
   }
@@ -53,7 +54,7 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
     for (const c of b.callouts) out.push(`- ${c.id} -> ${c.target} ${q(c.text)}`);
   }
   const marks: string[] = [];
-  for (const e of b.emph) marks.push(`${e.target}:${e.style}`);
+  for (const e of b.emphasis) marks.push(`${e.target}:${e.style}`);
   for (const k of b.questions) marks.push(`${k.target}:?`);
   if (marks.length) out.push("MARCAS " + marks.join(", "));
   return out.join("\n");

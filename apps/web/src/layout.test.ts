@@ -25,15 +25,15 @@ describe.each(SCRIPTS)("layout del guion $id", ({ script }) => {
     const lay = await computeLayout(board);
     for (const z of board.zones) {
       const zr = lay.zones[z.id];
-      const els = board.els.filter((e) => e.zone === z.id).map((e) => [e.id, lay.els[e.id]] as [string, Rect]);
-      for (const [id, r] of els) {
+      const elements = board.elements.filter((e) => e.zone === z.id).map((e) => [e.id, lay.elements[e.id]] as [string, Rect]);
+      for (const [id, r] of elements) {
         expect(r.x, id).toBeGreaterThanOrEqual(zr.x);
         expect(r.y, id).toBeGreaterThanOrEqual(zr.y);
         expect(r.x + r.w, id).toBeLessThanOrEqual(zr.x + zr.w);
         expect(r.y + r.h, id).toBeLessThanOrEqual(zr.y + zr.h);
       }
-      for (let i = 0; i < els.length; i++)
-        for (let j = i + 1; j < els.length; j++) expect(overlaps(els[i][1], els[j][1]), `${els[i][0]} vs ${els[j][0]}`).toBe(false);
+      for (let i = 0; i < elements.length; i++)
+        for (let j = i + 1; j < elements.length; j++) expect(overlaps(elements[i][1], elements[j][1]), `${elements[i][0]} vs ${elements[j][0]}`).toBe(false);
     }
   });
 
@@ -47,7 +47,7 @@ describe.each(SCRIPTS)("layout del guion $id", ({ script }) => {
 
   it("las conexiones entre zonas no cruzan otros elementos y las etiquetas no pisan cajas", async () => {
     const lay = await computeLayout(board);
-    const zoneOf = new Map(board.els.map((e) => [e.id, e.zone]));
+    const zoneOf = new Map(board.elements.map((e) => [e.id, e.zone]));
     const sample = (g: ConnectionGeom): Pt[] => {
       if (g.kind === "curve") return Array.from({ length: 41 }, (_, i) => bezierAt(g.pts, i / 40));
       const out: Pt[] = [];
@@ -56,37 +56,37 @@ describe.each(SCRIPTS)("layout del guion $id", ({ script }) => {
       return out;
     };
     let cross = 0;
-    for (const c of board.conns) {
+    for (const c of board.connections) {
       if (zoneOf.get(c.from) === zoneOf.get(c.to)) continue;
       cross++;
-      const g = lay.edges[c.id];
+      const g = lay.connections[c.id];
       expect(g.cross, c.id).toBe(true);
-      for (const e of board.els) {
+      for (const e of board.elements) {
         if (e.id === c.from || e.id === c.to) continue;
-        const r = lay.els[e.id];
+        const r = lay.elements[e.id];
         const bad = sample(g).find((p) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h);
         expect(bad, `${c.id} cruza ${e.id}`).toBeUndefined();
       }
     }
     expect(cross).toBeGreaterThanOrEqual(0);
-    for (const c of [...board.conns]) {
-      const g = lay.edges[c.id];
+    for (const c of [...board.connections]) {
+      const g = lay.connections[c.id];
       if (!g?.label) continue;
       const lr = labelRect(g.label);
-      for (const e of board.els) expect(overlaps(lr, lay.els[e.id]), `etiqueta ${c.id} sobre ${e.id}`).toBe(false);
+      for (const e of board.elements) expect(overlaps(lr, lay.elements[e.id]), `etiqueta ${c.id} sobre ${e.id}`).toBe(false);
     }
-    for (const c of board.conns) for (const d of board.conns) {
-      if (c.id >= d.id || !lay.edges[c.id]?.label || !lay.edges[d.id]?.label) continue;
-      expect(overlaps(labelRect(lay.edges[c.id].label!), labelRect(lay.edges[d.id].label!)), `${c.id}/${d.id}`).toBe(false);
+    for (const c of board.connections) for (const d of board.connections) {
+      if (c.id >= d.id || !lay.connections[c.id]?.label || !lay.connections[d.id]?.label) continue;
+      expect(overlaps(labelRect(lay.connections[c.id].label!), labelRect(lay.connections[d.id].label!)), `${c.id}/${d.id}`).toBe(false);
     }
   });
 
   it("todas las conexiones y notas tienen geometría", async () => {
     const lay = await computeLayout(board);
-    for (const c of board.conns) expect(lay.edges[c.id], c.id).toBeDefined();
+    for (const c of board.connections) expect(lay.connections[c.id], c.id).toBeDefined();
     for (const c of board.callouts) expect(lay.callouts[c.id], c.id).toBeDefined();
     const tree = buildTree(board, lay);
-    expect(tree.items.length).toBeGreaterThan(board.els.length);
+    expect(tree.items.length).toBeGreaterThan(board.elements.length);
   });
 });
 
@@ -97,9 +97,9 @@ describe("estabilidad", () => {
     const b0 = finalBoard(ops);
     const before = await computeLayout(b0);
     const after = await computeLayout(finalBoard([...ops, ...chunks[2].ops]));
-    for (const e of b0.els) {
-      expect(Math.abs(before.els[e.id].x - after.els[e.id].x), e.id).toBeLessThan(30);
-      expect(Math.abs(before.els[e.id].y - after.els[e.id].y), e.id).toBeLessThan(30);
+    for (const e of b0.elements) {
+      expect(Math.abs(before.elements[e.id].x - after.elements[e.id].x), e.id).toBeLessThan(30);
+      expect(Math.abs(before.elements[e.id].y - after.elements[e.id].y), e.id).toBeLessThan(30);
     }
     // el orden de las zonas se conserva
     expect(Object.keys(after.zones)).toEqual(Object.keys(before.zones));
@@ -119,10 +119,10 @@ describe("scale", () => {
     const board = withMarks([18, 20, 22, 90]);
     const lay = await computeLayout(board);
     const zr = lay.zones.e;
-    const marks = board.els.filter((e) => e.type === "mark");
+    const marks = board.elements.filter((e) => e.type === "mark");
     expect(marks).toHaveLength(4);
     for (const m of marks) {
-      const r = lay.els[m.id];
+      const r = lay.elements[m.id];
       expect(r.x, m.id).toBeGreaterThanOrEqual(zr.x);
       expect(r.y, m.id).toBeGreaterThanOrEqual(zr.y);
       expect(r.x + r.w, m.id).toBeLessThanOrEqual(zr.x + zr.w);
@@ -130,21 +130,21 @@ describe("scale", () => {
     }
     for (let i = 0; i < marks.length; i++)
       for (let j = i + 1; j < marks.length; j++)
-        expect(overlaps(lay.els[marks[i].id], lay.els[marks[j].id]), `${marks[i].id} vs ${marks[j].id}`).toBe(false);
+        expect(overlaps(lay.elements[marks[i].id], lay.elements[marks[j].id]), `${marks[i].id} vs ${marks[j].id}`).toBe(false);
     // ni cubren la barra
     const bar = lay.scales.e.bar;
-    for (const m of marks) expect(overlaps(lay.els[m.id], bar), m.id).toBe(false);
+    for (const m of marks) expect(overlaps(lay.elements[m.id], bar), m.id).toBe(false);
   });
 
   it("los tallos no cruzan las cajas de otras marcas", async () => {
     const board = withMarks([18, 19, 20, 21, 22, 24, 26, 90]);
     const lay = await computeLayout(board);
-    const marks = board.els.filter((e) => e.type === "mark");
+    const marks = board.elements.filter((e) => e.type === "mark");
     for (const m of marks) {
       const [, near, hook] = lay.marks[m.id].stem;
       for (const o of marks) {
         if (o.id === m.id) continue;
-        const q = lay.els[o.id];
+        const q = lay.elements[o.id];
         for (let k = 0; k <= 20; k++) {
           const x = near.x + ((hook.x - near.x) * k) / 20, y = near.y + ((hook.y - near.y) * k) / 20;
           expect(x > q.x && x < q.x + q.w && y > q.y && y < q.y + q.h, `tallo de ${m.id} cruza ${o.id}`).toBe(false);
@@ -164,7 +164,7 @@ describe("scale", () => {
     const lay = await computeLayout(board);
     const zr = lay.zones.e;
     for (const id of ["m0", "m1"]) {
-      const r = lay.els[id];
+      const r = lay.elements[id];
       expect(r.x).toBeGreaterThanOrEqual(zr.x);
       expect(r.x + r.w).toBeLessThanOrEqual(zr.x + zr.w);
     }
@@ -178,7 +178,7 @@ describe("scale", () => {
     const lay = await computeLayout(board);
     expect(lay.callouts.n).toBeDefined();
     const tree = buildTree(board, lay);
-    for (const k of ["bar:e", "level:e", "m0", "m1", "stem:m0", "stem:m1", "emph:m0", "n"]) expect(tree.map.has(k), k).toBe(true);
+    for (const k of ["bar:e", "level:e", "m0", "m1", "stem:m0", "stem:m1", "emphasis:m0", "n"]) expect(tree.map.has(k), k).toBe(true);
     const lvl = tree.map.get("level:e")!;
     expect(lvl.geom.w).toBeCloseTo(0.6 * lay.scales.e.w, 5);
     // sin nivel no hay relleno
@@ -213,10 +213,10 @@ describe("etiquetas de arista en flujos con textos largos", () => {
 
   it("ninguna etiqueta pisa una caja ni otra etiqueta", async () => {
     const lay = await computeLayout(board);
-    const labels = Object.entries(lay.edges).flatMap(([id, g]) => (g.label ? [[id, labelRect(g.label)] as [string, Rect]] : []));
+    const labels = Object.entries(lay.connections).flatMap(([id, g]) => (g.label ? [[id, labelRect(g.label)] as [string, Rect]] : []));
     expect(labels.length).toBe(5);
     for (const [id, l] of labels) {
-      for (const [eid, r] of Object.entries(lay.els)) expect(overlaps(l, r), `${id} sobre ${eid}`).toBe(false);
+      for (const [eid, r] of Object.entries(lay.elements)) expect(overlaps(l, r), `${id} sobre ${eid}`).toBe(false);
       for (const [oid, o] of labels) if (oid !== id) expect(overlaps(l, o), `${id} sobre ${oid}`).toBe(false);
     }
   });

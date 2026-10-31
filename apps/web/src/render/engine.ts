@@ -1,5 +1,4 @@
-// Motor de dibujo imperativo sobre SVG: animación de trazo, lápiz, resaltado, tweens y cámara.
-// React sólo monta el <svg>; aquí vive todo lo que se mueve.
+// Imperative SVG engine: stroke animation, pen, highlight, tweens and camera. React only mounts the <svg>.
 import type { Executor } from "@grafito/board";
 import type { Sink } from "@grafito/board";
 import type { Rect } from "@grafito/board";
@@ -8,7 +7,7 @@ import type { Cam, View } from "@grafito/board";
 import { geomEqual } from "@grafito/board";
 import type { Geom, RenderItem, RenderTree } from "@grafito/board";
 import { emptyTree } from "@grafito/board";
-import { addServiceIcon, enterSello, hideSello, planEntrada, removeSello } from "./stamp";
+import { addServiceIcon, enterStamp, hideStamp, entrancePlan, removeStamp } from "./stamp";
 import { RED } from "@grafito/board";
 import { buildVisual, hideForDraw, hideText, measure, showAll } from "./visuals";
 import type { Visual } from "./visuals";
@@ -104,12 +103,11 @@ export class Engine implements Sink, Executor {
     this.cleanup.forEach((f) => f());
   }
 
-  // ---------- Sink / Executor ----------
   setTarget(tree: RenderTree, bounds: Rect) {
     this.target = tree;
     this.bounds = bounds;
   }
-  move() { /* los movimientos se resuelven en el bucle: compara lo mostrado con el objetivo */ }
+  move() { /* moves are resolved in the tick loop by comparing shown vs target */ }
 
   async draw(key: string, speed: number) {
     const t = this.target.map.get(key);
@@ -126,15 +124,15 @@ export class Engine implements Sink, Executor {
     if (!isFinite(speed)) { showAll(vis); s.busy = false; return; }
     const sp = speed * this.userSpeed;
     hideForDraw(vis);
-    hideSello(vis);
-    for (const { fase } of planEntrada("dibujar", !!vis.sello?.length, sp)) {
-      if (fase === "trazo") await this.drawStrokes(s, sp);
-      else if (fase === "relleno") {
+    hideStamp(vis);
+    for (const { phase } of entrancePlan("draw", !!vis.stamps?.length, sp)) {
+      if (phase === "stroke") await this.drawStrokes(s, sp);
+      else if (phase === "fill") {
         await this.frame(240 / sp, (p) => {
           for (const f of vis.fills) f.style.opacity = String(p * parseFloat(f.getAttribute("opacity") ?? "1"));
         });
         for (const f of vis.fills) f.style.opacity = "";
-      } else if (fase === "sello") await enterSello(vis, (d, fn) => this.frame(d, fn), sp);
+      } else if (phase === "stamp") await enterStamp(vis, (d, fn) => this.frame(d, fn), sp);
       else await this.writeText(s, sp);
     }
     this.hidePen();
@@ -151,16 +149,16 @@ export class Engine implements Sink, Executor {
     const sp = speed * this.userSpeed;
     if (!instant) await this.strike(s, sp);
     const vis = buildVisual(t, s.geom);
-    const nuevo = vis.sello?.length && t.data.service !== s.item.data.service;
+    const hasNewStamp = vis.stamps?.length && t.data.service !== s.item.data.service;
     s.layer.replaceChild(vis.g, s.vis.g);
     s.vis = vis;
     s.item = { ...t, geom: s.geom };
     this.highlight(s);
     if (!instant) {
       hideText(vis);
-      if (nuevo) hideSello(vis);
+      if (hasNewStamp) hideStamp(vis);
       await this.writeText(s, sp);
-      if (nuevo) await enterSello(vis, (d, fn) => this.frame(d, fn), sp);
+      if (hasNewStamp) await enterStamp(vis, (d, fn) => this.frame(d, fn), sp);
       this.hidePen();
     }
     s.busy = false;
@@ -204,7 +202,6 @@ export class Engine implements Sink, Executor {
   }
   get camScale() { return this.cam.scale; }
 
-  // ---------- animación ----------
   private frame(dur: number, fn: (p: number) => void): Promise<void> {
     if (!(dur > 0) || !isFinite(dur)) { fn(1); return Promise.resolve(); }
     return new Promise((resolve, reject) => {
@@ -249,19 +246,19 @@ export class Engine implements Sink, Executor {
     }
   }
 
-  /** set_service sobre algo ya dibujado: no se tacha ni se redibuja; el sello salta encima (o se quita). */
+  /** set_service on something already drawn: no strike-out or redraw; the stamp pops in on top (or is removed). */
   private async restamp(s: Shown, t: RenderItem) {
     s.busy = true;
-    removeSello(s.vis);
+    removeStamp(s.vis);
     s.item = { ...s.item, data: { ...s.item.data, service: t.data.service } };
     addServiceIcon(s.vis, s.item, s.geom);
-    const conSello = !!s.vis.sello?.length;
+    const withStamp = !!s.vis.stamps?.length;
     const speed = Number.isFinite(this.userSpeed) ? this.userSpeed : 1;
     try {
-      for (const { fase } of planEntrada("set_service", conSello, speed)) {
-        if (fase === "sello") { hideSello(s.vis); await enterSello(s.vis, (d, fn) => this.frame(d, fn), speed); }
+      for (const { phase } of entrancePlan("set_service", withStamp, speed)) {
+        if (phase === "stamp") { hideStamp(s.vis); await enterStamp(s.vis, (d, fn) => this.frame(d, fn), speed); }
       }
-    } catch { /* cancelado: el sello queda como esté */ }
+    } catch { /* cancelled: the stamp stays as it is */ }
     s.busy = false;
   }
 
@@ -281,10 +278,9 @@ export class Engine implements Sink, Executor {
     s.item = { ...s.item, geom: g, hue };
   }
 
-  // ---------- dibujo ----------
   private async drawStrokes(s: Shown, sp: number) {
     const total = s.vis.strokes.reduce((a, b) => a + b.len, 0);
-    const rate = Math.max(1.5, total / 2400) * sp; // px por ms
+    const rate = Math.max(1.5, total / 2400) * sp;
     const ox = s.vis.translates ? s.geom.x : 0, oy = s.vis.translates ? s.geom.y : 0;
     this.showPen();
     for (const st of s.vis.strokes) {
@@ -313,9 +309,9 @@ export class Engine implements Sink, Executor {
       for (; shown < n; shown++) flat[shown].run.chars[flat[shown].i].removeAttribute("fill-opacity");
       const cur = flat[Math.max(0, Math.min(total - 1, n - 1))];
       try {
-        const pt = cur.run.el.getStartPositionOfChar(cur.run.offsets[cur.i]);
+        const pt = cur.run.node.getStartPositionOfChar(cur.run.offsets[cur.i]);
         this.movePen(pt.x + ox + 6, pt.y + oy + 6);
-      } catch { /* sin medida todavía */ }
+      } catch { /* not measurable yet */ }
     });
     flat.forEach((f) => f.run.chars[f.i].removeAttribute("fill-opacity"));
   }
@@ -323,7 +319,7 @@ export class Engine implements Sink, Executor {
   private async strike(s: Shown, sp: number) {
     const lines: SVGPathElement[] = [];
     for (const run of s.vis.texts) {
-      const b = run.el.getBBox();
+      const b = run.node.getBBox();
       const p = document.createElementNS(NS, "path");
       p.setAttribute("d", `M${b.x - 4} ${b.y + b.height / 2 + 2} L${b.x + b.width + 4} ${b.y + b.height / 2 - 2}`);
       p.setAttribute("stroke", RED); p.setAttribute("stroke-width", "3"); p.setAttribute("stroke-linecap", "round");
@@ -363,7 +359,6 @@ export class Engine implements Sink, Executor {
     a.onfinish = () => node.remove();
   }
 
-  // ---------- lápiz ----------
   private makePen(): SVGGElement {
     const g = document.createElementNS(NS, "g");
     g.style.display = "none";
@@ -380,7 +375,6 @@ export class Engine implements Sink, Executor {
     this.pen.setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
   }
 
-  // ---------- cámara ----------
   private layerOf(i: RenderItem) {
     if (i.under) return this.layers.under;
     return i.kind === "zone" ? this.layers.zone : i.kind === "connection" ? this.layers.connection : i.kind === "element" ? this.layers.element : this.layers.ann;

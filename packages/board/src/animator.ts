@@ -98,7 +98,7 @@ export class AnimationQueue {
         else if (task.kind === "update") await this.exec.update(task.key, speed);
         else await this.exec.remove(task.keys, speed);
       } catch {
-        /* cancelada o fallida: seguimos con la siguiente */
+        /* cancelled or failed: carry on with the next task */
       }
     }
     if (epoch !== this.epoch) return;

@@ -1,17 +1,16 @@
-// Construye el SVG "a mano" (rough.js) de cada ítem. Semilla fija derivada de la clave: nunca tiembla.
+// Builds each render item's hand-drawn SVG (rough.js). The seed derives from the item key, so redraws never jitter.
 import rough from "roughjs";
 import type { Options } from "roughjs/bin/core";
 import type { Drawable } from "roughjs/bin/core";
 import type { Geom, RenderItem } from "@grafito/board";
 import { LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "@grafito/board";
-import { BLUE, EDGES, FILLS, FONT_FAMILY, INK, PAPER, RED, TONES } from "@grafito/board";
+import { BLUE, OUTLINES, FILLS, FONT_FAMILY, INK, PAPER, RED, TONES } from "@grafito/board";
 import { addServiceIcon } from "./stamp";
 
 const NS = "http://www.w3.org/2000/svg";
 const gen = rough.generator();
-/** Baja el temblor del trazo: multiplica roughness y bowing finales. */
+/** Tames the stroke wobble: scales the final roughness and bowing. */
 const ROUGH_SCALE = 0.62;
-
 
 export function hash(s: string): number {
   let h = 2166136261;
@@ -20,20 +19,20 @@ export function hash(s: string): number {
 }
 
 export interface Stroke { anim: SVGPathElement; show: SVGPathElement; len: number }
-export interface TextRun { el: SVGTextElement; chars: SVGTSpanElement[]; offsets: number[] }
+export interface TextRun { node: SVGTextElement; chars: SVGTSpanElement[]; offsets: number[] }
 export interface Visual {
   g: SVGGElement;
   strokes: Stroke[];
   fills: SVGElement[];
   texts: TextRun[];
-  /** true: las formas están en coordenadas locales y g lleva translate(geom.x, geom.y) */
+  /** true: shapes are in local coordinates and g carries translate(geom.x, geom.y) */
   translates: boolean;
-  /** Sello de servicio (icono de AWS) montado en la esquina. */
-  sello?: SVGGElement[];
+  /** Service stamps (AWS icons) pinned to the corner. */
+  stamps?: SVGGElement[];
 }
 
 let maskId = 0;
-const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}) => {
+const svgEl = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}) => {
   const e = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
   return e;
@@ -43,18 +42,18 @@ class Builder {
   v: Visual;
   defs?: SVGDefsElement;
   constructor(private key: string, translates: boolean) {
-    this.v = { g: el("g"), strokes: [], fills: [], texts: [], translates };
+    this.v = { g: svgEl("g"), strokes: [], fills: [], texts: [], translates };
   }
   seed(part: string) { return hash(this.key + ":" + part); }
 
-  /** Añade un Drawable de rough: trazos del contorno (en tramos independientes) y relleno. */
+  /** Adds a rough Drawable: outline strokes (as independent segments) and fill. */
   shape(d: Drawable, o: { stroke: string; width: number; dash?: boolean; fill?: string; fillOpacity?: number }) {
     for (const p of gen.toPaths(d)) {
       if (p.fill && p.fill !== "none") {
-        const f = el("path", { d: p.d, fill: p.fill, stroke: "none", opacity: o.fillOpacity ?? 1 });
+        const f = svgEl("path", { d: p.d, fill: p.fill, stroke: "none", opacity: o.fillOpacity ?? 1 });
         this.v.g.appendChild(f); this.v.fills.push(f);
       } else if (o.fill && p.stroke === o.fill) {
-        const f = el("path", { d: p.d, fill: "none", stroke: p.stroke, "stroke-width": p.strokeWidth, "stroke-linecap": "round", opacity: o.fillOpacity ?? 1 });
+        const f = svgEl("path", { d: p.d, fill: "none", stroke: p.stroke, "stroke-width": p.strokeWidth, "stroke-linecap": "round", opacity: o.fillOpacity ?? 1 });
         this.v.g.appendChild(f); this.v.fills.push(f);
       } else {
         for (const sub of p.d.split(/(?=M)/)) if (sub.trim()) this.stroke(sub, o.stroke, o.width, !!o.dash);
@@ -64,19 +63,19 @@ class Builder {
   stroke(d: string, color: string, width: number, dash: boolean) {
     const base = { d, fill: "none", stroke: color, "stroke-width": width, "stroke-linecap": "round", "stroke-linejoin": "round" };
     if (!dash) {
-      const p = el("path", base);
+      const p = svgEl("path", base);
       this.v.g.appendChild(p);
       this.v.strokes.push({ anim: p, show: p, len: 0 });
       return;
     }
-    // trazo discontinuo: se muestra con una máscara cuyo trazo continuo es el que se anima
-    if (!this.defs) { this.defs = el("defs"); this.v.g.appendChild(this.defs); }
+    // dashed stroke: shown through a mask whose solid stroke is the one that animates
+    if (!this.defs) { this.defs = svgEl("defs"); this.v.g.appendChild(this.defs); }
     const id = `m${++maskId}`;
-    const mask = el("mask", { id, maskUnits: "userSpaceOnUse", x: -20000, y: -20000, width: 40000, height: 40000 });
-    const mp = el("path", { d, fill: "none", stroke: PAPER, "stroke-width": width + 8, "stroke-linecap": "round" });
+    const mask = svgEl("mask", { id, maskUnits: "userSpaceOnUse", x: -20000, y: -20000, width: 40000, height: 40000 });
+    const mp = svgEl("path", { d, fill: "none", stroke: PAPER, "stroke-width": width + 8, "stroke-linecap": "round" });
     mask.appendChild(mp);
     this.defs.appendChild(mask);
-    const shown = el("path", { ...base, "stroke-dasharray": "9 7", mask: `url(#${id})` });
+    const shown = svgEl("path", { ...base, "stroke-dasharray": "9 7", mask: `url(#${id})` });
     this.v.g.appendChild(shown);
     this.v.strokes.push({ anim: mp, show: shown, len: 0 });
   }
@@ -100,7 +99,7 @@ class Builder {
     const size = o.size ?? 20, lh = o.lineH ?? size * 1.2;
     const y0 = cy - ((lines.length - 1) * lh) / 2;
     lines.forEach((line, i) => {
-      const t = el("text", {
+      const t = svgEl("text", {
         x: cx, y: y0 + i * lh, "text-anchor": o.anchor ?? "middle", "dominant-baseline": "central",
         "font-family": FONT_FAMILY, "font-size": size, "font-weight": o.weight ?? 400, fill: o.fill ?? INK,
       });
@@ -108,12 +107,12 @@ class Builder {
       const chars: SVGTSpanElement[] = [], offsets: number[] = [];
       let off = 0;
       for (const ch of line) {
-        const s = el("tspan");
+        const s = svgEl("tspan");
         s.textContent = ch;
         t.appendChild(s); chars.push(s); offsets.push(off); off += ch.length;
       }
       this.v.g.appendChild(t);
-      this.v.texts.push({ el: t, chars, offsets });
+      this.v.texts.push({ node: t, chars, offsets });
     });
   }
 }
@@ -154,18 +153,18 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
   const translates = item.kind === "zone" || item.kind === "element" || item.kind === "emphasis" || item.kind === "question";
   const b = new Builder(item.key, translates);
   const fill = item.hue >= 0 ? FILLS[item.hue] : "#F4E6A8";
-  const edge = item.hue >= 0 ? EDGES[item.hue] : INK;
+  const outline = item.hue >= 0 ? OUTLINES[item.hue] : INK;
   const st = { stroke: INK, width: 2.2 };
 
   if (item.kind === "zone") {
-    b.rough("rect", "frame", [3, 3, w - 6, h - 6], { roughness: 1.6, fillStyle: "solid" }, { stroke: edge, width: 2.6, fill, fillOpacity: 0.28 });
+    b.rough("rect", "frame", [3, 3, w - 6, h - 6], { roughness: 1.6, fillStyle: "solid" }, { stroke: outline, width: 2.6, fill, fillOpacity: 0.28 });
     const title = item.data.title ?? "";
     b.text([title], 26, 28, { size: 26, anchor: "start", weight: 600, fill: INK });
-    b.rough("line", "ul", [24, 46, 24 + Math.min(w - 50, title.length * 13.5), 47], { roughness: 1.4 }, { stroke: edge, width: 2.4 });
+    b.rough("line", "ul", [24, 46, 24 + Math.min(w - 50, title.length * 13.5), 47], { roughness: 1.4 }, { stroke: outline, width: 2.4 });
     if (item.data.divider !== undefined) {
-      b.rough("line", "div", [item.data.divider, 62, item.data.divider, h - 20], { roughness: 1.4 }, { stroke: edge, width: 2 });
-      b.text([item.data.leftTitle ?? ""], (26 + item.data.divider) / 2, 84, { size: 22, weight: 600, fill: edge });
-      b.text([item.data.rightTitle ?? ""], (item.data.divider + w - 26) / 2, 84, { size: 22, weight: 600, fill: edge });
+      b.rough("line", "div", [item.data.divider, 62, item.data.divider, h - 20], { roughness: 1.4 }, { stroke: outline, width: 2 });
+      b.text([item.data.leftTitle ?? ""], (26 + item.data.divider) / 2, 84, { size: 22, weight: 600, fill: outline });
+      b.text([item.data.rightTitle ?? ""], (item.data.divider + w - 26) / 2, 84, { size: 22, weight: 600, fill: outline });
     }
   } else if (item.kind === "element") {
     const lines = item.data.lines ?? [];
@@ -177,7 +176,7 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
       b.text([item.data.minLabel ?? ""], x0 - 10, h / 2, { anchor: "end", size: 22, weight: 700 });
       b.text([item.data.maxLabel ?? ""], x0 + bw + 10, h / 2, { anchor: "start", size: 22, weight: 700 });
     } else if (v === "scale-level") {
-      b.rough("rect", "lvl", [1, 4, Math.max(1, w - 2), h - 8], { roughness: 1.2, hachureGap: 8, hachureAngle: -40 }, { stroke: edge, width: 2.2, fill: edge, fillOpacity: 0.75 });
+      b.rough("rect", "lvl", [1, 4, Math.max(1, w - 2), h - 8], { roughness: 1.2, hachureGap: 8, hachureAngle: -40 }, { stroke: outline, width: 2.2, fill: outline, fillOpacity: 0.75 });
       if (item.data.label) {
         const need = item.data.label.length * 11 + 24;
         if (w >= need) b.text([item.data.label], w - 12, h / 2, { anchor: "end", size: 20, weight: 700, halo: true });
@@ -201,19 +200,19 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
       if (notes.length) b.text(notes, w / 2, 13 + lines.length * 27 + (notes.length * 22) / 2, { size: 18, fill: "#495057", lineH: 22 });
     } else if (v === "event") {
       const lines = item.data.lines ?? [], notes = item.data.noteLines ?? [];
-      b.rough("rect", "evt", [2, 2, w - 4, h - 4], { roughness: 1.3, fillStyle: "solid" }, { stroke: edge, width: 2.4, fill: PAPER });
+      b.rough("rect", "evt", [2, 2, w - 4, h - 4], { roughness: 1.3, fillStyle: "solid" }, { stroke: outline, width: 2.4, fill: PAPER });
       b.text(lines, w / 2, 13 + (lines.length * 27) / 2, { size: 22, weight: 700, lineH: 27 });
       if (notes.length) b.text(notes, w / 2, 13 + lines.length * 27 + (notes.length * 22) / 2, { size: 18, fill: "#495057", lineH: 22 });
     } else if (v === "when") {
-      b.text(item.data.lines ?? [], w / 2, h / 2, { size: 20, weight: 700, fill: edge, halo: true });
+      b.text(item.data.lines ?? [], w / 2, h / 2, { size: 20, weight: 700, fill: outline, halo: true });
     } else if (v === "span") {
-      // llave bajo el eje (extremos hacia arriba) y la etiqueta debajo
+      // bracket under the axis (ends pointing up) with the label below
       const tone = TONES[item.data.tone ?? "neutral"] ?? TONES.neutral;
       const x0 = item.data.x0 ?? 0, x1 = x0 + (item.data.barW ?? w);
       b.rough("path", "brk", [`M${x0} 2 L${x0} 14 L${x1} 14 L${x1} 2`], { roughness: 1.1, bowing: 1 }, { stroke: tone.ink, width: 2.8 });
       b.text(item.data.lines ?? [], (x0 + x1) / 2, 14 + 15, { size: 21, weight: 700, fill: tone.ink, halo: true });
     } else if (v === "cycle-center") {
-      b.rough("ellipse", "ctr", [w / 2, h / 2, w - 6, h - 6], { roughness: 1.5, fillStyle: "solid" }, { stroke: edge, width: 2.4, fill, fillOpacity: 0.35 });
+      b.rough("ellipse", "ctr", [w / 2, h / 2, w - 6, h - 6], { roughness: 1.5, fillStyle: "solid" }, { stroke: outline, width: 2.4, fill, fillOpacity: 0.35 });
       b.text(item.data.lines ?? [], w / 2, h / 2, { size: 24, weight: 700 });
     } else if (v === "step") {
       b.rough("rect", "s", [2, 2, w - 4, h - 4], {}, f);
@@ -225,7 +224,7 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
       b.rough("ellipse", "n", [w / 2, h / 2, w - 4, h - 4], {}, f);
       b.text(lines, w / 2, h / 2);
     } else if (v === "item") {
-      b.rough("ellipse", "dot", [10, h / 2, 12, 12], { fillStyle: "solid", roughness: 0.8 }, { stroke: edge, width: 2, fill: edge });
+      b.rough("ellipse", "dot", [10, h / 2, 12, 12], { fillStyle: "solid", roughness: 0.8 }, { stroke: outline, width: 2, fill: outline });
       b.text(lines, 26, h / 2, { anchor: "start" });
     } else if (v === "component:actor") {
       const cx = w / 2;
@@ -262,7 +261,7 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
       b.text(lines, w / 2, h * 0.56);
     }
   } else if (item.kind === "connection" && item.data.variant === "mark-stem") {
-    // muesca que cruza la barra + tallo hasta la etiqueta + triángulo que apunta a la barra
+    // notch across the bar + stem to the label + triangle pointing at the bar
     const [far, near, hook] = geom.pts!;
     const tone = TONES[item.data.tone ?? "neutral"] ?? TONES.neutral;
     const ts = { stroke: tone.ink, width: 2.6 };
@@ -273,15 +272,15 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
     b.rough("line", "stem", [base.x, base.y, hook.x, hook.y], { roughness: 0.9 }, ts);
     b.rough("poly", "tri", [[[base.x - u.y * 8, base.y + u.x * 8], [base.x + u.y * 8, base.y - u.x * 8], [near.x, near.y]]], { fillStyle: "solid", roughness: 0.7 }, { ...ts, width: 2, fill: tone.fill });
   } else if (item.kind === "connection" && item.data.variant === "bracket") {
-    // codo sin punta: la jerarquía se lee de izquierda a derecha
-    b.rough("path", "line", [roundedPoly(geom.pts!, 10)], { roughness: 0.9, bowing: 0.6 }, { stroke: edge, width: 2.4 });
+    // elbow without arrowhead: the hierarchy reads left to right
+    b.rough("path", "line", [roundedPoly(geom.pts!, 10)], { roughness: 0.9, bowing: 0.6 }, { stroke: outline, width: 2.4 });
   } else if (item.kind === "connection" && item.data.variant === "event-stem") {
-    // punto en el eje + tallo hasta la caja
+    // dot on the axis + stem to the box
     const [, dot, hook] = geom.pts!;
     const len = Math.hypot(hook.x - dot.x, hook.y - dot.y) || 1;
     const u = { x: (hook.x - dot.x) / len, y: (hook.y - dot.y) / len };
-    b.rough("ellipse", "dot", [dot.x, dot.y, 15, 15], { fillStyle: "solid", roughness: 0.8 }, { stroke: edge, width: 2.4, fill: edge });
-    b.rough("line", "stem", [dot.x + u.x * 8, dot.y + u.y * 8, hook.x, hook.y], { roughness: 0.9 }, { stroke: edge, width: 2.4 });
+    b.rough("ellipse", "dot", [dot.x, dot.y, 15, 15], { fillStyle: "solid", roughness: 0.8 }, { stroke: outline, width: 2.4, fill: outline });
+    b.rough("line", "stem", [dot.x + u.x * 8, dot.y + u.y * 8, hook.x, hook.y], { roughness: 0.9 }, { stroke: outline, width: 2.4 });
   } else if (item.kind === "connection") {
     const pts = geom.pts!;
     const cross = !!item.data.cross;
@@ -296,7 +295,7 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
     if (item.data.both) arrowHead(b, "head0", pts[0], geom.curve ? pts[1] : pts[1], color, wd);
     if (item.data.label && geom.lab) {
       const lr = labelRect({ x: geom.lab.x, y: geom.lab.y, text: item.data.label });
-      const patch = el("rect", { x: lr.x, y: lr.y, width: lr.w, height: lr.h, rx: 6, fill: PAPER, opacity: 0.96 });
+      const patch = svgEl("rect", { x: lr.x, y: lr.y, width: lr.w, height: lr.h, rx: 6, fill: PAPER, opacity: 0.96 });
       b.v.g.appendChild(patch); b.v.fills.push(patch);
       b.text(labelLines(item.data.label), geom.lab.x, geom.lab.y + 1, { size: LABEL_SIZE, lineH: LABEL_LH, halo: true, fill: "#343a40" });
     }
@@ -323,7 +322,7 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
   return b.v;
 }
 
-/** Mide los trazos (el grupo ya debe estar en el DOM). */
+/** Measures the strokes (the group must already be in the DOM). */
 export function measure(v: Visual) {
   for (const s of v.strokes) s.len = s.anim.getTotalLength();
 }

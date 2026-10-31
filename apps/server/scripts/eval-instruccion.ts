@@ -41,8 +41,8 @@ if (dry) {
 }
 
 const labelsOf = (b: Board) => ({
-  els: b.els.map((e) => e.label),
-  conns: b.conns.filter((c) => c.label).map((c) => c.label as string),
+  elements: b.elements.map((e) => e.label),
+  connections: b.connections.filter((c) => c.label).map((c) => c.label as string),
 });
 const before = labelsOf(board);
 
@@ -104,19 +104,19 @@ else console.log("(sin done)");
 console.log("\n--- TABLERO FINAL ---");
 for (const z of final.zones) {
   console.log(`[${z.kind}] ${z.title}`);
-  for (const e of final.els.filter((x) => x.zone === z.id)) console.log(`  - ${e.label}`);
+  for (const e of final.elements.filter((x) => x.zone === z.id)) console.log(`  - ${e.label}`);
 }
-const conns = final.conns.filter((c) => c.label);
+const connections = final.connections.filter((c) => c.label);
 console.log("Conexiones con etiqueta:");
-for (const c of conns) console.log(`  - ${c.label}`);
+for (const c of connections) console.log(`  - ${c.label}`);
 
 console.log("\n--- CHEQUEO ---");
 const has = (arr: string[], l: string) => arr.some((x) => x.toLowerCase() === l.toLowerCase());
 const after = labelsOf(final);
-const missEls = [...new Set(before.els)].filter((l) => !has(after.els, l));
-const missConns = [...new Set(before.conns)].filter((l) => !has(after.conns, l));
-console.log(`Elementos que faltan: ${missEls.length ? missEls.join(", ") : "ninguno"}`);
-console.log(`Conexiones que faltan: ${missConns.length ? missConns.join(", ") : "ninguna"}`);
+const missingElements = [...new Set(before.elements)].filter((l) => !has(after.elements, l));
+const missingConnections = [...new Set(before.connections)].filter((l) => !has(after.connections, l));
+console.log(`Elementos que faltan: ${missingElements.length ? missingElements.join(", ") : "ninguno"}`);
+console.log(`Conexiones que faltan: ${missingConnections.length ? missingConnections.join(", ") : "ninguna"}`);
 const kinds: Record<string, number> = {};
 for (const z of final.zones) kinds[z.kind] = (kinds[z.kind] ?? 0) + 1;
 console.log(`Zonas: ${final.zones.length} (${Object.entries(kinds).map(([k, n]) => `${k}:${n}`).join(", ")})`);

@@ -54,9 +54,9 @@ export interface Callout { id: string; target: string; text: string }
 
 export interface Board {
   zones: Zone[];
-  els: Element[];
-  conns: Connection[];
-  emph: Emphasis[];
+  elements: Element[];
+  connections: Connection[];
+  emphasis: Emphasis[];
   questions: Question[];
   callouts: Callout[];
   summary: string;
@@ -64,7 +64,7 @@ export interface Board {
 }
 
 export const emptyBoard = (): Board => ({
-  zones: [], els: [], conns: [], emph: [], questions: [], callouts: [], summary: "", zoneCounter: 0,
+  zones: [], elements: [], connections: [], emphasis: [], questions: [], callouts: [], summary: "", zoneCounter: 0,
 });
 
 export interface ApplyResult { board: Board; warnings: string[] }
@@ -74,15 +74,15 @@ const ELEMENT_ZONE: Record<ElementType, ZoneKind[]> = {
 };
 
 export const findZone = (b: Board, id: string) => b.zones.find((z) => z.id === id);
-export const findElement = (b: Board, id: string) => b.els.find((e) => e.id === id);
+export const findElement = (b: Board, id: string) => b.elements.find((e) => e.id === id);
 export const idTaken = (b: Board, id: string) =>
-  !!findZone(b, id) || !!findElement(b, id) || b.conns.some((c) => c.id === id) || b.callouts.some((c) => c.id === id);
-const isTarget = (b: Board, id: string) => !!findZone(b, id) || !!findElement(b, id) || b.conns.some((c) => c.id === id);
+  !!findZone(b, id) || !!findElement(b, id) || b.connections.some((c) => c.id === id) || b.callouts.some((c) => c.id === id);
+const isTarget = (b: Board, id: string) => !!findZone(b, id) || !!findElement(b, id) || b.connections.some((c) => c.id === id);
 
 /** Implicit connections (after / parent) as regular connections with id "auto:<element>". */
 export function derivedConnections(b: Board): Connection[] {
   const out: Connection[] = [];
-  for (const e of b.els) {
+  for (const e of b.elements) {
     if (e.type === "stage") continue; // the cycle order is not an arrow: the ring draws it
     const from = e.type === "node" ? e.parent : e.after;
     if (from && findElement(b, from)) out.push({ id: `auto:${e.id}`, from, to: e.id, style: "solid", both: false });
@@ -95,8 +95,8 @@ function clone(b: Board): Board {
 }
 
 function removeRefs(b: Board, ids: Set<string>) {
-  b.conns = b.conns.filter((c) => !ids.has(c.from) && !ids.has(c.to) && !ids.has(c.id));
-  b.emph = b.emph.filter((e) => !ids.has(e.target));
+  b.connections = b.connections.filter((c) => !ids.has(c.from) && !ids.has(c.to) && !ids.has(c.id));
+  b.emphasis = b.emphasis.filter((e) => !ids.has(e.target));
   b.questions = b.questions.filter((q) => !ids.has(q.target));
   b.callouts = b.callouts.filter((c) => !ids.has(c.target) && !ids.has(c.id));
 }
@@ -162,32 +162,32 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!ELEMENT_ZONE[type].includes(zone.kind)) return bad(`cannot add ${type} to a ${zone.kind} zone`);
       const label = type === "decision" ? i.question : type === "item" ? i.text : i.label;
       if (!str(label)) return bad("missing text");
-      const el: Element = { id: i.id, zone: zone.id, type, label };
+      const element: Element = { id: i.id, zone: zone.id, type, label };
       if (type === "component") {
         if (!["actor", "client", "service", "database", "queue", "storage", "external"].includes(i.type)) return bad("invalid component type");
-        el.comp = i.type;
+        element.comp = i.type;
       }
       const svc = type === "step" || type === "decision" || type === "component" ? parseService(i.service) : null;
       if (str(i.service) && (type === "step" || type === "decision" || type === "component") && !svc) {
         warnings.push(`${op.name}: unknown service '${i.service}'; ignored`);
       }
-      if (svc) el.service = svc;
+      if (svc) element.service = svc;
       // with a valid service the emoji is ignored
-      if (str(i.icon) && !svc && (type === "step" || type === "component")) el.icon = i.icon;
+      if (str(i.icon) && !svc && (type === "step" || type === "component")) element.icon = i.icon;
       if (type === "step" || type === "decision") {
         if (i.after !== undefined) {
           const prev = findElement(b, i.after);
           if (!prev || prev.zone !== zone.id) warnings.push(`${op.name}: after '${i.after}' is not in the zone; ignored`);
-          else el.after = prev.id;
+          else element.after = prev.id;
         }
       }
       if (type === "node" && i.parent !== undefined) {
         const p = findElement(b, i.parent);
         if (!p || p.zone !== zone.id) warnings.push(`add_node: parent '${i.parent}' is not in the zone; ignored`);
-        else el.parent = p.id;
+        else element.parent = p.id;
       }
-      if (type === "item" && zone.kind === "compare") el.column = i.column === "right" ? "right" : "left";
-      b.els.push(el);
+      if (type === "item" && zone.kind === "compare") element.column = i.column === "right" ? "right" : "left";
+      b.elements.push(element);
       return { board: b, warnings };
     }
     case "add_branch": {
@@ -197,13 +197,13 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (zone.kind !== "tree") return bad(`cannot add branch to a ${zone.kind} zone`);
       if (!str(i.label)) return bad("missing label");
-      const el: Element = { id: i.id, zone: zone.id, type: "branch", label: i.label, ...(str(i.note) ? { note: i.note } : {}) };
+      const element: Element = { id: i.id, zone: zone.id, type: "branch", label: i.label, ...(str(i.note) ? { note: i.note } : {}) };
       if (i.parent !== undefined) {
         const p = findElement(b, i.parent);
         if (!p || p.zone !== zone.id || p.type !== "branch") warnings.push(`add_branch: parent '${i.parent}' is not a node of the zone; becomes a root`);
-        else el.parent = p.id;
+        else element.parent = p.id;
       }
-      b.els.push(el);
+      b.elements.push(element);
       return { board: b, warnings };
     }
     case "add_mark": {
@@ -215,7 +215,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!inRange(i.at)) return bad("at must be a number between 0 and 100");
       if (!str(i.label)) return bad("missing label");
       if (i.tone !== undefined && !MARK_TONES.includes(i.tone)) return bad("invalid tone");
-      b.els.push({
+      b.elements.push({
         id: i.id, zone: zone.id, type: "mark", label: i.label, at: i.at,
         ...(str(i.note) ? { note: i.note } : {}), tone: i.tone ?? "neutral",
       });
@@ -228,13 +228,13 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (zone.kind !== "cycle") return bad(`cannot add stage to a ${zone.kind} zone`);
       if (!str(i.label)) return bad("missing label");
-      const el: Element = { id: i.id, zone: zone.id, type: "stage", label: i.label, ...(str(i.note) ? { note: i.note } : {}) };
+      const element: Element = { id: i.id, zone: zone.id, type: "stage", label: i.label, ...(str(i.note) ? { note: i.note } : {}) };
       if (i.after !== undefined) {
         const prev = findElement(b, i.after);
         if (!prev || prev.zone !== zone.id || prev.type !== "stage") warnings.push(`add_stage: after '${i.after}' is not a stage of the zone; ignored`);
-        else el.after = prev.id;
+        else element.after = prev.id;
       }
-      b.els.push(el);
+      b.elements.push(element);
       return { board: b, warnings };
     }
     case "add_event": {
@@ -245,7 +245,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (zone.kind !== "timeline") return bad(`cannot add event to a ${zone.kind} zone`);
       if (!str(i.label)) return bad("missing label");
       if (i.at !== undefined && !inRange(i.at)) return bad("at must be a number between 0 and 100");
-      b.els.push({
+      b.elements.push({
         id: i.id, zone: zone.id, type: "event", label: i.label,
         ...(str(i.when) ? { when: i.when } : {}), ...(str(i.note) ? { note: i.note } : {}),
         ...(i.at !== undefined ? { at: i.at } : {}),
@@ -262,7 +262,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!(i.from < i.to)) return bad("from must be less than to");
       if (!str(i.label)) return bad("missing label");
       if (i.tone !== undefined && !MARK_TONES.includes(i.tone)) return bad("invalid tone");
-      b.els.push({ id: i.id, zone: zone.id, type: "span", label: i.label, at: i.from, to: i.to, tone: i.tone ?? "neutral" });
+      b.elements.push({ id: i.id, zone: zone.id, type: "span", label: i.label, at: i.from, to: i.to, tone: i.tone ?? "neutral" });
       return { board: b, warnings };
     }
     case "set_level": {
@@ -279,7 +279,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!findElement(b, i.from)) return bad(`source '${i.from}' does not exist`);
       if (!findElement(b, i.to)) return bad(`target '${i.to}' does not exist`);
       if (i.from === i.to) return bad("source and target are the same");
-      b.conns.push({
+      b.connections.push({
         id: i.id, from: i.from, to: i.to, label: str(i.label) ? i.label : undefined,
         style: i.style === "dashed" ? "dashed" : "solid", both: !!i.both_ways,
       });
@@ -288,8 +288,8 @@ export function applyOp(board: Board, op: Op): ApplyResult {
     case "emphasize": {
       if (!isTarget(b, i.target)) return bad(`target '${i.target}' does not exist`);
       if (!["circle", "underline", "star"].includes(i.style)) return bad("invalid style");
-      b.emph = b.emph.filter((x) => x.target !== i.target);
-      b.emph.push({ target: i.target, style: i.style });
+      b.emphasis = b.emphasis.filter((x) => x.target !== i.target);
+      b.emphasis.push({ target: i.target, style: i.style });
       return { board: b, warnings };
     }
     case "mark_question": {
@@ -310,9 +310,9 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!str(i.label)) return bad("missing label");
       const z = findZone(b, i.id);
       if (z) { z.title = i.label; return { board: b, warnings }; }
-      const el = findElement(b, i.id);
-      if (el) { el.label = i.label; return { board: b, warnings }; }
-      const c = b.conns.find((x) => x.id === i.id);
+      const element = findElement(b, i.id);
+      if (element) { element.label = i.label; return { board: b, warnings }; }
+      const c = b.connections.find((x) => x.id === i.id);
       if (c) { c.label = i.label; return { board: b, warnings }; }
       const co = b.callouts.find((x) => x.id === i.id);
       if (co) { co.text = i.label; return { board: b, warnings }; }
@@ -320,13 +320,13 @@ export function applyOp(board: Board, op: Op): ApplyResult {
     }
     case "set_service": {
       if (typeof i.service !== "string") return bad("missing service");
-      const el = findElement(b, i.id);
-      if (!el) return bad(findZone(b, i.id) ? `'${i.id}' is a zone; set_service only works on elements` : `id '${i.id}' does not exist`);
-      if (!i.service.trim()) { delete el.service; return { board: b, warnings }; }
+      const element = findElement(b, i.id);
+      if (!element) return bad(findZone(b, i.id) ? `'${i.id}' is a zone; set_service only works on elements` : `id '${i.id}' does not exist`);
+      if (!i.service.trim()) { delete element.service; return { board: b, warnings }; }
       const svc = parseService(i.service);
       if (!svc) return bad(`unknown service '${i.service}'; ignored`);
       // the `icon` emoji (if any) stays: the text doesn't change, so no redraw
-      el.service = svc;
+      element.service = svc;
       return { board: b, warnings };
     }
     case "update_text": {
@@ -336,25 +336,25 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const missing = () => bad(`'${i.id}' has no ${i.field}`);
       const required = () => bad(`${i.field} of '${i.id}' cannot be left empty; use delete to remove the element`);
       const z = findZone(b, i.id);
-      const el = findElement(b, i.id);
-      const c = b.conns.find((x) => x.id === i.id);
+      const element = findElement(b, i.id);
+      const c = b.connections.find((x) => x.id === i.id);
       const co = b.callouts.find((x) => x.id === i.id);
-      if (!z && !el && !c && !co) return bad(`id '${i.id}' does not exist`);
+      if (!z && !element && !c && !co) return bad(`id '${i.id}' does not exist`);
       switch (i.field) {
         case "label":
-          if (z || el) {
+          if (z || element) {
             if (empty) return required();
-            if (z) z.title = i.value; else el!.label = i.value;
+            if (z) z.title = i.value; else element!.label = i.value;
           } else if (c) c.label = empty ? undefined : i.value;
           else return missing();
           break;
         case "note":
-          if (!el || !["mark", "stage", "event", "branch"].includes(el.type)) return missing();
-          el.note = empty ? undefined : i.value;
+          if (!element || !["mark", "stage", "event", "branch"].includes(element.type)) return missing();
+          element.note = empty ? undefined : i.value;
           break;
         case "when":
-          if (!el || el.type !== "event") return missing();
-          el.when = empty ? undefined : i.value;
+          if (!element || element.type !== "event") return missing();
+          element.when = empty ? undefined : i.value;
           break;
         case "text":
           if (!co) return missing();
@@ -368,40 +368,40 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const gone = new Set<string>();
       if (findZone(b, i.id)) {
         gone.add(i.id);
-        for (const e of b.els) if (e.zone === i.id) gone.add(e.id);
+        for (const e of b.elements) if (e.zone === i.id) gone.add(e.id);
         b.zones = b.zones.filter((z) => z.id !== i.id);
-        b.els = b.els.filter((e) => e.zone !== i.id);
+        b.elements = b.elements.filter((e) => e.zone !== i.id);
         // other zones that were placed relative to this one lose their hint
         for (const z of b.zones) if (z.place?.of === i.id) z.place = undefined;
       } else if (findElement(b, i.id)) {
-        const el = findElement(b, i.id)!;
+        const element = findElement(b, i.id)!;
         gone.add(i.id);
-        b.els = b.els.filter((e) => e.id !== i.id);
-        for (const e of b.els) {
+        b.elements = b.elements.filter((e) => e.id !== i.id);
+        for (const e of b.elements) {
           if (e.after === i.id) e.after = undefined;
-          if (e.parent === i.id) e.parent = el.parent; // children move up a level
+          if (e.parent === i.id) e.parent = element.parent; // children move up a level
         }
-      } else if (b.conns.some((c) => c.id === i.id) || b.callouts.some((c) => c.id === i.id)) {
+      } else if (b.connections.some((c) => c.id === i.id) || b.callouts.some((c) => c.id === i.id)) {
         gone.add(i.id);
       } else return bad(`id '${i.id}' does not exist`);
       removeRefs(b, gone);
       return { board: b, warnings };
     }
     case "move_to_zone": {
-      const el = findElement(b, i.id);
-      if (!el) return bad(`element '${i.id}' does not exist`);
+      const element = findElement(b, i.id);
+      if (!element) return bad(`element '${i.id}' does not exist`);
       const zone = findZone(b, i.zone);
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
-      if (!ELEMENT_ZONE[el.type].includes(zone.kind)) return bad(`a ${el.type} does not fit in a ${zone.kind} zone`);
-      if (el.zone === zone.id) return bad("already in that zone");
-      el.zone = zone.id;
-      el.after = undefined;
-      el.parent = undefined;
-      for (const o of b.els) {
-        if (o.after === el.id && o.zone !== zone.id) o.after = undefined;
-        if (o.parent === el.id && o.zone !== zone.id) o.parent = undefined;
+      if (!ELEMENT_ZONE[element.type].includes(zone.kind)) return bad(`a ${element.type} does not fit in a ${zone.kind} zone`);
+      if (element.zone === zone.id) return bad("already in that zone");
+      element.zone = zone.id;
+      element.after = undefined;
+      element.parent = undefined;
+      for (const o of b.elements) {
+        if (o.after === element.id && o.zone !== zone.id) o.after = undefined;
+        if (o.parent === element.id && o.zone !== zone.id) o.parent = undefined;
       }
-      if (zone.kind === "compare" && !el.column) el.column = "left";
+      if (zone.kind === "compare" && !element.column) element.column = "left";
       return { board: b, warnings };
     }
     case "update_summary": {

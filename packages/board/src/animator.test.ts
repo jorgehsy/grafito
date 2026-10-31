@@ -10,14 +10,14 @@ const tree = (...items: RenderItem[]): RenderTree => ({ items, map: new Map(item
 
 describe("diffTrees", () => {
   it("new ones: zone, element, connection, annotation order", () => {
-    const next = tree(item("n", "callout"), item("e", "connection"), item("el", "element"), item("z", "zone"));
+    const next = tree(item("n", "callout"), item("e", "connection"), item("elem", "element"), item("z", "zone"));
     const d = diffTrees(tree(), next);
-    expect(d.sequential.map((t) => (t as { key: string }).key)).toEqual(["z", "el", "e", "n"]);
+    expect(d.sequential.map((t) => (t as { key: string }).key)).toEqual(["z", "elem", "e", "n"]);
     expect(d.moves).toEqual([]);
   });
   it("deletes grouped, then updates, then draws; moves separate", () => {
     const prev = tree(item("a", "element"), item("b", "element", 0, "viejo"), item("c", "element", 0));
-    const next = tree(item("b", "element", 0, "nuevo"), item("c", "element", 200), item("d", "element"));
+    const next = tree(item("b", "element", 0, "changed"), item("c", "element", 200), item("d", "element"));
     const d = diffTrees(prev, next);
     expect(d.sequential).toEqual([{ kind: "delete", keys: ["a"] }, { kind: "update", key: "b" }, { kind: "draw", key: "d" }]);
     expect(d.moves).toEqual([{ kind: "move", key: "c" }]);
@@ -44,7 +44,7 @@ describe("AnimationQueue", () => {
   function setup() {
     const events: string[] = [];
     const releases: (() => void)[] = [];
-    const hold = (label: string) => new Promise<void>((res) => { events.push("inicio " + label); releases.push(() => { events.push("fin " + label); res(); }); });
+    const hold = (label: string) => new Promise<void>((res) => { events.push("start " + label); releases.push(() => { events.push("end " + label); res(); }); });
     const exec: Executor = {
       draw: (k) => hold("draw " + k),
       update: (k) => hold("update " + k),
@@ -59,10 +59,10 @@ describe("AnimationQueue", () => {
     const { events, releases, q } = setup();
     q.push({ sequential: [{ kind: "draw", key: "a" }, { kind: "draw", key: "b" }], moves: [{ kind: "move", key: "m" }] });
     await flush();
-    expect(events).toEqual(["move m", "inicio draw a"]);
+    expect(events).toEqual(["move m", "start draw a"]);
     releases[0]();
     await flush();
-    expect(events.slice(-2)).toEqual(["fin draw a", "inicio draw b"]);
+    expect(events.slice(-2)).toEqual(["end draw a", "start draw b"]);
     q.push({ sequential: [], moves: [{ kind: "move", key: "m2" }] });
     expect(events.at(-1)).toBe("move m2"); // without waiting for the draw in progress
     releases[1]();
@@ -92,6 +92,6 @@ describe("AnimationQueue", () => {
     q.reset();
     expect(q.pending).toBe(0);
     await flush();
-    expect(events).toEqual(["inicio draw a"]);
+    expect(events).toEqual(["start draw a"]);
   });
 });

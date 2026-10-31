@@ -18,8 +18,8 @@ export interface ConnectionGeom {
 }
 export interface BoardLayout {
   zones: Record<string, Rect>;
-  els: Record<string, Rect>;
-  edges: Record<string, ConnectionGeom>;
+  elements: Record<string, Rect>;
+  connections: Record<string, ConnectionGeom>;
   callouts: Record<string, { box: Rect; lines: string[]; arrow: ConnectionGeom }>;
   /** compare: absolute x of each zone's divider line */
   dividers: Record<string, number>;
@@ -69,7 +69,6 @@ const TL_LANE_H = 44;
 const TL_LANE_GAP = 4;
 const CYCLE_MARGIN = 26;
 
-// ---------- text ----------
 export function wrapText(text: string, max: number): string[] {
   const words = text.trim().split(/\s+/);
   const lines: string[] = [];
@@ -145,7 +144,6 @@ export function elementSize(e: Element): { w: number; h: number } {
   }
 }
 
-// ---------- geometry ----------
 export const rectRight = (r: Rect) => r.x + r.w;
 export const rectBottom = (r: Rect) => r.y + r.h;
 export const center = (r: Rect): Pt => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
@@ -249,12 +247,11 @@ export function routeCurve(a: Rect, b: Rect, obstacles: Rect[], curvature = 0.1)
   return { kind: "curve", pts: best! };
 }
 
-// ---------- layout inside the zone ----------
 interface ZoneLocal {
   w: number;
   h: number;
-  els: Record<string, Rect>;
-  edges: Record<string, ConnectionGeom>;
+  elements: Record<string, Rect>;
+  connections: Record<string, ConnectionGeom>;
   /** compare: x of the divider line */
   divider?: number;
   scale?: ScaleGeom;
@@ -276,9 +273,9 @@ function longestSegmentMid(pts: Pt[]): Pt {
   return mid;
 }
 
-async function layoutElk(zone: Zone, els: Element[], conns: Connection[], extraObs: Rect[], dir: "RIGHT" | "DOWN" = "RIGHT"): Promise<ZoneLocal> {
-  const sizes = Object.fromEntries(els.map((e) => [e.id, elementSize(e)]));
-  const hasLabels = conns.some((c) => c.label);
+async function layoutElk(zone: Zone, elements: Element[], connections: Connection[], extraObs: Rect[], dir: "RIGHT" | "DOWN" = "RIGHT"): Promise<ZoneLocal> {
+  const sizes = Object.fromEntries(elements.map((e) => [e.id, elementSize(e)]));
+  const hasLabels = connections.some((c) => c.label);
   const graph = {
     id: "root",
     layoutOptions: {
@@ -299,32 +296,32 @@ async function layoutElk(zone: Zone, els: Element[], conns: Connection[], extraO
       "elk.edgeLabels.placement": "CENTER",
       "elk.spacing.edgeLabel": "6",
     },
-    children: els.map((e) => ({ id: e.id, width: sizes[e.id].w, height: sizes[e.id].h })),
-    edges: conns.map((c) => {
+    children: elements.map((e) => ({ id: e.id, width: sizes[e.id].w, height: sizes[e.id].h })),
+    edges: connections.map((c) => {
       if (!c.label) return { id: c.id, sources: [c.from], targets: [c.to] };
       const r = labelRect({ x: 0, y: 0, text: c.label });
       return { id: c.id, sources: [c.from], targets: [c.to], labels: [{ id: `${c.id}:l`, text: c.label, width: r.w, height: r.h }] };
     }),
   };
   const res: any = await elk.layout(graph as any);
-  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {}, dir };
-  for (const ch of res.children) out.els[ch.id] = { x: ch.x, y: ch.y, w: ch.width, h: ch.height };
+  const out: ZoneLocal = { w: 0, h: 0, elements: {}, connections: {}, dir };
+  for (const ch of res.children) out.elements[ch.id] = { x: ch.x, y: ch.y, w: ch.width, h: ch.height };
   for (const e of res.edges ?? []) {
     const s = e.sections?.[0];
     if (!s) continue;
     const pts: Pt[] = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint].map((p: Pt) => ({ x: p.x, y: p.y }));
-    out.edges[e.id] = { kind: "poly", pts };
+    out.connections[e.id] = { kind: "poly", pts };
   }
   const elkLabel = new Map<string, Pt>();
   for (const e of res.edges ?? []) {
     const l = e.labels?.[0];
     if (l && l.x !== undefined) elkLabel.set(e.id, { x: l.x + l.width / 2, y: l.y + l.height / 2 });
   }
-  const obs = [...Object.values(out.els), ...extraObs.map((r) => ({ ...r }))];
+  const obs = [...Object.values(out.elements), ...extraObs.map((r) => ({ ...r }))];
   const taken: Rect[] = [];
   const free = (r: Rect) => !obs.some((o) => overlaps(r, o, 2)) && !taken.some((o) => overlaps(r, o, 4));
-  for (const c of conns) {
-    const g = out.edges[c.id];
+  for (const c of connections) {
+    const g = out.connections[c.id];
     if (!g || !c.label) continue;
     const at = elkLabel.get(c.id);
     const m = at && free(labelRect({ ...at, text: c.label })) ? at : placeLabel(g, c.label, obs, taken);
@@ -334,17 +331,17 @@ async function layoutElk(zone: Zone, els: Element[], conns: Connection[], extraO
   return out;
 }
 
-function layoutMindmap(els: Element[]): ZoneLocal {
-  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {} };
-  if (!els.length) return out;
-  const byId = new Map(els.map((e) => [e.id, e]));
-  const root = els.find((e) => !e.parent || !byId.has(e.parent))!;
+function layoutMindmap(elements: Element[]): ZoneLocal {
+  const out: ZoneLocal = { w: 0, h: 0, elements: {}, connections: {} };
+  if (!elements.length) return out;
+  const byId = new Map(elements.map((e) => [e.id, e]));
+  const root = elements.find((e) => !e.parent || !byId.has(e.parent))!;
   interface N { id: string; kids: N[] }
   const kidsOf = (id: string): N[] =>
-    els.filter((e) => e.parent === id).map((e) => ({ id: e.id, kids: kidsOf(e.id) }));
+    elements.filter((e) => e.parent === id).map((e) => ({ id: e.id, kids: kidsOf(e.id) }));
   const rootNode: N = { id: root.id, kids: kidsOf(root.id) };
   // other parentless ideas hang off the central one
-  for (const e of els) if (e.id !== root.id && (!e.parent || !byId.has(e.parent))) rootNode.kids.push({ id: e.id, kids: kidsOf(e.id) });
+  for (const e of elements) if (e.id !== root.id && (!e.parent || !byId.has(e.parent))) rootNode.kids.push({ id: e.id, kids: kidsOf(e.id) });
   const h = hierarchy<N>(rootNode, (n) => n.kids);
   tree<N>().nodeSize([62, 1]).separation((a, b) => {
     const ha = elementSize(byId.get(a.data.id)!).h, hb = elementSize(byId.get(b.data.id)!).h;
@@ -359,15 +356,15 @@ function layoutMindmap(els: Element[]): ZoneLocal {
   h.each((n) => { minY = Math.min(minY, n.x! - elementSize(byId.get(n.data.id)!).h / 2); });
   h.each((n) => {
     const s = elementSize(byId.get(n.data.id)!);
-    out.els[n.data.id] = { x: colX[n.depth], y: n.x! - s.h / 2 - minY, w: s.w, h: s.h };
+    out.elements[n.data.id] = { x: colX[n.depth], y: n.x! - s.h / 2 - minY, w: s.w, h: s.h };
   });
   // parent -> child connections (horizontal curves)
   h.each((n) => {
     if (!n.parent) return;
-    const a = out.els[n.parent.data.id], b = out.els[n.data.id];
+    const a = out.elements[n.parent.data.id], b = out.elements[n.data.id];
     const p0 = { x: rectRight(a) + 3, y: a.y + a.h / 2 }, p3 = { x: b.x - 6, y: b.y + b.h / 2 };
     const dx = (p3.x - p0.x) / 2;
-    out.edges[`auto:${n.data.id}`] = { kind: "curve", pts: [p0, { x: p0.x + dx, y: p0.y }, { x: p3.x - dx, y: p3.y }, p3] };
+    out.connections[`auto:${n.data.id}`] = { kind: "curve", pts: [p0, { x: p0.x + dx, y: p0.y }, { x: p3.x - dx, y: p3.y }, p3] };
   });
   return out;
 }
@@ -378,24 +375,24 @@ const TREE_ROOT_GAP = 30;
 
 /** Left-to-right tree: one column per depth (width = the widest label of the level),
  *  siblings stacked in arrival order, each parent centered on its children, with elbow connectors. */
-function layoutTree(els: Element[]): ZoneLocal {
-  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {} };
-  if (!els.length) return out;
-  const byId = new Map(els.map((e) => [e.id, e]));
+function layoutTree(elements: Element[]): ZoneLocal {
+  const out: ZoneLocal = { w: 0, h: 0, elements: {}, connections: {} };
+  if (!elements.length) return out;
+  const byId = new Map(elements.map((e) => [e.id, e]));
   // a missing parent, or one that doesn't precede the child, counts as a root (avoids cycles)
-  const order = new Map(els.map((e, k) => [e.id, k]));
+  const order = new Map(elements.map((e, k) => [e.id, k]));
   const parentOf = (e: Element) => (e.parent && byId.has(e.parent) && order.get(e.parent)! < order.get(e.id)! ? e.parent : undefined);
   const kids = new Map<string | undefined, Element[]>();
-  for (const e of els) {
+  for (const e of elements) {
     const p = parentOf(e);
     kids.set(p, [...(kids.get(p) ?? []), e]);
   }
-  const size = new Map(els.map((e) => [e.id, elementSize(e)]));
+  const size = new Map(elements.map((e) => [e.id, elementSize(e)]));
   const depth = new Map<string, number>();
   const walk = (e: Element, d: number) => { depth.set(e.id, d); for (const k of kids.get(e.id) ?? []) walk(k, d + 1); };
   for (const r of kids.get(undefined) ?? []) walk(r, 0);
   const colW: number[] = [];
-  for (const e of els) colW[depth.get(e.id)!] = Math.max(colW[depth.get(e.id)!] ?? 0, size.get(e.id)!.w);
+  for (const e of elements) colW[depth.get(e.id)!] = Math.max(colW[depth.get(e.id)!] ?? 0, size.get(e.id)!.w);
   const colX: number[] = [];
   let x = 0;
   colW.forEach((w, d) => { colX[d] = x; x += w + TREE_COL_GAP; });
@@ -419,21 +416,21 @@ function layoutTree(els: Element[]): ZoneLocal {
   };
   let y = 0;
   for (const r of kids.get(undefined) ?? []) y = place(r, y) + TREE_ROOT_GAP;
-  for (const e of els) {
+  for (const e of elements) {
     const s = size.get(e.id)!;
-    out.els[e.id] = { x: colX[depth.get(e.id)!], y: cy.get(e.id)! - s.h / 2, w: s.w, h: s.h };
+    out.elements[e.id] = { x: colX[depth.get(e.id)!], y: cy.get(e.id)! - s.h / 2, w: s.w, h: s.h };
   }
   // bracket connectors: parent -> shared vertical run -> horizontal to each child
-  for (const e of els) {
+  for (const e of elements) {
     const p = parentOf(e);
     if (!p) continue;
-    const a = out.els[p], b = out.els[e.id];
+    const a = out.elements[p], b = out.elements[e.id];
     const pc = a.y + a.h / 2, cc = b.y + b.h / 2;
     const mx = colX[depth.get(p)!] + colW[depth.get(p)!] + TREE_COL_GAP / 2;
     const pts = Math.abs(pc - cc) < 0.5
       ? [{ x: rectRight(a) + 3, y: pc }, { x: b.x - 4, y: cc }]
       : [{ x: rectRight(a) + 3, y: pc }, { x: mx, y: pc }, { x: mx, y: cc }, { x: b.x - 4, y: cc }];
-    out.edges[`br:${e.id}`] = { kind: "poly", pts };
+    out.connections[`br:${e.id}`] = { kind: "poly", pts };
   }
   return out;
 }
@@ -468,12 +465,12 @@ function spreadRow(items: { c: number; w: number }[], gap: number): number[] {
 }
 
 /** Horizontal bar with marks: sorted by position, split above/below and spaced so they don't overlap. */
-function layoutScale(zone: Zone, els: Element[]): ZoneLocal {
+function layoutScale(zone: Zone, elements: Element[]): ZoneLocal {
   const minL = zone.minLabel ?? "0%", maxL = zone.maxLabel ?? "100%";
   const leftW = Math.max(46, [...minL].length * LABEL_CW + 18);
   const rightW = Math.max(54, [...maxL].length * LABEL_CW + 18);
-  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {}, marks: {} };
-  const marks = els.filter((e) => e.type === "mark").sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+  const out: ZoneLocal = { w: 0, h: 0, elements: {}, connections: {}, marks: {} };
+  const marks = elements.filter((e) => e.type === "mark").sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
   const info = marks.map((e) => ({ e, s: elementSize(e), cx: leftW + ((e.at ?? 0) / 100) * SCALE_W, side: "above" as "above" | "below" }));
   // side: above if it fits next to the previous one on that side; otherwise below; if neither, the less crowded
   const reach = { above: -Infinity, below: -Infinity };
@@ -489,7 +486,7 @@ function layoutScale(zone: Zone, els: Element[]): ZoneLocal {
     row.forEach((m, k) => {
       const x = centers[k] - m.s.w / 2;
       const y = side === "above" ? -SCALE_STEM - m.s.h : SCALE_BAR_H + SCALE_STEM;
-      out.els[m.e.id] = { x, y, w: m.s.w, h: m.s.h };
+      out.elements[m.e.id] = { x, y, w: m.s.w, h: m.s.h };
       const attach = Math.min(Math.max(m.cx, x + 10), x + m.s.w - 10);
       // [far edge of the bar, near edge (notch), box point]
       out.marks![m.e.id] = {
@@ -507,10 +504,10 @@ function layoutScale(zone: Zone, els: Element[]): ZoneLocal {
 }
 
 /** Stages on an elliptical ring (in insertion order or after `after`), with clockwise arrows, the last closing back to the first. */
-function layoutCycle(zone: Zone, els: Element[]): ZoneLocal {
-  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {}, labels: {} };
+function layoutCycle(zone: Zone, elements: Element[]): ZoneLocal {
+  const out: ZoneLocal = { w: 0, h: 0, elements: {}, connections: {}, labels: {} };
   const stages: Element[] = [];
-  for (const e of els) {
+  for (const e of elements) {
     if (e.type !== "stage") continue;
     const k = e.after ? stages.findIndex((x) => x.id === e.after) : -1;
     if (k >= 0) stages.splice(k + 1, 0, e);
@@ -528,7 +525,7 @@ function layoutCycle(zone: Zone, els: Element[]): ZoneLocal {
     return out;
   }
   if (n === 1) {
-    out.els[stages[0].id] = { x: 0, y: 0, w: sizes[0].w, h: sizes[0].h };
+    out.elements[stages[0].id] = { x: 0, y: 0, w: sizes[0].w, h: sizes[0].h };
     if (center) out.labels![`center:${zone.id}`] = { ...center, x: sizes[0].w + 60, y: (sizes[0].h - center.h) / 2 };
     return out;
   }
@@ -557,7 +554,7 @@ function layoutCycle(zone: Zone, els: Element[]): ZoneLocal {
     }
     if (ok) break;
   }
-  stages.forEach((e, i) => (out.els[e.id] = rects[i]));
+  stages.forEach((e, i) => (out.elements[e.id] = rects[i]));
   if (center && cr) out.labels![`center:${zone.id}`] = cr;
   for (let i = 0; i < n; i++) {
     const { t0, t1 } = arcSpan(rx, ry, rects, i);
@@ -566,7 +563,7 @@ function layoutCycle(zone: Zone, els: Element[]): ZoneLocal {
     const P = (t: number): Pt => ({ x: rx * Math.cos(t), y: ry * Math.sin(t) });
     const D = (t: number): Pt => ({ x: -rx * Math.sin(t), y: ry * Math.cos(t) });
     const p0 = P(t0), p3 = P(t1), d0 = D(t0), d3 = D(t1);
-    out.edges[`ring:${stages[i].id}`] = {
+    out.connections[`ring:${stages[i].id}`] = {
       kind: "curve",
       pts: [p0, { x: p0.x + k * d0.x, y: p0.y + k * d0.y }, { x: p3.x - k * d3.x, y: p3.y - k * d3.y }, p3],
     };
@@ -575,10 +572,10 @@ function layoutCycle(zone: Zone, els: Element[]): ZoneLocal {
 }
 
 /** Horizontal axis with an arrow: events (mark + date + box above/below, alternating) and spans (brackets under the axis). */
-function layoutTimeline(zone: Zone, els: Element[]): ZoneLocal {
-  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {}, marks: {}, spans: {}, labels: {} };
-  const events = els.filter((e) => e.type === "event");
-  const spans = els.filter((e) => e.type === "span");
+function layoutTimeline(zone: Zone, elements: Element[]): ZoneLocal {
+  const out: ZoneLocal = { w: 0, h: 0, elements: {}, connections: {}, marks: {}, spans: {}, labels: {} };
+  const events = elements.filter((e) => e.type === "event");
+  const spans = elements.filter((e) => e.type === "span");
   if (!events.length && !spans.length) return out;
   const W = Math.max(TL_BASE_W, Math.ceil(events.length / 2) * 210);
   const LEFT = 40;
@@ -610,7 +607,7 @@ function layoutTimeline(zone: Zone, els: Element[]): ZoneLocal {
     let lane = lanes.findIndex((r) => r + 10 <= sb.left);
     if (lane < 0) { lane = lanes.length; lanes.push(-Infinity); }
     lanes[lane] = sb.right;
-    out.els[sb.e.id] = { x: sb.left, y: laneTop + lane * (TL_LANE_H + TL_LANE_GAP), w: sb.right - sb.left, h: TL_LANE_H };
+    out.elements[sb.e.id] = { x: sb.left, y: laneTop + lane * (TL_LANE_H + TL_LANE_GAP), w: sb.right - sb.left, h: TL_LANE_H };
     out.spans![sb.e.id] = { x0: sb.x0, x1: sb.x1 };
   }
   const belowY = lanes.length ? laneTop + lanes.length * (TL_LANE_H + TL_LANE_GAP) + 22 : TL_STEM;
@@ -620,7 +617,7 @@ function layoutTimeline(zone: Zone, els: Element[]): ZoneLocal {
     row.forEach((m, k) => {
       const x = centers[k] - m.s.w / 2;
       const y = side === "above" ? -TL_STEM - m.s.h : belowY;
-      out.els[m.e.id] = { x, y, w: m.s.w, h: m.s.h };
+      out.elements[m.e.id] = { x, y, w: m.s.w, h: m.s.h };
       const attach = Math.min(Math.max(m.cx, x + 10), x + m.s.w - 10);
       const dot = { x: m.cx, y: 0 };
       out.marks![m.e.id] = { side, stem: [dot, dot, { x: attach, y: side === "above" ? -TL_STEM : belowY }] };
@@ -633,33 +630,33 @@ function layoutTimeline(zone: Zone, els: Element[]): ZoneLocal {
       out.labels![`when:${m.e.id}`] = { x: cs[k] - ws[k].w / 2, y: side === "above" ? -12 - TL_WHEN_H : 12, w: ws[k].w, h: TL_WHEN_H };
     });
   }
-  const xs = [...Object.values(out.els), ...Object.values(out.labels!)];
+  const xs = [...Object.values(out.elements), ...Object.values(out.labels!)];
   const end = Math.max(LEFT + W, ...xs.map(rectRight)) + 30;
-  out.edges[`axis:${zone.id}`] = { kind: "poly", pts: [{ x: 0, y: 0 }, { x: end, y: 0 }] };
+  out.connections[`axis:${zone.id}`] = { kind: "poly", pts: [{ x: 0, y: 0 }, { x: end, y: 0 }] };
   return out;
 }
 
-function layoutStack(zone: Zone, els: Element[]): ZoneLocal {
-  const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {} };
+function layoutStack(zone: Zone, elements: Element[]): ZoneLocal {
+  const out: ZoneLocal = { w: 0, h: 0, elements: {}, connections: {} };
   const GAPY = 10;
   if (zone.kind === "compare") {
     const cols = { left: 0, right: 0 } as Record<string, number>;
     const widths = { left: 170, right: 170 } as Record<string, number>;
-    for (const e of els) widths[e.column ?? "left"] = Math.max(widths[e.column ?? "left"], elementSize(e).w);
+    for (const e of elements) widths[e.column ?? "left"] = Math.max(widths[e.column ?? "left"], elementSize(e).w);
     const leftW = widths.left;
-    for (const e of els) {
+    for (const e of elements) {
       const c = e.column ?? "left";
       const s = elementSize(e);
-      out.els[e.id] = { x: c === "left" ? 0 : leftW + 60, y: cols[c], w: s.w, h: s.h };
+      out.elements[e.id] = { x: c === "left" ? 0 : leftW + 60, y: cols[c], w: s.w, h: s.h };
       cols[c] += s.h + GAPY;
     }
     out.divider = leftW + 30;
     return out;
   }
   let y = 0;
-  for (const e of els) {
+  for (const e of elements) {
     const s = elementSize(e);
-    out.els[e.id] = { x: 0, y, w: s.w, h: s.h };
+    out.elements[e.id] = { x: 0, y, w: s.w, h: s.h };
     y += s.h + GAPY;
   }
   return out;
@@ -671,61 +668,61 @@ const TARGET_ASPECT = 1.6;
 /** Below this width, left→right is always fine (it reads better). */
 const MAX_RIGHT_W = 1000;
 function contentBox(z: ZoneLocal): Rect {
-  return union([...Object.values(z.els), ...Object.values(z.edges).flatMap((g) => (g.label ? [labelRect(g.label)] : []))]);
+  return union([...Object.values(z.elements), ...Object.values(z.connections).flatMap((g) => (g.label ? [labelRect(g.label)] : []))]);
 }
 const aspectMiss = (r: Rect) => Math.abs(Math.log(r.w / Math.max(1, r.h) / TARGET_ASPECT));
 
 /** Left→right unless it ends up too wide and top→bottom makes better use of the available height. */
-async function layoutElkBest(zone: Zone, els: Element[], conns: Connection[], extraObs: Rect[], dir?: "RIGHT" | "DOWN"): Promise<ZoneLocal> {
-  if (dir) return layoutElk(zone, els, conns, extraObs, dir);
-  const right = await layoutElk(zone, els, conns, extraObs, "RIGHT");
+async function layoutElkBest(zone: Zone, elements: Element[], connections: Connection[], extraObs: Rect[], dir?: "RIGHT" | "DOWN"): Promise<ZoneLocal> {
+  if (dir) return layoutElk(zone, elements, connections, extraObs, dir);
+  const right = await layoutElk(zone, elements, connections, extraObs, "RIGHT");
   const rb = contentBox(right);
   if (rb.w <= MAX_RIGHT_W) return right;
-  const down = await layoutElk(zone, els, conns, extraObs, "DOWN");
+  const down = await layoutElk(zone, elements, connections, extraObs, "DOWN");
   return aspectMiss(contentBox(down)) < aspectMiss(rb) ? down : right;
 }
 
-async function layoutElkWithEmph(zone: Zone, els: Element[], conns: Connection[], circled: string[]): Promise<ZoneLocal> {
-  const first = await layoutElkBest(zone, els, conns, []);
+async function layoutElkWithEmph(zone: Zone, elements: Element[], connections: Connection[], circled: string[]): Promise<ZoneLocal> {
+  const first = await layoutElkBest(zone, elements, connections, []);
   if (!circled.length) return first;
-  const extra = circled.flatMap((id) => (first.els[id] ? [emphasisRect(first.els[id])] : []));
+  const extra = circled.flatMap((id) => (first.elements[id] ? [emphasisRect(first.elements[id])] : []));
   // same direction as the first pass, so the emphasis gap lands where it belongs
   const dir = first.dir;
-  return layoutElkBest(zone, els, conns, extra, dir);
+  return layoutElkBest(zone, elements, connections, extra, dir);
 }
 
 const cache = new Map<string, ZoneLocal>();
 export const clearLayoutCache = () => cache.clear();
 
 async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
-  const els = board.els.filter((e) => e.zone === zone.id);
-  const ids = new Set(els.map((e) => e.id));
-  const conns =
+  const elements = board.elements.filter((e) => e.zone === zone.id);
+  const ids = new Set(elements.map((e) => e.id));
+  const connections =
     zone.kind === "flow" || zone.kind === "system"
-      ? [...derivedConnections(board), ...board.conns].filter((c) => ids.has(c.from) && ids.has(c.to))
+      ? [...derivedConnections(board), ...board.connections].filter((c) => ids.has(c.from) && ids.has(c.to))
       : [];
-  const circled = board.emph.filter((m) => m.style === "circle" && ids.has(m.target)).map((m) => m.target);
-  const key = JSON.stringify([zone.kind, zone.title, zone.leftTitle, zone.rightTitle, zone.minLabel, zone.maxLabel, zone.centerLabel, els, conns, circled]);
+  const circled = board.emphasis.filter((m) => m.style === "circle" && ids.has(m.target)).map((m) => m.target);
+  const key = JSON.stringify([zone.kind, zone.title, zone.leftTitle, zone.rightTitle, zone.minLabel, zone.maxLabel, zone.centerLabel, elements, connections, circled]);
   let content = cache.get(key);
   if (!content) {
-    if (zone.kind === "scale") content = layoutScale(zone, els);
-    else if (zone.kind === "cycle") content = layoutCycle(zone, els);
-    else if (zone.kind === "timeline") content = layoutTimeline(zone, els);
-    else if (!els.length) content = { w: 0, h: 0, els: {}, edges: {} };
-    else if (zone.kind === "flow" || zone.kind === "system") content = await layoutElkWithEmph(zone, els, conns, circled);
-    else if (zone.kind === "mindmap") content = layoutMindmap(els);
-    else if (zone.kind === "tree") content = layoutTree(els);
-    else content = layoutStack(zone, els);
+    if (zone.kind === "scale") content = layoutScale(zone, elements);
+    else if (zone.kind === "cycle") content = layoutCycle(zone, elements);
+    else if (zone.kind === "timeline") content = layoutTimeline(zone, elements);
+    else if (!elements.length) content = { w: 0, h: 0, elements: {}, connections: {} };
+    else if (zone.kind === "flow" || zone.kind === "system") content = await layoutElkWithEmph(zone, elements, connections, circled);
+    else if (zone.kind === "mindmap") content = layoutMindmap(elements);
+    else if (zone.kind === "tree") content = layoutTree(elements);
+    else content = layoutStack(zone, elements);
     if (cache.size > 300) cache.clear();
     cache.set(key, content);
   }
   // normalize: content starts at (0,0)
-  const all = [...Object.values(content.els), ...Object.values(content.labels ?? {}), ...(content.scale ? [content.scale.bar] : [])];
+  const all = [...Object.values(content.elements), ...Object.values(content.labels ?? {}), ...(content.scale ? [content.scale.bar] : [])];
   const box = union(all);
-  const edgePts = Object.values(content.edges).flatMap((e) => e.pts);
-  const minX = Math.min(box.x, ...edgePts.map((p) => p.x)), minY = Math.min(box.y, ...edgePts.map((p) => p.y));
-  const maxX = Math.max(rectRight(box), ...edgePts.map((p) => p.x)), maxY = Math.max(rectBottom(box), ...edgePts.map((p) => p.y));
-  const labelBox = Object.values(content.edges).flatMap((e) => (e.label ? [labelRect(e.label)] : []));
+  const connectionPts = Object.values(content.connections).flatMap((e) => e.pts);
+  const minX = Math.min(box.x, ...connectionPts.map((p) => p.x)), minY = Math.min(box.y, ...connectionPts.map((p) => p.y));
+  const maxX = Math.max(rectRight(box), ...connectionPts.map((p) => p.x)), maxY = Math.max(rectBottom(box), ...connectionPts.map((p) => p.y));
+  const labelBox = Object.values(content.connections).flatMap((e) => (e.label ? [labelRect(e.label)] : []));
   const lx0 = Math.min(minX, ...labelBox.map((l) => l.x));
   const lx1 = Math.max(maxX, ...labelBox.map(rectRight));
   const ly0 = Math.min(minY, ...labelBox.map((l) => l.y));
@@ -739,17 +736,16 @@ async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
   const ox = PAD + (w - 2 * PAD - cw) / 2 - x0; // centers the content
   const oy = top + PAD * 0.4 - y0;
   const sh = (p: Pt): Pt => ({ x: p.x + ox, y: p.y + oy });
-  const res: ZoneLocal = { w, h, els: {}, edges: {}, divider: content.divider !== undefined ? content.divider + ox : undefined, marks: content.marks && Object.fromEntries(Object.entries(content.marks).map(([id, m]) => [id, { ...m, stem: m.stem.map(sh) }])) };
+  const res: ZoneLocal = { w, h, elements: {}, connections: {}, divider: content.divider !== undefined ? content.divider + ox : undefined, marks: content.marks && Object.fromEntries(Object.entries(content.marks).map(([id, m]) => [id, { ...m, stem: m.stem.map(sh) }])) };
   if (content.spans) res.spans = Object.fromEntries(Object.entries(content.spans).map(([id, p]) => [id, { x0: p.x0 + ox, x1: p.x1 + ox }]));
   if (content.labels) res.labels = Object.fromEntries(Object.entries(content.labels).map(([id, r]) => [id, { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h }]));
   if (content.scale) res.scale = { ...content.scale, bar: { ...content.scale.bar, x: content.scale.bar.x + ox, y: content.scale.bar.y + oy } };
-  for (const [id, r] of Object.entries(content.els)) res.els[id] = { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h };
-  for (const [id, e] of Object.entries(content.edges))
-    res.edges[id] = { kind: e.kind, pts: e.pts.map(sh), label: e.label ? { ...e.label, ...sh(e.label) } : undefined };
+  for (const [id, r] of Object.entries(content.elements)) res.elements[id] = { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h };
+  for (const [id, e] of Object.entries(content.connections))
+    res.connections[id] = { kind: e.kind, pts: e.pts.map(sh), label: e.label ? { ...e.label, ...sh(e.label) } : undefined };
   return res;
 }
 
-// ---------- board ----------
 function placeZones(zones: Zone[], sizes: Record<string, { w: number; h: number }>): Record<string, Rect> {
   const placed: Record<string, Rect> = {};
   let rowX = 0, rowY = 0, maxBottom = 0;
@@ -782,14 +778,14 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
   const sizes: Record<string, { w: number; h: number }> = {};
   board.zones.forEach((z, i) => (sizes[z.id] = { w: locals[i].w, h: locals[i].h }));
   const zoneRects = placeZones(board.zones, sizes);
-  const out: BoardLayout = { zones: zoneRects, els: {}, edges: {}, callouts: {}, dividers: {}, scales: {}, marks: {}, spans: {}, labels: {}, bounds: { x: 0, y: 0, w: 0, h: 0 } };
+  const out: BoardLayout = { zones: zoneRects, elements: {}, connections: {}, callouts: {}, dividers: {}, scales: {}, marks: {}, spans: {}, labels: {}, bounds: { x: 0, y: 0, w: 0, h: 0 } };
 
   board.zones.forEach((z, i) => {
     const o = zoneRects[z.id];
     const loc = locals[i];
-    for (const [id, r] of Object.entries(loc.els)) out.els[id] = { x: r.x + o.x, y: r.y + o.y, w: r.w, h: r.h };
-    for (const [id, e] of Object.entries(loc.edges))
-      out.edges[id] = {
+    for (const [id, r] of Object.entries(loc.elements)) out.elements[id] = { x: r.x + o.x, y: r.y + o.y, w: r.w, h: r.h };
+    for (const [id, e] of Object.entries(loc.connections))
+      out.connections[id] = {
         kind: e.kind,
         pts: e.pts.map((p) => ({ x: p.x + o.x, y: p.y + o.y })),
         label: e.label ? { ...e.label, x: e.label.x + o.x, y: e.label.y + o.y } : undefined,
@@ -801,20 +797,20 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
     for (const [id, m] of Object.entries(loc.marks ?? {})) out.marks[id] = { ...m, stem: m.stem.map((p) => ({ x: p.x + o.x, y: p.y + o.y })) };
   });
 
-  const allEls = Object.values(out.els);
-  const elZone = new Map(board.els.map((e) => [e.id, e.zone]));
-  const circles = board.emph.flatMap((m) => (m.style === "circle" && out.els[m.target] ? [emphasisRect(out.els[m.target])] : []));
-  const labelObs = [...allEls, ...circles];
+  const allElements = Object.values(out.elements);
+  const elZone = new Map(board.elements.map((e) => [e.id, e.zone]));
+  const circles = board.emphasis.flatMap((m) => (m.style === "circle" && out.elements[m.target] ? [emphasisRect(out.elements[m.target])] : []));
+  const labelObs = [...allElements, ...circles];
   const takenLabels: Rect[] = [];
-  for (const e of Object.values(out.edges)) if (e.label) takenLabels.push(labelRect(e.label));
+  for (const e of Object.values(out.connections)) if (e.label) takenLabels.push(labelRect(e.label));
 
   // connections ELK didn't resolve: between zones -> orthogonal through the corridors; otherwise bezier
-  const pending = [...derivedConnections(board), ...board.conns].filter((c) => !out.edges[c.id] && out.els[c.from] && out.els[c.to]);
+  const pending = [...derivedConnections(board), ...board.connections].filter((c) => !out.connections[c.id] && out.elements[c.from] && out.elements[c.to]);
   const needsRouter = pending.some((c) => elZone.get(c.from) !== elZone.get(c.to));
   const router = needsRouter
     ? new Router({
         bounds: union(Object.values(out.zones)),
-        els: allEls,
+        elements: allElements,
         zones: Object.values(out.zones),
         headers: board.zones.map((z) => {
           const r = out.zones[z.id];
@@ -823,7 +819,7 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
       })
     : null;
   for (const c of pending) {
-    const a = out.els[c.from], b = out.els[c.to];
+    const a = out.elements[c.from], b = out.elements[c.to];
     const cross = elZone.get(c.from) !== elZone.get(c.to);
     let g: ConnectionGeom | undefined;
     if (cross && router) {
@@ -831,7 +827,7 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
       if (pts) g = { kind: "poly", pts, cross: true };
     }
     if (!g) {
-      const obstacles = allEls.filter((r) => r !== a && r !== b);
+      const obstacles = allElements.filter((r) => r !== a && r !== b);
       g = routeCurve(a, b, obstacles, 0.12);
       if (cross) g.cross = true;
     }
@@ -840,12 +836,12 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
       g.label = { x: m.x, y: m.y, text: c.label };
       takenLabels.push(labelRect(g.label));
     }
-    out.edges[c.id] = g;
+    out.connections[c.id] = g;
   }
 
   // callouts with an arrow
   const taken: Rect[] = [...takenLabels];
-  const rectOf = (id: string): Rect | undefined => out.els[id] ?? out.zones[id] ?? edgeMid(out, id);
+  const rectOf = (id: string): Rect | undefined => out.elements[id] ?? out.zones[id] ?? connectionMid(out, id);
   for (const co of board.callouts) {
     const tr = rectOf(co.target);
     if (!tr) continue;
@@ -853,9 +849,9 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
     const box: Rect = { x: 0, y: 0, w: maxLen(lines) * CALLOUT_CW + 24, h: lines.length * CALLOUT_LH + 14 };
     const targetEl = findElement(board, co.target);
     const zr = out.zones[targetEl?.zone ?? co.target] ?? tr;
-    const placed = placeCallout(box, tr, zr, Object.values(out.zones), [...allEls, ...circles], taken);
+    const placed = placeCallout(box, tr, zr, Object.values(out.zones), [...allElements, ...circles], taken);
     taken.push(placed);
-    const obstacles = allEls.filter((r) => r !== tr);
+    const obstacles = allElements.filter((r) => r !== tr);
     const arrow = routeCurve(placed, tr, obstacles, 0.25);
     out.callouts[co.id] = { box: placed, lines, arrow };
   }
@@ -864,14 +860,14 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
   return out;
 }
 
-function edgeMid(out: BoardLayout, id: string): Rect | undefined {
-  const e = out.edges[id];
+function connectionMid(out: BoardLayout, id: string): Rect | undefined {
+  const e = out.connections[id];
   if (!e) return undefined;
   const m = e.kind === "curve" ? bezierAt(e.pts, 0.5) : longestSegmentMid(e.pts);
   return { x: m.x - 4, y: m.y - 4, w: 8, h: 8 };
 }
 
-function placeCallout(box: Rect, target: Rect, zone: Rect, zones: Rect[], els: Rect[], taken: Rect[]): Rect {
+function placeCallout(box: Rect, target: Rect, zone: Rect, zones: Rect[], elements: Rect[], taken: Rect[]): Rect {
   const t = center(target);
   const cands: Rect[] = [];
   for (let k = 0; k < 8; k++) {
@@ -886,7 +882,7 @@ function placeCallout(box: Rect, target: Rect, zone: Rect, zones: Rect[], els: R
     }
   }
   const dist = (c: Rect) => Math.hypot(center(c).x - t.x, center(c).y - t.y);
-  const free = cands.filter((c) => ![...zones, ...els, ...taken].some((o) => overlaps(c, o, 14))).sort((a, b) => dist(a) - dist(b));
+  const free = cands.filter((c) => ![...zones, ...elements, ...taken].some((o) => overlaps(c, o, 14))).sort((a, b) => dist(a) - dist(b));
   return free[0] ?? cands[0];
 }
 
