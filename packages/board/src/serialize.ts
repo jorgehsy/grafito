@@ -1,11 +1,11 @@
-// Serialización compacta del tablero para el prompt (sin layout ni coordenadas).
+// Compact serialization of the board for the prompt (no layout or coordinates).
 import type { Board } from "./model";
 import { FILL_NAMES } from "./palette";
 
 const q = (s: string) => JSON.stringify(s);
 
 export interface SerializeOpts {
-  /** Catálogo de iconos prendido: se muestra ` service:lambda` por elemento. Apagado: no se muestra. */
+  /** Icon catalog turned on: shows ` service:lambda` per element. Off: not shown. */
   catalog?: boolean;
 }
 
@@ -28,7 +28,7 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
   out.push("ELEMENTOS");
   for (const e of b.els) {
     const kind = e.type === "component" ? `component/${e.comp ?? "service"}` : e.type;
-    // nodos de árbol: sangría por profundidad para que se vea la jerarquía
+    // tree nodes: indent by depth so the hierarchy shows
     let depth = 0;
     for (let p = e.type === "branch" ? e.parent : undefined; p && depth < 20; depth++) p = b.els.find((x) => x.id === p)?.parent;
     let l = `- ${"  ".repeat(depth)}${e.id} (${kind}) ${q(e.label)} @${e.zone}`;

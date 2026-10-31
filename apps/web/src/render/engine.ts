@@ -6,7 +6,7 @@ import type { Rect } from "@grafito/board";
 import { IDLE_OVERVIEW_MS, stepCam, targetCam, viewBoxOf, zoomAt } from "@grafito/board";
 import type { Cam, View } from "@grafito/board";
 import { geomEqual } from "@grafito/board";
-import type { Geom, RItem, RenderTree } from "@grafito/board";
+import type { Geom, RenderItem, RenderTree } from "@grafito/board";
 import { emptyTree } from "@grafito/board";
 import { addServiceIcon, enterSello, hideSello, planEntrada, removeSello } from "./sello";
 import { RED } from "@grafito/board";
@@ -17,7 +17,7 @@ const NS = "http://www.w3.org/2000/svg";
 class Cancel extends Error {}
 
 interface Shown {
-  item: RItem;
+  item: RenderItem;
   geom: Geom;
   vis: Visual;
   layer: SVGGElement;
@@ -62,7 +62,7 @@ export class Engine implements Sink, Executor {
   follow = true;
   onFollowChange?: (f: boolean) => void;
 
-  private layers: Record<"zone" | "under" | "edge" | "element" | "ann", SVGGElement>;
+  private layers: Record<"zone" | "under" | "connection" | "element" | "ann", SVGGElement>;
   private pen: SVGGElement;
   private clock = 0;
   private lastReal = 0;
@@ -82,7 +82,7 @@ export class Engine implements Sink, Executor {
 
   constructor(private svg: SVGSVGElement) {
     const mk = () => { const g = document.createElementNS(NS, "g"); svg.appendChild(g); return g; };
-    this.layers = { zone: mk(), under: mk(), edge: mk(), element: mk(), ann: mk() };
+    this.layers = { zone: mk(), under: mk(), connection: mk(), element: mk(), ann: mk() };
     this.pen = this.makePen();
     svg.appendChild(this.pen);
     this.ro = new ResizeObserver(() => this.measureView());
@@ -250,7 +250,7 @@ export class Engine implements Sink, Executor {
   }
 
   /** set_service sobre algo ya dibujado: no se tacha ni se redibuja; el sello salta encima (o se quita). */
-  private async restamp(s: Shown, t: RItem) {
+  private async restamp(s: Shown, t: RenderItem) {
     s.busy = true;
     removeSello(s.vis);
     s.item = { ...s.item, data: { ...s.item.data, service: t.data.service } };
@@ -270,7 +270,7 @@ export class Engine implements Sink, Executor {
     if (s.vis.translates && sameSize && hue === s.item.hue) {
       s.vis.g.setAttribute("transform", `translate(${g.x} ${g.y})`);
     } else {
-      const item: RItem = { ...s.item, hue, geom: g };
+      const item: RenderItem = { ...s.item, hue, geom: g };
       const vis = buildVisual(item, g);
       showAll(vis);
       s.layer.replaceChild(vis.g, s.vis.g);
@@ -340,7 +340,7 @@ export class Engine implements Sink, Executor {
     const g = s.vis.g;
     let node: SVGElement;
     const kind = s.item.kind;
-    if (kind === "edge" && s.vis.strokes[0]) {
+    if (kind === "connection" && s.vis.strokes[0]) {
       node = document.createElementNS(NS, "path");
       node.setAttribute("d", s.vis.strokes[0].anim.getAttribute("d")!);
       node.setAttribute("fill", "none"); node.setAttribute("stroke", "#ffe066"); node.setAttribute("stroke-width", "16"); node.setAttribute("stroke-linecap", "round");
@@ -381,9 +381,9 @@ export class Engine implements Sink, Executor {
   }
 
   // ---------- cámara ----------
-  private layerOf(i: RItem) {
+  private layerOf(i: RenderItem) {
     if (i.under) return this.layers.under;
-    return i.kind === "zone" ? this.layers.zone : i.kind === "edge" ? this.layers.edge : i.kind === "element" ? this.layers.element : this.layers.ann;
+    return i.kind === "zone" ? this.layers.zone : i.kind === "connection" ? this.layers.connection : i.kind === "element" ? this.layers.element : this.layers.ann;
   }
   private setFocus(g: Geom) {
     this.focus = { x: g.x, y: g.y, w: Math.max(g.w, 60), h: Math.max(g.h, 40) };

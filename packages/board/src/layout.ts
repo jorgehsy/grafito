@@ -1,41 +1,41 @@
-// Layout puro (sin React): posiciona zonas en el tablero y elementos dentro de cada zona.
-// ELK (layered, RIGHT) para flow/system; d3-hierarchy para mindmap; filas apiladas para list/compare.
+// Pure layout (no React): positions zones on the board and elements inside each zone.
+// ELK (layered, RIGHT) for flow/system; d3-hierarchy for mindmap; stacked rows for list/compare.
 import ELK from "elkjs/lib/elk.bundled.js";
 import { hierarchy, tree } from "d3-hierarchy";
-import type { Board, Conn, El, Zone } from "./model";
-import { derivedConns, findEl, findZone } from "./model";
+import type { Board, Connection, Element, Zone } from "./model";
+import { derivedConnections, findElement, findZone } from "./model";
 import { Router } from "./route";
 
 export interface Pt { x: number; y: number }
 export interface Rect { x: number; y: number; w: number; h: number }
-export interface EdgeGeom {
-  /** poly: polilínea ortogonal (ELK). curve: 4 puntos de control de una bézier cúbica. */
+export interface ConnectionGeom {
+  /** poly: orthogonal polyline (ELK). curve: 4 control points of a cubic bezier. */
   kind: "poly" | "curve";
   pts: Pt[];
   label?: { x: number; y: number; text: string };
-  /** conexión entre zonas (se dibuja más ligera) */
+  /** connection between zones (drawn lighter) */
   cross?: boolean;
 }
 export interface BoardLayout {
   zones: Record<string, Rect>;
   els: Record<string, Rect>;
-  edges: Record<string, EdgeGeom>;
-  callouts: Record<string, { box: Rect; lines: string[]; arrow: EdgeGeom }>;
-  /** compare: x absoluta de la línea divisoria por zona */
+  edges: Record<string, ConnectionGeom>;
+  callouts: Record<string, { box: Rect; lines: string[]; arrow: ConnectionGeom }>;
+  /** compare: absolute x of each zone's divider line */
   dividers: Record<string, number>;
-  /** scale: barra por zona (rect absoluto con las etiquetas de los extremos; x0 = inicio de la barra respecto a rect.x) */
+  /** scale: bar per zone (absolute rect with the end labels; x0 = start of the bar relative to rect.x) */
   scales: Record<string, ScaleGeom>;
-  /** scale: lado y tallo de cada marca */
+  /** scale: side and stem of each mark */
   marks: Record<string, MarkGeom>;
-  /** timeline: x absolutas (inicio y final) del corchete de cada tramo */
+  /** timeline: absolute x (start and end) of each span's bracket */
   spans: Record<string, SpanGeom>;
-  /** textos sueltos con caja propia: `when:<evento>` (timeline) y `center:<zona>` (cycle) */
+  /** loose texts with their own box: `when:<event>` (timeline) and `center:<zone>` (cycle) */
   labels: Record<string, Rect>;
   bounds: Rect;
 }
 export interface SpanGeom { x0: number; x1: number }
 export interface ScaleGeom { bar: Rect; x0: number; w: number; h: number }
-/** stem: [borde lejano de la barra, borde cercano (donde va la muesca), punto de enganche en la caja] */
+/** stem: [far edge of the bar, near edge (where the notch goes), attachment point on the box] */
 export interface MarkGeom { side: "above" | "below"; stem: Pt[] }
 
 export const FONT = 20;
@@ -46,7 +46,7 @@ export const PAD = 26;
 export const ZONE_GAP = 150;
 export const LABEL_SIZE = 21;
 export const LABEL_LH = 24;
-/** Etiquetas de flecha más largas que esto se parten en dos líneas. */
+/** Arrow labels longer than this are split into two lines. */
 const LABEL_MAX_1LINE = 22;
 const LABEL_CW = 10.3;
 const CALLOUT_CW = 12.2;
@@ -69,7 +69,7 @@ const TL_LANE_H = 44;
 const TL_LANE_GAP = 4;
 const CYCLE_MARGIN = 26;
 
-// ---------- texto ----------
+// ---------- text ----------
 export function wrapText(text: string, max: number): string[] {
   const words = text.trim().split(/\s+/);
   const lines: string[] = [];
@@ -83,7 +83,7 @@ export function wrapText(text: string, max: number): string[] {
   return lines.length ? lines : [""];
 }
 const maxLen = (lines: string[]) => Math.max(...lines.map((l) => [...l].length));
-/** Etiqueta de flecha: una línea si es corta; si no, dos lo más parejas posible (corte en el espacio más cercano a la mitad). */
+/** Arrow label: one line if short; otherwise two as even as possible (cut at the space closest to the middle). */
 export function labelLines(text: string): string[] {
   const t = text.trim();
   if ([...t].length <= LABEL_MAX_1LINE) return [t];
@@ -92,19 +92,19 @@ export function labelLines(text: string): string[] {
   return cut < 0 ? [t] : [t.slice(0, cut), t.slice(cut + 1)];
 }
 
-/** Líneas visibles de un elemento (el icono va delante de la primera). */
-export function elLines(e: El): string[] {
+/** Visible lines of an element (the icon goes before the first). */
+export function elementLines(e: Element): string[] {
   const wrap = e.type === "mark" || e.type === "event" || e.type === "span" || e.type === "branch" ? 18 : e.type === "stage" ? 16 : e.type === "decision" ? 14 : e.type === "item" ? 28 : e.type === "node" ? 20 : e.comp === "actor" ? 14 : 18;
   const lines = wrapText(e.label, wrap);
   if (e.icon) lines[0] = `${e.icon} ${lines[0]}`;
   return lines;
 }
 
-/** Líneas de la explicación de una marca, etapa o evento (debajo de su etiqueta). */
-export const markNoteLines = (e: El): string[] => (e.note ? wrapText(e.note, 22) : []);
+/** Lines of the explanation of a mark, stage or event (below its label). */
+export const markNoteLines = (e: Element): string[] => (e.note ? wrapText(e.note, 22) : []);
 
-export function elSize(e: El): { w: number; h: number } {
-  const lines = elLines(e);
+export function elementSize(e: Element): { w: number; h: number } {
+  const lines = elementLines(e);
   const tw = maxLen(lines) * CHAR_W;
   const th = lines.length * LINE_H;
   switch (e.type) {
@@ -145,7 +145,7 @@ export function elSize(e: El): { w: number; h: number } {
   }
 }
 
-// ---------- geometría ----------
+// ---------- geometry ----------
 export const rectRight = (r: Rect) => r.x + r.w;
 export const rectBottom = (r: Rect) => r.y + r.h;
 export const center = (r: Rect): Pt => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
@@ -153,18 +153,18 @@ export function overlaps(a: Rect, b: Rect, m = 0): boolean {
   return a.x < rectRight(b) + m && b.x < rectRight(a) + m && a.y < rectBottom(b) + m && b.y < rectBottom(a) + m;
 }
 const inflate = (r: Rect, m: number): Rect => ({ x: r.x - m, y: r.y - m, w: r.w + 2 * m, h: r.h + 2 * m });
-/** Caja (con parche de fondo) de una etiqueta de arista centrada en (x, y). */
+/** Box (with a background patch) of a connection label centered at (x, y). */
 export function labelRect(l: { x: number; y: number; text: string }): Rect {
   const lines = labelLines(l.text);
   const w = maxLen(lines) * LABEL_CW + 14, h = lines.length * LABEL_LH + 8;
   return { x: l.x - w / 2, y: l.y - h / 2, w, h };
 }
-/** Elipse de énfasis alrededor de un elemento: holgada para no cortar sus esquinas. */
-export function emphRect(r: Rect): Rect {
+/** Emphasis ellipse around an element: roomy so it doesn't clip its corners. */
+export function emphasisRect(r: Rect): Rect {
   const w = r.w * 1.25 + 16, h = r.h * 1.25 + 16;
   return { x: r.x + r.w / 2 - w / 2, y: r.y + r.h / 2 - h / 2, w, h };
 }
-function samplePath(g: EdgeGeom, step = 8): { p: Pt; s: number }[] {
+function samplePath(g: ConnectionGeom, step = 8): { p: Pt; s: number }[] {
   const raw: Pt[] = [];
   if (g.kind === "curve") for (let i = 0; i <= 40; i++) raw.push(bezierAt(g.pts, i / 40));
   else raw.push(...g.pts);
@@ -179,15 +179,15 @@ function samplePath(g: EdgeGeom, step = 8): { p: Pt; s: number }[] {
   }
   return out;
 }
-/** Punto de la ruta, lo más cerca posible de su mitad, donde la etiqueta no pisa cajas ni otras etiquetas. */
-export function placeLabel(g: EdgeGeom, text: string, obstacles: Rect[], taken: Rect[]): Pt {
+/** Point on the path, as close to its middle as possible, where the label overlaps no boxes or other labels. */
+export function placeLabel(g: ConnectionGeom, text: string, obstacles: Rect[], taken: Rect[]): Pt {
   const pts = samplePath(g);
   const total = pts[pts.length - 1].s;
   const order = pts.filter((q) => q.s >= Math.min(24, total / 3) && q.s <= total - Math.min(24, total / 3));
   const cand = (order.length ? order : pts).slice().sort((a, b) => Math.abs(a.s - total / 2) - Math.abs(b.s - total / 2));
   const bad = (r: Rect) => obstacles.some((o) => overlaps(r, o, 2)) || taken.some((o) => overlaps(r, o, 4));
   for (const q of cand) if (!bad(labelRect({ ...q.p, text }))) return q.p;
-  // sin hueco sobre la línea: desplazar perpendicularmente
+  // no gap on the line: shift perpendicularly
   for (const off of [26, -26, 40, -40]) {
     for (const q of cand) {
       for (const pt of [{ x: q.p.x, y: q.p.y + off }, { x: q.p.x + off, y: q.p.y }]) if (!bad(labelRect({ ...pt, text }))) return pt;
@@ -200,7 +200,7 @@ function union(rs: Rect[]): Rect {
   const x = Math.min(...rs.map((r) => r.x)), y = Math.min(...rs.map((r) => r.y));
   return { x, y, w: Math.max(...rs.map(rectRight)) - x, h: Math.max(...rs.map(rectBottom)) - y };
 }
-/** Punto del borde de r en la dirección de `to` desde su centro. */
+/** Point on r's border in the direction of `to` from its center. */
 function clip(r: Rect, to: Pt, out = 4): Pt {
   const c = center(r);
   const dx = to.x - c.x, dy = to.y - c.y;
@@ -228,8 +228,8 @@ function hits(p: Pt[], obstacles: Rect[]): number {
   return n;
 }
 
-/** Curva bézier entre dos rectángulos; prueba desplazamientos laterales para esquivar obstáculos. */
-export function routeCurve(a: Rect, b: Rect, obstacles: Rect[], curvature = 0.1): EdgeGeom {
+/** Bezier curve between two rectangles; tries lateral offsets to dodge obstacles. */
+export function routeCurve(a: Rect, b: Rect, obstacles: Rect[], curvature = 0.1): ConnectionGeom {
   const ca = center(a), cb = center(b);
   const dx = cb.x - ca.x, dy = cb.y - ca.y;
   const dist = Math.hypot(dx, dy) || 1;
@@ -249,19 +249,19 @@ export function routeCurve(a: Rect, b: Rect, obstacles: Rect[], curvature = 0.1)
   return { kind: "curve", pts: best! };
 }
 
-// ---------- layout dentro de la zona ----------
+// ---------- layout inside the zone ----------
 interface ZoneLocal {
   w: number;
   h: number;
   els: Record<string, Rect>;
-  edges: Record<string, EdgeGeom>;
-  /** compare: x de la línea divisoria */
+  edges: Record<string, ConnectionGeom>;
+  /** compare: x of the divider line */
   divider?: number;
   scale?: ScaleGeom;
   marks?: Record<string, MarkGeom>;
   spans?: Record<string, SpanGeom>;
   labels?: Record<string, Rect>;
-  /** flow/system: dirección que usó ELK */
+  /** flow/system: direction ELK used */
   dir?: "RIGHT" | "DOWN";
 }
 
@@ -276,8 +276,8 @@ function longestSegmentMid(pts: Pt[]): Pt {
   return mid;
 }
 
-async function layoutElk(zone: Zone, els: El[], conns: Conn[], extraObs: Rect[], dir: "RIGHT" | "DOWN" = "RIGHT"): Promise<ZoneLocal> {
-  const sizes = Object.fromEntries(els.map((e) => [e.id, elSize(e)]));
+async function layoutElk(zone: Zone, els: Element[], conns: Connection[], extraObs: Rect[], dir: "RIGHT" | "DOWN" = "RIGHT"): Promise<ZoneLocal> {
+  const sizes = Object.fromEntries(els.map((e) => [e.id, elementSize(e)]));
   const hasLabels = conns.some((c) => c.label);
   const graph = {
     id: "root",
@@ -295,7 +295,7 @@ async function layoutElk(zone: Zone, els: El[], conns: Conn[], extraObs: Rect[],
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
       "elk.separateConnectedComponents": "true",
       "elk.spacing.componentComponent": "50",
-      // ELK reserva hueco para cada etiqueta: así no caen encima de las cajas
+      // ELK reserves room for each label so they don't land on top of the boxes
       "elk.edgeLabels.placement": "CENTER",
       "elk.spacing.edgeLabel": "6",
     },
@@ -334,7 +334,7 @@ async function layoutElk(zone: Zone, els: El[], conns: Conn[], extraObs: Rect[],
   return out;
 }
 
-function layoutMindmap(els: El[]): ZoneLocal {
+function layoutMindmap(els: Element[]): ZoneLocal {
   const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {} };
   if (!els.length) return out;
   const byId = new Map(els.map((e) => [e.id, e]));
@@ -343,25 +343,25 @@ function layoutMindmap(els: El[]): ZoneLocal {
   const kidsOf = (id: string): N[] =>
     els.filter((e) => e.parent === id).map((e) => ({ id: e.id, kids: kidsOf(e.id) }));
   const rootNode: N = { id: root.id, kids: kidsOf(root.id) };
-  // otras ideas sin padre cuelgan de la central
+  // other parentless ideas hang off the central one
   for (const e of els) if (e.id !== root.id && (!e.parent || !byId.has(e.parent))) rootNode.kids.push({ id: e.id, kids: kidsOf(e.id) });
   const h = hierarchy<N>(rootNode, (n) => n.kids);
   tree<N>().nodeSize([62, 1]).separation((a, b) => {
-    const ha = elSize(byId.get(a.data.id)!).h, hb = elSize(byId.get(b.data.id)!).h;
+    const ha = elementSize(byId.get(a.data.id)!).h, hb = elementSize(byId.get(b.data.id)!).h;
     return (ha / 2 + hb / 2 + 22) / 62;
   })(h);
   const colW: number[] = [];
-  h.each((n) => { colW[n.depth] = Math.max(colW[n.depth] ?? 0, elSize(byId.get(n.data.id)!).w); });
+  h.each((n) => { colW[n.depth] = Math.max(colW[n.depth] ?? 0, elementSize(byId.get(n.data.id)!).w); });
   const colX: number[] = [];
   let x = 0;
   colW.forEach((w, d) => { colX[d] = x; x += w + 90; });
   let minY = Infinity;
-  h.each((n) => { minY = Math.min(minY, n.x! - elSize(byId.get(n.data.id)!).h / 2); });
+  h.each((n) => { minY = Math.min(minY, n.x! - elementSize(byId.get(n.data.id)!).h / 2); });
   h.each((n) => {
-    const s = elSize(byId.get(n.data.id)!);
+    const s = elementSize(byId.get(n.data.id)!);
     out.els[n.data.id] = { x: colX[n.depth], y: n.x! - s.h / 2 - minY, w: s.w, h: s.h };
   });
-  // aristas padre -> hijo (curvas horizontales)
+  // parent -> child connections (horizontal curves)
   h.each((n) => {
     if (!n.parent) return;
     const a = out.els[n.parent.data.id], b = out.els[n.data.id];
@@ -376,40 +376,40 @@ const TREE_COL_GAP = 76;
 const TREE_ROW_GAP = 14;
 const TREE_ROOT_GAP = 30;
 
-/** Árbol de izquierda a derecha: una columna por profundidad (ancho = la etiqueta más ancha del nivel),
- *  hermanos apilados en orden de llegada, cada padre centrado ante sus hijos y conectores de codo. */
-function layoutTree(els: El[]): ZoneLocal {
+/** Left-to-right tree: one column per depth (width = the widest label of the level),
+ *  siblings stacked in arrival order, each parent centered on its children, with elbow connectors. */
+function layoutTree(els: Element[]): ZoneLocal {
   const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {} };
   if (!els.length) return out;
   const byId = new Map(els.map((e) => [e.id, e]));
-  // un padre ausente o que no precede al hijo cuenta como raíz (evita ciclos)
+  // a missing parent, or one that doesn't precede the child, counts as a root (avoids cycles)
   const order = new Map(els.map((e, k) => [e.id, k]));
-  const parentOf = (e: El) => (e.parent && byId.has(e.parent) && order.get(e.parent)! < order.get(e.id)! ? e.parent : undefined);
-  const kids = new Map<string | undefined, El[]>();
+  const parentOf = (e: Element) => (e.parent && byId.has(e.parent) && order.get(e.parent)! < order.get(e.id)! ? e.parent : undefined);
+  const kids = new Map<string | undefined, Element[]>();
   for (const e of els) {
     const p = parentOf(e);
     kids.set(p, [...(kids.get(p) ?? []), e]);
   }
-  const size = new Map(els.map((e) => [e.id, elSize(e)]));
+  const size = new Map(els.map((e) => [e.id, elementSize(e)]));
   const depth = new Map<string, number>();
-  const walk = (e: El, d: number) => { depth.set(e.id, d); for (const k of kids.get(e.id) ?? []) walk(k, d + 1); };
+  const walk = (e: Element, d: number) => { depth.set(e.id, d); for (const k of kids.get(e.id) ?? []) walk(k, d + 1); };
   for (const r of kids.get(undefined) ?? []) walk(r, 0);
   const colW: number[] = [];
   for (const e of els) colW[depth.get(e.id)!] = Math.max(colW[depth.get(e.id)!] ?? 0, size.get(e.id)!.w);
   const colX: number[] = [];
   let x = 0;
   colW.forEach((w, d) => { colX[d] = x; x += w + TREE_COL_GAP; });
-  const cy = new Map<string, number>(); // centro vertical de cada nodo
-  const subtree = (e: El): string[] => [e.id, ...(kids.get(e.id) ?? []).flatMap(subtree)];
-  /** coloca el subárbol desde yStart y devuelve su borde inferior */
-  const place = (e: El, yStart: number): number => {
+  const cy = new Map<string, number>(); // vertical center of each node
+  const subtree = (e: Element): string[] => [e.id, ...(kids.get(e.id) ?? []).flatMap(subtree)];
+  /** places the subtree from yStart and returns its bottom edge */
+  const place = (e: Element, yStart: number): number => {
     const s = size.get(e.id)!;
     const ks = kids.get(e.id) ?? [];
     if (!ks.length) { cy.set(e.id, yStart + s.h / 2); return yStart + s.h; }
     let y = yStart, bottom = yStart;
     for (const k of ks) { bottom = place(k, y); y = bottom + TREE_ROW_GAP; }
     let c = (cy.get(ks[0].id)! + cy.get(ks[ks.length - 1].id)!) / 2;
-    if (c - s.h / 2 < yStart) { // el padre es más alto que sus hijos: bajar todo el subárbol
+    if (c - s.h / 2 < yStart) { // the parent is taller than its children: shift the whole subtree down
       const dy = yStart - (c - s.h / 2);
       for (const k of ks) for (const id of subtree(k)) cy.set(id, cy.get(id)! + dy);
       c += dy; bottom += dy;
@@ -423,7 +423,7 @@ function layoutTree(els: El[]): ZoneLocal {
     const s = size.get(e.id)!;
     out.els[e.id] = { x: colX[depth.get(e.id)!], y: cy.get(e.id)! - s.h / 2, w: s.w, h: s.h };
   }
-  // conectores de corchete: padre -> tramo vertical compartido -> horizontal a cada hijo
+  // bracket connectors: parent -> shared vertical run -> horizontal to each child
   for (const e of els) {
     const p = parentOf(e);
     if (!p) continue;
@@ -438,7 +438,7 @@ function layoutTree(els: El[]): ZoneLocal {
   return out;
 }
 
-/** Reparte cajas (centro ideal c, ancho w) en una fila sin solapes, con el mínimo desplazamiento total. */
+/** Spreads boxes (ideal center c, width w) in a row without overlaps, with minimal total displacement. */
 function spreadRow(items: { c: number; w: number }[], gap: number): number[] {
   interface Cl { idx: number[]; left: number }
   const widthOf = (idx: number[]) => idx.reduce((a, i) => a + items[i].w, 0) + gap * (idx.length - 1);
@@ -467,15 +467,15 @@ function spreadRow(items: { c: number; w: number }[], gap: number): number[] {
   return out;
 }
 
-/** Barra horizontal con marcas: ordenadas por posición, se reparten encima/debajo y se separan sin solaparse. */
-function layoutScale(zone: Zone, els: El[]): ZoneLocal {
+/** Horizontal bar with marks: sorted by position, split above/below and spaced so they don't overlap. */
+function layoutScale(zone: Zone, els: Element[]): ZoneLocal {
   const minL = zone.minLabel ?? "0%", maxL = zone.maxLabel ?? "100%";
   const leftW = Math.max(46, [...minL].length * LABEL_CW + 18);
   const rightW = Math.max(54, [...maxL].length * LABEL_CW + 18);
   const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {}, marks: {} };
   const marks = els.filter((e) => e.type === "mark").sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
-  const info = marks.map((e) => ({ e, s: elSize(e), cx: leftW + ((e.at ?? 0) / 100) * SCALE_W, side: "above" as "above" | "below" }));
-  // lado: arriba si cabe junto a la anterior de ese lado; si no, abajo; si tampoco, el menos apretado
+  const info = marks.map((e) => ({ e, s: elementSize(e), cx: leftW + ((e.at ?? 0) / 100) * SCALE_W, side: "above" as "above" | "below" }));
+  // side: above if it fits next to the previous one on that side; otherwise below; if neither, the less crowded
   const reach = { above: -Infinity, below: -Infinity };
   for (const m of info) {
     const left = m.cx - m.s.w / 2;
@@ -491,7 +491,7 @@ function layoutScale(zone: Zone, els: El[]): ZoneLocal {
       const y = side === "above" ? -SCALE_STEM - m.s.h : SCALE_BAR_H + SCALE_STEM;
       out.els[m.e.id] = { x, y, w: m.s.w, h: m.s.h };
       const attach = Math.min(Math.max(m.cx, x + 10), x + m.s.w - 10);
-      // [borde lejano de la barra, borde cercano (muesca), punto de la caja]
+      // [far edge of the bar, near edge (notch), box point]
       out.marks![m.e.id] = {
         side,
         stem: [
@@ -506,10 +506,10 @@ function layoutScale(zone: Zone, els: El[]): ZoneLocal {
   return out;
 }
 
-/** Etapas en un anillo elíptico (en orden de inserción o tras `after`), con flechas horarias y la última cierra al primero. */
-function layoutCycle(zone: Zone, els: El[]): ZoneLocal {
+/** Stages on an elliptical ring (in insertion order or after `after`), with clockwise arrows, the last closing back to the first. */
+function layoutCycle(zone: Zone, els: Element[]): ZoneLocal {
   const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {}, labels: {} };
-  const stages: El[] = [];
+  const stages: Element[] = [];
   for (const e of els) {
     if (e.type !== "stage") continue;
     const k = e.after ? stages.findIndex((x) => x.id === e.after) : -1;
@@ -517,7 +517,7 @@ function layoutCycle(zone: Zone, els: El[]): ZoneLocal {
     else stages.push(e);
   }
   const n = stages.length;
-  const sizes = stages.map(elSize);
+  const sizes = stages.map(elementSize);
   let center: Rect | null = null;
   if (zone.centerLabel) {
     const lines = wrapText(zone.centerLabel, 14);
@@ -536,7 +536,7 @@ function layoutCycle(zone: Zone, els: El[]): ZoneLocal {
   const rectsAt = (rx: number, ry: number) =>
     stages.map((_, i) => ({ x: rx * Math.cos(ang(i)) - sizes[i].w / 2, y: ry * Math.sin(ang(i)) - sizes[i].h / 2, w: sizes[i].w, h: sizes[i].h }));
   const inside = (r: Rect, p: Pt, m: number) => p.x > r.x - m && p.x < rectRight(r) + m && p.y > r.y - m && p.y < rectBottom(r) + m;
-  /** ángulos en que el anillo sale de la caja i hacia delante / entra a la i hacia atrás */
+  /** angles at which the ring leaves box i going forward / enters box i going backward */
   const arcSpan = (rx: number, ry: number, rects: Rect[], i: number) => {
     const j = (i + 1) % n;
     const at = (t: number): Pt => ({ x: rx * Math.cos(t), y: ry * Math.sin(t) });
@@ -574,8 +574,8 @@ function layoutCycle(zone: Zone, els: El[]): ZoneLocal {
   return out;
 }
 
-/** Eje horizontal con flecha: eventos (marca + fecha + caja arriba/abajo, alternando) y tramos (corchetes bajo el eje). */
-function layoutTimeline(zone: Zone, els: El[]): ZoneLocal {
+/** Horizontal axis with an arrow: events (mark + date + box above/below, alternating) and spans (brackets under the axis). */
+function layoutTimeline(zone: Zone, els: Element[]): ZoneLocal {
   const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {}, marks: {}, spans: {}, labels: {} };
   const events = els.filter((e) => e.type === "event");
   const spans = els.filter((e) => e.type === "span");
@@ -585,10 +585,10 @@ function layoutTimeline(zone: Zone, els: El[]): ZoneLocal {
   const xOf = (at: number) => LEFT + (at / 100) * W;
   const n = events.length;
   const info = events
-    .map((e, k) => ({ e, s: elSize(e), at: e.at ?? (n === 1 ? 50 : 6 + (88 * k) / (n - 1)), k }))
+    .map((e, k) => ({ e, s: elementSize(e), at: e.at ?? (n === 1 ? 50 : 6 + (88 * k) / (n - 1)), k }))
     .sort((a, b) => a.at - b.at || a.k - b.k)
     .map((m) => ({ ...m, cx: xOf(m.at), side: "above" as "above" | "below" }));
-  // lados: se alterna; si la preferida choca con la anterior de ese lado y la otra no, se cambia
+  // sides: alternate; if the preferred one collides with the previous one on that side and the other doesn't, switch
   const reach = { above: -Infinity, below: -Infinity };
   info.forEach((m, idx) => {
     const left = m.cx - m.s.w / 2;
@@ -597,10 +597,10 @@ function layoutTimeline(zone: Zone, els: El[]): ZoneLocal {
     m.side = clash(pref) <= 0 || clash(other) > 0 ? pref : other;
     reach[m.side] = Math.max(reach[m.side], m.cx + m.s.w / 2);
   });
-  // tramos: carriles bajo el eje (debajo de las fechas)
+  // spans: lanes under the axis (below the dates)
   const lanes: number[] = [];
   const spanBoxes = spans.map((e) => {
-    const s = elSize(e);
+    const s = elementSize(e);
     const x0 = xOf(e.at ?? 0), x1 = xOf(e.to ?? 100), mid = (x0 + x1) / 2;
     const left = Math.min(x0, mid - s.w / 2), right = Math.max(x1, mid + s.w / 2);
     return { e, x0, x1, left, right };
@@ -625,7 +625,7 @@ function layoutTimeline(zone: Zone, els: El[]): ZoneLocal {
       const dot = { x: m.cx, y: 0 };
       out.marks![m.e.id] = { side, stem: [dot, dot, { x: attach, y: side === "above" ? -TL_STEM : belowY }] };
     });
-    // fechas: en el lado contrario a la caja, pegadas al eje
+    // dates: on the opposite side of the box, hugging the axis
     const dated = info.filter((m) => m.side !== side && m.e.when);
     const ws = dated.map((m) => ({ c: m.cx, w: [...m.e.when!].length * TL_WHEN_CW + 14 }));
     const cs = spreadRow(ws, 8);
@@ -639,17 +639,17 @@ function layoutTimeline(zone: Zone, els: El[]): ZoneLocal {
   return out;
 }
 
-function layoutStack(zone: Zone, els: El[]): ZoneLocal {
+function layoutStack(zone: Zone, els: Element[]): ZoneLocal {
   const out: ZoneLocal = { w: 0, h: 0, els: {}, edges: {} };
   const GAPY = 10;
   if (zone.kind === "compare") {
     const cols = { left: 0, right: 0 } as Record<string, number>;
     const widths = { left: 170, right: 170 } as Record<string, number>;
-    for (const e of els) widths[e.column ?? "left"] = Math.max(widths[e.column ?? "left"], elSize(e).w);
+    for (const e of els) widths[e.column ?? "left"] = Math.max(widths[e.column ?? "left"], elementSize(e).w);
     const leftW = widths.left;
     for (const e of els) {
       const c = e.column ?? "left";
-      const s = elSize(e);
+      const s = elementSize(e);
       out.els[e.id] = { x: c === "left" ? 0 : leftW + 60, y: cols[c], w: s.w, h: s.h };
       cols[c] += s.h + GAPY;
     }
@@ -658,25 +658,25 @@ function layoutStack(zone: Zone, els: El[]): ZoneLocal {
   }
   let y = 0;
   for (const e of els) {
-    const s = elSize(e);
+    const s = elementSize(e);
     out.els[e.id] = { x: 0, y, w: s.w, h: s.h };
     y += s.h + GAPY;
   }
   return out;
 }
 
-/** El círculo de énfasis depende de la posición final: se calcula con un primer pase de ELK. */
-/** Proporción ancho/alto a la que apuntamos: la de una pantalla apaisada. */
+/** The emphasis circle depends on the final position: computed with a first ELK pass. */
+/** Width/height ratio we aim for: that of a landscape screen. */
 const TARGET_ASPECT = 1.6;
-/** Por debajo de este ancho, izquierda→derecha siempre vale (se lee mejor). */
+/** Below this width, left→right is always fine (it reads better). */
 const MAX_RIGHT_W = 1000;
 function contentBox(z: ZoneLocal): Rect {
   return union([...Object.values(z.els), ...Object.values(z.edges).flatMap((g) => (g.label ? [labelRect(g.label)] : []))]);
 }
 const aspectMiss = (r: Rect) => Math.abs(Math.log(r.w / Math.max(1, r.h) / TARGET_ASPECT));
 
-/** Izquierda→derecha salvo que quede demasiado ancho y de arriba→abajo aproveche mejor el alto disponible. */
-async function layoutElkBest(zone: Zone, els: El[], conns: Conn[], extraObs: Rect[], dir?: "RIGHT" | "DOWN"): Promise<ZoneLocal> {
+/** Left→right unless it ends up too wide and top→bottom makes better use of the available height. */
+async function layoutElkBest(zone: Zone, els: Element[], conns: Connection[], extraObs: Rect[], dir?: "RIGHT" | "DOWN"): Promise<ZoneLocal> {
   if (dir) return layoutElk(zone, els, conns, extraObs, dir);
   const right = await layoutElk(zone, els, conns, extraObs, "RIGHT");
   const rb = contentBox(right);
@@ -685,11 +685,11 @@ async function layoutElkBest(zone: Zone, els: El[], conns: Conn[], extraObs: Rec
   return aspectMiss(contentBox(down)) < aspectMiss(rb) ? down : right;
 }
 
-async function layoutElkWithEmph(zone: Zone, els: El[], conns: Conn[], circled: string[]): Promise<ZoneLocal> {
+async function layoutElkWithEmph(zone: Zone, els: Element[], conns: Connection[], circled: string[]): Promise<ZoneLocal> {
   const first = await layoutElkBest(zone, els, conns, []);
   if (!circled.length) return first;
-  const extra = circled.flatMap((id) => (first.els[id] ? [emphRect(first.els[id])] : []));
-  // misma dirección que la primera pasada, para que el hueco del énfasis caiga donde corresponde
+  const extra = circled.flatMap((id) => (first.els[id] ? [emphasisRect(first.els[id])] : []));
+  // same direction as the first pass, so the emphasis gap lands where it belongs
   const dir = first.dir;
   return layoutElkBest(zone, els, conns, extra, dir);
 }
@@ -702,7 +702,7 @@ async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
   const ids = new Set(els.map((e) => e.id));
   const conns =
     zone.kind === "flow" || zone.kind === "system"
-      ? [...derivedConns(board), ...board.conns].filter((c) => ids.has(c.from) && ids.has(c.to))
+      ? [...derivedConnections(board), ...board.conns].filter((c) => ids.has(c.from) && ids.has(c.to))
       : [];
   const circled = board.emph.filter((m) => m.style === "circle" && ids.has(m.target)).map((m) => m.target);
   const key = JSON.stringify([zone.kind, zone.title, zone.leftTitle, zone.rightTitle, zone.minLabel, zone.maxLabel, zone.centerLabel, els, conns, circled]);
@@ -719,7 +719,7 @@ async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
     if (cache.size > 300) cache.clear();
     cache.set(key, content);
   }
-  // normalizar: el contenido empieza en (0,0)
+  // normalize: content starts at (0,0)
   const all = [...Object.values(content.els), ...Object.values(content.labels ?? {}), ...(content.scale ? [content.scale.bar] : [])];
   const box = union(all);
   const edgePts = Object.values(content.edges).flatMap((e) => e.pts);
@@ -736,7 +736,7 @@ async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
   const cw = all.length ? lx1 - x0 : 0, ch = all.length ? ly1 - y0 : 0;
   const w = Math.max(titleW, cw + 2 * PAD);
   const h = Math.max(top + 90, top + ch + PAD * 1.4);
-  const ox = PAD + (w - 2 * PAD - cw) / 2 - x0; // centra el contenido
+  const ox = PAD + (w - 2 * PAD - cw) / 2 - x0; // centers the content
   const oy = top + PAD * 0.4 - y0;
   const sh = (p: Pt): Pt => ({ x: p.x + ox, y: p.y + oy });
   const res: ZoneLocal = { w, h, els: {}, edges: {}, divider: content.divider !== undefined ? content.divider + ox : undefined, marks: content.marks && Object.fromEntries(Object.entries(content.marks).map(([id, m]) => [id, { ...m, stem: m.stem.map(sh) }])) };
@@ -749,7 +749,7 @@ async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
   return res;
 }
 
-// ---------- tablero ----------
+// ---------- board ----------
 function placeZones(zones: Zone[], sizes: Record<string, { w: number; h: number }>): Record<string, Rect> {
   const placed: Record<string, Rect> = {};
   let rowX = 0, rowY = 0, maxBottom = 0;
@@ -803,13 +803,13 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
 
   const allEls = Object.values(out.els);
   const elZone = new Map(board.els.map((e) => [e.id, e.zone]));
-  const circles = board.emph.flatMap((m) => (m.style === "circle" && out.els[m.target] ? [emphRect(out.els[m.target])] : []));
+  const circles = board.emph.flatMap((m) => (m.style === "circle" && out.els[m.target] ? [emphasisRect(out.els[m.target])] : []));
   const labelObs = [...allEls, ...circles];
   const takenLabels: Rect[] = [];
   for (const e of Object.values(out.edges)) if (e.label) takenLabels.push(labelRect(e.label));
 
-  // conexiones que ELK no resolvió: entre zonas -> ortogonal por los pasillos; si no, bézier
-  const pending = [...derivedConns(board), ...board.conns].filter((c) => !out.edges[c.id] && out.els[c.from] && out.els[c.to]);
+  // connections ELK didn't resolve: between zones -> orthogonal through the corridors; otherwise bezier
+  const pending = [...derivedConnections(board), ...board.conns].filter((c) => !out.edges[c.id] && out.els[c.from] && out.els[c.to]);
   const needsRouter = pending.some((c) => elZone.get(c.from) !== elZone.get(c.to));
   const router = needsRouter
     ? new Router({
@@ -825,7 +825,7 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
   for (const c of pending) {
     const a = out.els[c.from], b = out.els[c.to];
     const cross = elZone.get(c.from) !== elZone.get(c.to);
-    let g: EdgeGeom | undefined;
+    let g: ConnectionGeom | undefined;
     if (cross && router) {
       const pts = router.route(a, b);
       if (pts) g = { kind: "poly", pts, cross: true };
@@ -843,7 +843,7 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
     out.edges[c.id] = g;
   }
 
-  // notas con flecha
+  // callouts with an arrow
   const taken: Rect[] = [...takenLabels];
   const rectOf = (id: string): Rect | undefined => out.els[id] ?? out.zones[id] ?? edgeMid(out, id);
   for (const co of board.callouts) {
@@ -851,7 +851,7 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
     if (!tr) continue;
     const lines = wrapText(co.text, 20);
     const box: Rect = { x: 0, y: 0, w: maxLen(lines) * CALLOUT_CW + 24, h: lines.length * CALLOUT_LH + 14 };
-    const targetEl = findEl(board, co.target);
+    const targetEl = findElement(board, co.target);
     const zr = out.zones[targetEl?.zone ?? co.target] ?? tr;
     const placed = placeCallout(box, tr, zr, Object.values(out.zones), [...allEls, ...circles], taken);
     taken.push(placed);

@@ -1,20 +1,20 @@
-// Árbol de render: tablero + layout -> lista plana de ítems dibujables con clave estable.
+// Render tree: board + layout -> flat list of drawable items with a stable key.
 import type { Board } from "./model";
-import { derivedConns, findEl } from "./model";
+import { derivedConnections, findElement } from "./model";
 import type { BoardLayout, Pt, Rect } from "./layout";
-import { bezierAt, elLines, emphRect, markNoteLines, wrapText } from "./layout";
+import { bezierAt, elementLines, emphasisRect, markNoteLines, wrapText } from "./layout";
 
-export type ItemKind = "zone" | "element" | "edge" | "emphasis" | "question" | "callout";
+export type RenderItemKind = "zone" | "element" | "connection" | "emphasis" | "question" | "callout";
 export interface Geom { x: number; y: number; w: number; h: number; pts?: Pt[]; curve?: boolean; lab?: Pt }
 export interface ItemData {
-  variant?: string; // tipo de paso/componente, estilo de énfasis o de arista
+  variant?: string; // step/component type, emphasis style or connection style
   lines?: string[];
-  /** Icono de servicio (`aws:lambda`). No entra en `sig`: set_service no redibuja. */
+  /** Service icon (`aws:lambda`). Not part of `sig`: set_service doesn't redraw. */
   service?: string;
   title?: string;
   leftTitle?: string;
   rightTitle?: string;
-  divider?: number; // x local de la divisoria (compare)
+  divider?: number; // local x of the divider (compare)
   dashed?: boolean;
   both?: boolean;
   label?: string;
@@ -26,24 +26,24 @@ export interface ItemData {
   side?: "above" | "below";
   minLabel?: string;
   maxLabel?: string;
-  /** scale: inicio y ancho de la barra dentro de su rect */
+  /** scale: start and width of the bar inside its rect */
   x0?: number;
   barW?: number;
-  /** span: inicio y final del corchete en coordenadas locales (x0 y barW de scale se reutilizan: x0 = inicio, barW = ancho) */
+  /** span: start and end of the bracket in local coordinates (scale's x0 and barW are reused: x0 = start, barW = width) */
 }
-export interface RItem {
+export interface RenderItem {
   key: string;
-  kind: ItemKind;
-  /** firma del contenido visual (sin posición ni color): si cambia -> "update". */
+  kind: RenderItemKind;
+  /** signature of the visual content (no position or color): if it changes -> "update". */
   sig: string;
-  /** índice de color de zona; -1 = tinta neutra */
+  /** zone color index; -1 = neutral ink */
   hue: number;
   geom: Geom;
   data: ItemData;
-  /** se dibuja bajo las aristas (p. ej. la barra de una escala, para que sus muescas queden encima) */
+  /** drawn under the connections (e.g. a scale's bar, so its notches stay on top) */
   under?: boolean;
 }
-export interface RenderTree { items: RItem[]; map: Map<string, RItem> }
+export interface RenderTree { items: RenderItem[]; map: Map<string, RenderItem> }
 
 export const HUES = 6;
 
@@ -54,7 +54,7 @@ function bbox(pts: Pt[]): Rect {
 }
 
 export function buildTree(board: Board, lay: BoardLayout): RenderTree {
-  const items: RItem[] = [];
+  const items: RenderItem[] = [];
   const zoneN = new Map(board.zones.map((z) => [z.id, z.n % HUES]));
 
   for (const z of board.zones) {
@@ -92,7 +92,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
     const r = lay.els[e.id];
     if (!r) continue;
     const variant = e.type === "component" ? `component:${e.comp}` : e.type;
-    const lines = elLines(e);
+    const lines = elementLines(e);
     if (e.type === "span") {
       const sp = lay.spans[e.id];
       const tone = e.tone ?? "neutral";
@@ -119,7 +119,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       const mg = lay.marks[e.id];
       if (e.type === "event" && mg) {
         items.push({
-          key: `stem:${e.id}`, kind: "edge", hue: zoneN.get(e.zone) ?? 0, sig: JSON.stringify(["event-stem", mg.side]),
+          key: `stem:${e.id}`, kind: "connection", hue: zoneN.get(e.zone) ?? 0, sig: JSON.stringify(["event-stem", mg.side]),
           geom: { ...bbox(mg.stem), pts: mg.stem }, data: { variant: "event-stem", side: mg.side },
         });
       }
@@ -135,7 +135,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       const mg = lay.marks[e.id];
       if (mg) {
         items.push({
-          key: `stem:${e.id}`, kind: "edge", hue: -1, sig: JSON.stringify(["mark-stem", tone, mg.side]),
+          key: `stem:${e.id}`, kind: "connection", hue: -1, sig: JSON.stringify(["mark-stem", tone, mg.side]),
           geom: { ...bbox(mg.stem), pts: mg.stem }, data: { variant: "mark-stem", tone, side: mg.side },
         });
       }
@@ -143,38 +143,38 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
     }
     items.push({ key: e.id, kind: "element", sig: JSON.stringify([variant, lines]), hue: zoneN.get(e.zone) ?? 0, geom: { ...r }, data: { variant, lines, service: e.service } });
   }
-  // corchetes de un árbol
+  // brackets of a tree
   for (const [key, g] of Object.entries(lay.edges)) {
     if (!key.startsWith("br:")) continue;
     items.push({
-      key, kind: "edge", hue: zoneN.get(findEl(board, key.slice(3))?.zone ?? "") ?? 0, sig: JSON.stringify(["bracket"]),
+      key, kind: "connection", hue: zoneN.get(findElement(board, key.slice(3))?.zone ?? "") ?? 0, sig: JSON.stringify(["bracket"]),
       geom: { ...bbox(g.pts), pts: g.pts }, data: { variant: "bracket" },
     });
   }
-  // anillo de un ciclo y eje de una línea de tiempo
+  // ring of a cycle and axis of a timeline
   for (const [key, g] of Object.entries(lay.edges)) {
     const isRing = key.startsWith("ring:"), isAxis = key.startsWith("axis:");
     if (!isRing && !isAxis) continue;
-    const zid = isAxis ? key.slice(5) : findEl(board, key.slice(5))?.zone;
+    const zid = isAxis ? key.slice(5) : findElement(board, key.slice(5))?.zone;
     const hue = zoneN.get(zid ?? "") ?? 0;
     items.push({
-      key, kind: "edge", hue, sig: JSON.stringify([isRing ? "ring" : "axis"]),
+      key, kind: "connection", hue, sig: JSON.stringify([isRing ? "ring" : "axis"]),
       geom: { ...bbox(g.pts), pts: g.pts, curve: g.kind === "curve" }, data: { variant: isRing ? "ring" : "axis" },
     });
   }
-  for (const c of [...derivedConns(board), ...board.conns]) {
+  for (const c of [...derivedConnections(board), ...board.conns]) {
     const g = lay.edges[c.id];
     if (!g) continue;
     const b = bbox(g.pts);
     items.push({
-      key: c.id, kind: "edge", hue: -1,
+      key: c.id, kind: "connection", hue: -1,
       sig: JSON.stringify([c.style, c.both, c.label ?? ""]),
       geom: { ...b, pts: g.pts, curve: g.kind === "curve", lab: g.label ? { x: g.label.x, y: g.label.y } : undefined },
       data: { dashed: c.style === "dashed", both: c.both, label: g.label?.text, cross: g.cross },
     });
   }
 
-  // anotaciones
+  // annotations
   const targetRect = (id: string, forMark: boolean): Rect | undefined => {
     const el = lay.els[id];
     if (el) return el;
@@ -191,7 +191,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
     const t = targetRect(m.target, true);
     if (!t) continue;
     let geom: Geom;
-    if (m.style === "circle") geom = lay.els[m.target] ? emphRect(t) : { x: t.x - 16, y: t.y - 14, w: t.w + 32, h: t.h + 28 };
+    if (m.style === "circle") geom = lay.els[m.target] ? emphasisRect(t) : { x: t.x - 16, y: t.y - 14, w: t.w + 32, h: t.h + 28 };
     else if (m.style === "underline") geom = { x: t.x, y: t.y + t.h + 2, w: t.w, h: 10 };
     else geom = { x: t.x + t.w - 16, y: t.y - 26, w: 38, h: 38 };
     items.push({ key: `emph:${m.target}`, kind: "emphasis", hue: -1, sig: m.style, geom, data: { variant: m.style } });

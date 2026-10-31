@@ -1,8 +1,8 @@
-// Vocabulario de operaciones: fuente única de verdad.
-// Tipos TS + un JSON Schema por operación, con forma de herramienta de Anthropic
-// ({name, description, input_schema}) para reutilizarlas tal cual en el servidor.
-// Ninguna operación lleva coordenadas.
-import { AWS_PREFIJO_CATALOGO, SERVICIOS_AWS } from "@grafito/icons";
+// Operation vocabulary: single source of truth.
+// TS types + one JSON Schema per operation, shaped like an Anthropic tool
+// ({name, description, input_schema}) so the server can reuse them as they are.
+// No operation carries coordinates.
+import { AWS_CATALOG_ID, AWS_SERVICES } from "@grafito/icons";
 
 export type ZoneKind = "flow" | "system" | "list" | "compare" | "mindmap" | "scale" | "cycle" | "timeline" | "tree";
 export type MarkTone = "neutral" | "warn" | "danger" | "ok";
@@ -40,7 +40,7 @@ export interface OpInputs {
   update_text: { id: string; field: TextField; value: string };
   delete: { id: string };
   move_to_zone: { id: string; zone: string };
-  /** Icono de servicio de cualquier elemento; `service` vacío lo quita. */
+  /** Service icon for any element; an empty `service` removes it. */
   set_service: { id: string; service: string };
   update_summary: { text: string };
 }
@@ -50,7 +50,7 @@ export type OpName = keyof OpInputs;
 export type Op = { [K in OpName]: { name: K; input: OpInputs[K] } }[OpName];
 
 type OpBuilders = { [K in OpName]: (input: OpInputs[K]) => { name: K; input: OpInputs[K] } };
-/** Constructores tipados: op.add_step({...}) -> {name:"add_step", input:{...}} */
+/** Typed builders: op.add_step({...}) -> {name:"add_step", input:{...}} */
 export const op = new Proxy({} as OpBuilders, {
   get: (_t, name: string) => (input: unknown) => ({ name, input }),
 });
@@ -287,16 +287,16 @@ export const OP_SCHEMAS: Record<OpName, ToolDef["input_schema"]> = Object.fromEn
   OP_TOOLS.map((t) => [t.name, t.input_schema]),
 ) as Record<OpName, ToolDef["input_schema"]>;
 
-// ---- Catálogos de iconos (opcionales) ----
-// Apagado, Claude no recibe nada del catálogo: toolsFor([]) devuelve OP_TOOLS tal cual.
+// ---- Icon catalogs (optional) ----
+// When off, Claude receives nothing from the catalog: toolsFor([]) returns OP_TOOLS as is.
 
-/** Catálogos de iconos que el servidor conoce (hoy solo AWS). */
-export const CATALOG_IDS = [AWS_PREFIJO_CATALOGO] as const;
+/** Icon catalogs the server knows about (only AWS for now). */
+export const CATALOG_IDS = [AWS_CATALOG_ID] as const;
 const SERVICE_TOOLS: OpName[] = ["add_step", "add_decision", "add_component"];
 
-/** Ids de servicio (sin prefijo de catálogo) que Claude puede mandar con los catálogos dados. */
+/** Service ids (without catalog prefix) Claude may send with the given catalogs. */
 export function serviceIdsFor(catalogs: readonly string[]): string[] {
-  return catalogs.includes(AWS_PREFIJO_CATALOGO) ? SERVICIOS_AWS.map((s) => s.id) : [];
+  return catalogs.includes(AWS_CATALOG_ID) ? AWS_SERVICES.map((s) => s.id) : [];
 }
 
 export function toolsFor(catalogs: readonly string[]): ToolDef[] {
@@ -314,6 +314,6 @@ export function toolsFor(catalogs: readonly string[]): ToolDef[] {
       { id: id("Id del elemento."), service: { type: "string", enum: [...ids, ""], description: "Id del servicio; vacío para quitarlo." } },
       ["id", "service"],
     ),
-    patched[patched.length - 1], // update_summary sigue al final
+    patched[patched.length - 1], // update_summary stays last
   ];
 }

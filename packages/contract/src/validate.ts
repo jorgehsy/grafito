@@ -1,8 +1,8 @@
 import Ajv from "ajv";
 import { toolsFor } from "./ops";
 
-// Una sola fuente de verdad: las herramientas son OP_TOOLS (src/board/ops.ts); con un catálogo
-// prendido, toolsFor(catalogs) les suma `service` y set_service. Una versión cacheada por conjunto.
+// Single source of truth: the tools are OP_TOOLS (src/ops.ts); with a catalog turned on,
+// toolsFor(catalogs) adds `service` and set_service to them. One cached validator per set.
 const ajv = new (Ajv as any)({ strict: false, allErrors: false });
 const toolSets = new Map<string, { tools: any[]; validators: Map<string, any> }>();
 
@@ -20,18 +20,18 @@ export function toolSetFor(catalogs: readonly string[]) {
   return set;
 }
 
-/** Ordenados y sin repetir, para que {["aws"]} y {["aws","aws"]} compartan caché. */
+/** Sorted and deduplicated, so ["aws"] and ["aws","aws"] share a cache entry. */
 export function normalizeCatalogs(catalogs: readonly string[]): string[] {
   return [...new Set(catalogs)].sort();
 }
 
 export function validateOp(name: string, input: unknown, catalogs: readonly string[] = []): string | null {
   const v = toolSetFor(catalogs).validators.get(name);
-  if (!v) return `herramienta desconocida "${name}"`;
-  if (!input || typeof input !== "object") return "entrada no es un objeto";
+  if (!v) return `unknown tool "${name}"`;
+  if (!input || typeof input !== "object") return "input is not an object";
   if (!v(input)) {
     const e = v.errors?.[0];
-    return `${e?.instancePath || "entrada"} ${e?.message ?? "inválida"}`;
+    return `${e?.instancePath || "input"} ${e?.message ?? "invalid"}`;
   }
   return null;
 }

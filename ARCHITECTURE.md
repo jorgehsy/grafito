@@ -23,7 +23,7 @@ Dependencies point one way: `apps/*` → `packages/*`. `board` depends on `contr
 | --- | --- |
 | `packages/contract` | `ops.ts` (op types and tool definitions), `validate.ts` (op validation and tool sets per catalog), `pricing.ts` (prices, usage, cost) |
 | `packages/board` | `model.ts` (board, `applyOp`), `layout.ts`, `route.ts` (routing across zones), `tree.ts` (render tree), `animator.ts` (diff, animation queue), `controller.ts`, `camera.ts`, `player.ts` (demo player), `serialize.ts` (board text), `palette.ts` |
-| `packages/icons` | `src/aws/servicios.ts` (curated list), `src/aws/*.svg`, `src/aws/AVISO.md` (NOTICE), `scripts/iconos-aws.ts` |
+| `packages/icons` | `src/aws/services.ts` (curated list), `src/aws/*.svg`, `src/aws/NOTICE.md`, `scripts/aws-icons.ts` |
 | `apps/web` | `BoardApp.tsx`, `live/*` (session, scheduler, SSE client, speech, session record, UI), `render/*` (engine, visuals, service stamp), `scripts/*` (demos) |
 | `apps/server` | `src/index.ts` (routes), `src/board.ts` (prompt, Claude call, SSE), `src/sessions.ts`, `scripts/eval-instruccion.ts` |
 

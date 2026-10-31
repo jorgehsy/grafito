@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { centroSello, cuerpoIconoPrefijado, escalaSello, iniciosDeFases, planEntrada, selloMarkup, SELLO_MS } from "./sello";
-import { SERVICIOS_AWS } from "@grafito/icons";
+import { AWS_SERVICES } from "@grafito/icons";
 
 describe("planEntrada", () => {
   it("al dibujar, el sello entra después del trazo y el relleno, y antes del texto", () => {
@@ -65,7 +65,7 @@ describe("SVG incrustado", () => {
     expect(out).toContain('xlink:href="#p-a/b"');
   });
   it("todos los servicios tienen markup y ningún id queda sin prefijo", () => {
-    for (const s of SERVICIOS_AWS) {
+    for (const s of AWS_SERVICES) {
       const m = selloMarkup(`aws:${s.id}`, { x: 0, y: 0 }, "z-")!;
       expect(m, s.id).toBeTruthy();
       for (const id of ids(m)) if (!id.startsWith("z-")) throw new Error(`${s.id}: ${id}`);

@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Request, Response } from "express";
 import { CATALOG_IDS, ZONE_KINDS, normalizeCatalogs, toolSetFor, validateOp } from "@grafito/contract";
-import { AWS_PREFIJO_CATALOGO, SERVICIOS_AWS } from "@grafito/icons";
+import { AWS_CATALOG_ID, AWS_SERVICES } from "@grafito/icons";
 
 export const MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"] as const;
 const PLACEHOLDER = "pega-tu-clave-aqui";
@@ -50,9 +50,9 @@ TABLERO ACTUAL: (tablero vacío)
 FRAGMENTO: "El cliente hace el pedido en la web y la API lo guarda en la base de datos."
 Llamadas: create_zone{id:"app",kind:"system",title:"Pedidos"}; add_component{zone:"app",id:"cliente",label:"Cliente",type:"actor"}; add_component{zone:"app",id:"web",label:"Web",type:"client"}; add_component{zone:"app",id:"api",label:"API",type:"service"}; add_component{zone:"app",id:"db",label:"Base de datos",type:"database"}; connect{id:"c1",from:"cliente",to:"web"}; connect{id:"c2",from:"web",to:"api"}; connect{id:"c3",from:"api",to:"db",label:"guarda pedido"}; update_summary{text:"El cliente pide por la web; la API guarda el pedido en la base de datos."}`;
 
-// Bloque extra del prompt cuando el catálogo AWS está prendido. La lista sale de servicios.ts.
+// Bloque extra del prompt cuando el catálogo AWS está prendido. La lista sale de services.ts.
 function awsPromptBlock(): string {
-  const lista = SERVICIOS_AWS.map((s) => (s.sinonimos?.length ? `${s.id} (también: ${s.sinonimos.join(", ")})` : s.id)).join("; ");
+  const lista = AWS_SERVICES.map((s) => (s.synonyms?.length ? `${s.id} (también: ${s.synonyms.join(", ")})` : s.id)).join("; ");
   return `Iconos de servicio de AWS: add_step, add_decision y add_component admiten service, y set_service lo pone o cambia (o lo quita con service vacío) en cualquier elemento ya dibujado, p. ej. "esa API en realidad es API Gateway" o "a la caja API ponle icono de API Gateway". Ids válidos: ${lista}.
 - Marca service SOLO si el hablante nombra el servicio ("Lambda", "un bucket de S3") o no hay duda. Si solo lo deduces ("una función serverless"), no marques.
 - Las palabras genéricas ("una base de datos", "una cola", "un servidor") no llevan icono. Solo hay icono de servicio, nunca de recurso.
@@ -61,7 +61,7 @@ function awsPromptBlock(): string {
 
 /** Prompt del sistema: bloque base + bloque del catálogo si está prendido. Apagado = BOARD_SYSTEM_PROMPT tal cual. */
 export function systemPromptFor(catalogs: readonly string[]): string {
-  return catalogs.includes(AWS_PREFIJO_CATALOGO) ? `${BOARD_SYSTEM_PROMPT}\n\n${awsPromptBlock()}` : BOARD_SYSTEM_PROMPT;
+  return catalogs.includes(AWS_CATALOG_ID) ? `${BOARD_SYSTEM_PROMPT}\n\n${awsPromptBlock()}` : BOARD_SYSTEM_PROMPT;
 }
 
 function sse(res: Response, event: string, data: unknown) {

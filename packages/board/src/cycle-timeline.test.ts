@@ -15,7 +15,7 @@ const noOverlap = (rs: [string, Rect][]) => {
     for (let j = i + 1; j < rs.length; j++) expect(overlaps(rs[i][1], rs[j][1]), `${rs[i][0]} vs ${rs[j][0]}`).toBe(false);
 };
 
-describe("validación con esquema", () => {
+describe("schema validation", () => {
   it("add_stage, add_event, add_span y center_label", () => {
     expect(validateOp("create_zone", { id: "c", kind: "cycle", title: "t", center_label: "Ventana" })).toBeNull();
     expect(validateOp("create_zone", { id: "c", kind: "timeline", title: "t" })).toBeNull();
@@ -36,13 +36,13 @@ describe("validación con esquema", () => {
 
 describe("modelo cycle", () => {
   const cyc = () => applyOps(emptyBoard(), [op.create_zone({ id: "c", kind: "cycle", title: "Ciclo", center_label: "Ventana" }), op.create_zone({ id: "f", kind: "flow", title: "F" })]).board;
-  it("guarda center_label y las etapas", () => {
+  it("stores center_label and the stages", () => {
     const r = applyOps(cyc(), [op.add_stage({ zone: "c", id: "a", label: "A", note: "n" }), op.add_stage({ zone: "c", id: "b", label: "B", after: "a" })]);
     expect(r.warnings).toEqual([]);
     expect(r.board.zones[0].centerLabel).toBe("Ventana");
     expect(r.board.els.map((e) => [e.id, e.type, e.note, e.after])).toEqual([["a", "stage", "n", undefined], ["b", "stage", undefined, "a"]]);
   });
-  it("add_stage inválido se ignora con aviso", () => {
+  it("an invalid add_stage is ignored with a warning", () => {
     const b = applyOp(cyc(), op.add_stage({ zone: "c", id: "a", label: "A" })).board;
     for (const bad of [
       op.add_stage({ zone: "nope", id: "x", label: "x" }),
@@ -57,7 +57,7 @@ describe("modelo cycle", () => {
     }
     expect(applyOp(b, op.add_stage({ zone: "c", id: "x", label: "x", after: "zzz" })).warnings).toHaveLength(1);
   });
-  it("las etapas no generan flechas implícitas; emphasize, connect, callout y update_label funcionan", () => {
+  it("stages produce no implicit arrows; emphasize, connect, callout and update_label work", () => {
     let b = applyOps(cyc(), [
       op.add_stage({ zone: "c", id: "a", label: "A" }), op.add_stage({ zone: "c", id: "b", label: "B", after: "a" }),
       op.add_step({ zone: "f", id: "p", label: "P" }),
@@ -75,7 +75,7 @@ describe("modelo cycle", () => {
 
 describe("modelo timeline", () => {
   const tl = () => applyOps(emptyBoard(), [op.create_zone({ id: "t", kind: "timeline", title: "T" }), op.create_zone({ id: "c", kind: "cycle", title: "C" })]).board;
-  it("add_event y add_span crean elementos", () => {
+  it("add_event and add_span create elements", () => {
     const r = applyOps(tl(), [
       op.add_event({ zone: "t", id: "e", label: "E", when: "Antes", note: "n", at: 10 }),
       op.add_event({ zone: "t", id: "e2", label: "E2" }),
@@ -89,10 +89,10 @@ describe("modelo timeline", () => {
     ]);
     expect(r.board.els[3].tone).toBe("neutral");
   });
-  it("entradas inválidas se ignoran con aviso", () => {
+  it("invalid inputs are ignored with a warning", () => {
     const b = applyOps(tl(), [op.add_event({ zone: "t", id: "e", label: "E" }), op.add_span({ zone: "t", id: "p", from: 0, to: 10, label: "x" })]).board;
     for (const bad of [
-      op.add_event({ zone: "c", id: "x", label: "x" }), // zona cycle
+      op.add_event({ zone: "c", id: "x", label: "x" }), // cycle zone
       op.add_event({ zone: "nope", id: "x", label: "x" }),
       op.add_event({ zone: "t", id: "e", label: "dup" }),
       op.add_event({ zone: "t", id: "p", label: "dup" }),
@@ -114,7 +114,7 @@ describe("modelo timeline", () => {
       expect(r.warnings).toHaveLength(1);
     }
   });
-  it("emphasize, question, callout, connect y update_label valen para eventos y tramos", () => {
+  it("emphasize, question, callout, connect and update_label work for events and spans", () => {
     const r = applyOps(tl(), [
       op.add_event({ zone: "t", id: "e", label: "E" }), op.add_span({ zone: "t", id: "p", from: 0, to: 10, label: "x" }),
       op.emphasize({ target: "p", style: "underline" }), op.mark_question({ target: "e" }),
@@ -126,8 +126,8 @@ describe("modelo timeline", () => {
   });
 });
 
-describe("serialización", () => {
-  it("el modelo ve ciclos, eventos y tramos", () => {
+describe("serialization", () => {
+  it("the model sees cycles, events and spans", () => {
     const t = serializeBoard(finalBoard([
       op.create_zone({ id: "c", kind: "cycle", title: "Ciclo", center_label: "Ventana" }),
       op.add_stage({ zone: "c", id: "a", label: "Conversar", note: "pides" }),
@@ -146,10 +146,10 @@ describe("layout cycle", () => {
   const cycleBoard = (n: number, center = "Ventana de contexto") =>
     finalBoard([
       op.create_zone({ id: "c", kind: "cycle", title: "Ciclo", center_label: center }),
-      ...Array.from({ length: n }, (_, i) => op.add_stage({ zone: "c", id: `s${i}`, label: `Etapa número ${i + 1}`, note: i % 2 ? "una nota algo más larga" : undefined })),
+      ...Array.from({ length: n }, (_, i) => op.add_stage({ zone: "c", id: `s${i}`, label: `Stage number ${i + 1}`, note: i % 2 ? "a somewhat longer note" : undefined })),
     ]);
 
-  it.each([2, 3, 5, 8])("%i etapas: sin solapes, dentro de la zona y con anillo cerrado", async (n) => {
+  it.each([2, 3, 5, 8])("%i stages: no overlaps, inside the zone and with a closed ring", async (n) => {
     const board = cycleBoard(n);
     const lay = await computeLayout(board);
     const zr = lay.zones.c;
@@ -159,36 +159,36 @@ describe("layout cycle", () => {
     for (const [id, r] of rects) expect(inside(r, zr), id).toBe(true);
     const rings = Object.keys(lay.edges).filter((k) => k.startsWith("ring:"));
     expect(rings).toHaveLength(n);
-    // las flechas no pisan las cajas ni el centro, salvo en sus extremos
+    // arrows don't cross the boxes or the center, except at their ends
     for (const k of rings) {
       const g = lay.edges[k];
       for (const p of g.pts) expect(p.x >= zr.x && p.x <= zr.x + zr.w && p.y >= zr.y && p.y <= zr.y + zr.h, k).toBe(true);
     }
-    // la última cierra con la primera
+    // the last one closes with the first
     expect(lay.edges[`ring:s${n - 1}`]).toBeDefined();
   });
 
-  it("el árbol de render trae anillo, centro y etapas; sin flechas auto", async () => {
+  it("the render tree has ring, center and stages; no auto arrows", async () => {
     const board = cycleBoard(3);
     const tree = buildTree(board, await computeLayout(board));
     for (const k of ["c", "center:c", "s0", "s1", "s2", "ring:s0", "ring:s1", "ring:s2"]) expect(tree.map.has(k), k).toBe(true);
     expect([...tree.map.keys()].some((k) => k.startsWith("auto:"))).toBe(false);
   });
 
-  it("el radio crece con el número de etapas", async () => {
+  it("the radius grows with the number of stages", async () => {
     const a = (await computeLayout(cycleBoard(2))).zones.c, b = (await computeLayout(cycleBoard(8))).zones.c;
     expect(b.w).toBeGreaterThan(a.w);
     expect(b.h).toBeGreaterThan(a.h);
   });
 
-  it("after inserta la etapa en el anillo; sin etapas ni centro no rompe", async () => {
+  it("after inserts the stage into the ring; with no stages or center it doesn't break", async () => {
     const b = finalBoard([
       op.create_zone({ id: "c", kind: "cycle", title: "Ciclo" }),
       op.add_stage({ zone: "c", id: "a", label: "A" }), op.add_stage({ zone: "c", id: "b", label: "B" }),
       op.add_stage({ zone: "c", id: "x", label: "X", after: "a" }),
     ]);
     const lay = await computeLayout(b);
-    // a arriba, x a la derecha (siguiente horario), b abajo-izquierda
+    // a on top, x on the right (next clockwise), b bottom-left
     expect(lay.els.x.x).toBeGreaterThan(lay.els.a.x);
     expect(Object.keys(lay.edges).filter((k) => k.startsWith("ring:"))).toHaveLength(3);
     const empty = finalBoard([op.create_zone({ id: "c", kind: "cycle", title: "Ciclo" })]);
@@ -210,7 +210,7 @@ describe("layout timeline", () => {
     return lay;
   };
 
-  it("eventos con at muy cercanos (10, 12, 14, 90) no se solapan y caben", async () => {
+  it("events with very close at values (10, 12, 14, 90) don't overlap and fit", async () => {
     const lay = await check(tlBoard([
       op.add_event({ zone: "t", id: "a", label: "Primer evento largo", when: "Mes 1", note: "una nota", at: 10 }),
       op.add_event({ zone: "t", id: "b", label: "Segundo evento", when: "Mes 2", at: 12 }),
@@ -218,11 +218,11 @@ describe("layout timeline", () => {
       op.add_event({ zone: "t", id: "d", label: "Cuarto", when: "2024", at: 90 }),
     ]));
     expect(new Set(["a", "b", "c"].map((i) => lay.marks[i].side)).size).toBe(2);
-    // las cajas respetan el orden por posición dentro de cada lado
+    // boxes keep position order within each side
     expect(lay.marks.a.stem[1].x).toBeLessThan(lay.marks.d.stem[1].x);
   });
 
-  it("sin at se reparten por igual en orden de inserción", async () => {
+  it("without at they are spread evenly in insertion order", async () => {
     const board = tlBoard(["a", "b", "c", "d", "e"].map((id) => op.add_event({ zone: "t", id, label: id.toUpperCase() })));
     const lay = await check(board);
     const xs = ["a", "b", "c", "d", "e"].map((id) => lay.marks[id].stem[1].x);
@@ -231,7 +231,7 @@ describe("layout timeline", () => {
     expect(d[0]).toBeGreaterThan(0);
   });
 
-  it("with at, la posición es proporcional aunque se añadan desordenados", async () => {
+  it("with at, the position is proportional even if added out of order", async () => {
     const lay = await check(tlBoard([
       op.add_event({ zone: "t", id: "b", label: "B", at: 80 }), op.add_event({ zone: "t", id: "a", label: "A", at: 20 }),
     ]));
@@ -240,7 +240,7 @@ describe("layout timeline", () => {
     expect(ax[1].x).toBeGreaterThan(lay.marks.b.stem[1].x);
   });
 
-  it("tramos: llevan carriles separados y caben bajo el eje", async () => {
+  it("spans: get separate lanes and fit under the axis", async () => {
     const lay = await check(tlBoard([
       op.add_event({ zone: "t", id: "a", label: "Idea", when: "Antes", at: 0 }),
       op.add_event({ zone: "t", id: "b", label: "Software", at: 48 }),
@@ -252,10 +252,10 @@ describe("layout timeline", () => {
     const axisY = lay.edges["axis:t"].pts[0].y;
     for (const id of ["p1", "p2", "p3"]) expect(lay.els[id].y).toBeGreaterThan(axisY);
     expect(lay.spans.p1.x1).toBeGreaterThan(lay.spans.p1.x0);
-    // cajas de eventos de abajo no pisan los tramos (comprobado por noOverlap)
+    // event boxes below don't overlap the spans (checked by noOverlap)
   });
 
-  it("árbol de render: eje, marcas, fechas, tramos y anotaciones", async () => {
+  it("render tree: axis, marks, dates, spans and annotations", async () => {
     const board = tlBoard([
       op.add_event({ zone: "t", id: "a", label: "Idea", when: "Antes", at: 0 }),
       op.add_event({ zone: "t", id: "b", label: "Sin fecha", at: 50 }),
@@ -269,18 +269,18 @@ describe("layout timeline", () => {
     expect(tree.map.get("p")!.data.tone).toBe("warn");
   });
 
-  it("zona vacía y sólo tramos no rompen", async () => {
+  it("an empty zone and spans-only don't break", async () => {
     await computeLayout(tlBoard([]));
     await check(tlBoard([op.add_span({ zone: "t", id: "p", from: 0, to: 50, label: "x" })]));
   });
 });
 
-describe("zona tree", () => {
+describe("tree zone", () => {
   const base = () => [op.create_zone({ id: "t", kind: "tree", title: "Tipos de prototipo" })];
   const proto = () => [
     ...base(),
     op.add_branch({ zone: "t", id: "p", label: "Prototipos" }),
-    op.add_branch({ zone: "t", id: "v", label: "Visual", parent: "p", note: "cómo se ve" }),
+    op.add_branch({ zone: "t", id: "v", label: "Visual", parent: "p", note: "how it looks" }),
     op.add_branch({ zone: "t", id: "s", label: "Servicios", parent: "p" }),
     op.add_branch({ zone: "t", id: "f", label: "Figma", parent: "v" }),
     op.add_branch({ zone: "t", id: "a", label: "Artefactos en Claude Code", parent: "v" }),
@@ -288,37 +288,37 @@ describe("zona tree", () => {
     op.add_branch({ zone: "t", id: "m", label: "Postman Collection", parent: "s" }),
   ];
 
-  it("valida add_branch y rechaza zonas de otro tipo", () => {
+  it("validates add_branch and rejects zones of another kind", () => {
     expect(validateOp("add_branch", { zone: "t", id: "x", label: "L", parent: "p", note: "n" })).toBeNull();
     expect(validateOp("add_branch", { zone: "t", id: "x" })).not.toBeNull();
     const r = applyOps(emptyBoard(), [op.create_zone({ id: "l", kind: "list", title: "L" }), op.add_branch({ zone: "l", id: "x", label: "X" })]);
-    expect(r.warnings[0]).toContain("no se puede añadir branch");
+    expect(r.warnings[0]).toContain("cannot add branch");
   });
-  it("padre inexistente: queda como raíz con aviso", () => {
+  it("missing parent: becomes a root with a warning", () => {
     const r = applyOps(emptyBoard(), [...base(), op.add_branch({ zone: "t", id: "x", label: "X", parent: "nada" })]);
-    expect(r.warnings[0]).toContain("queda como raíz");
+    expect(r.warnings[0]).toContain("becomes a root");
     expect(r.board.els[0].parent).toBeUndefined();
   });
-  it("update_text edita la nota y la etiqueta del nodo", () => {
+  it("update_text edits the node's note and label", () => {
     let b = finalBoard(proto());
     b = applyOp(b, op.update_text({ id: "v", field: "note", value: "" })).board;
     expect(b.els.find((e) => e.id === "v")!.note).toBeUndefined();
     b = applyOp(b, op.update_text({ id: "v", field: "label", value: "Visuales" })).board;
     expect(b.els.find((e) => e.id === "v")!.label).toBe("Visuales");
   });
-  it("borrar un nodo sube a sus hijos un nivel", () => {
+  it("deleting a node moves its children up a level", () => {
     const b = applyOp(finalBoard(proto()), op.delete({ id: "v" })).board;
     expect(b.els.find((e) => e.id === "f")!.parent).toBe("p");
     expect(b.els.some((e) => e.id === "v")).toBe(false);
   });
-  it("layout: una columna por profundidad, hijos en orden, sin solapes y dentro de la zona", async () => {
+  it("layout: one column per depth, children in order, no overlaps and inside the zone", async () => {
     const lay = await computeLayout(finalBoard(proto()));
     const e = lay.els, z = lay.zones.t;
     expect(e.p.x).toBeLessThan(e.v.x);
     expect(e.v.x).toBe(e.s.x);
     expect(e.v.x).toBeLessThan(e.f.x);
     expect(e.f.x).toBe(e.m.x);
-    expect(e.f.x).toBeGreaterThanOrEqual(e.v.x + e.v.w); // la columna de hijos empieza tras la más ancha del nivel anterior
+    expect(e.f.x).toBeGreaterThanOrEqual(e.v.x + e.v.w); // the children column starts after the widest of the previous level
     expect(e.v.y).toBeLessThan(e.s.y);
     expect(e.f.y).toBeLessThan(e.a.y);
     expect(e.a.y).toBeLessThan(e.o.y);
@@ -327,15 +327,15 @@ describe("zona tree", () => {
     for (const [id, r] of Object.entries(e)) expect(inside(r, z), id).toBe(true);
     expect(Object.keys(lay.edges).filter((k) => k.startsWith("br:"))).toHaveLength(6);
   });
-  it("etiquetas largas ensanchan su columna sin chocar con la siguiente", async () => {
+  it("long labels widen their column without hitting the next one", async () => {
     const lay = await computeLayout(finalBoard([
       ...base(),
-      op.add_branch({ zone: "t", id: "r", label: "Una categoría con un nombre muy largo de verdad", note: "y una nota" }),
+      op.add_branch({ zone: "t", id: "r", label: "A category with a really very long name", note: "and a note" }),
       op.add_branch({ zone: "t", id: "h", label: "Hijo", parent: "r" }),
     ]));
     expect(lay.els.h.x).toBeGreaterThanOrEqual(lay.els.r.x + lay.els.r.w);
   });
-  it("bosque: varias raíces se apilan", async () => {
+  it("forest: several roots stack", async () => {
     const lay = await computeLayout(finalBoard([
       ...base(),
       op.add_branch({ zone: "t", id: "r1", label: "Uno" }),
@@ -346,15 +346,15 @@ describe("zona tree", () => {
     expect(lay.els.r1.y).toBeLessThan(lay.els.r2.y);
     noOverlap(Object.entries(lay.els));
   });
-  it("buildTree incluye nota y corchetes; serialize muestra la jerarquía", async () => {
+  it("buildTree includes the note and brackets; serialize shows the hierarchy", async () => {
     const b = finalBoard(proto());
     const tree = buildTree(b, await computeLayout(b));
-    expect(tree.map.get("v")!.data.noteLines).toEqual(["cómo se ve"]);
+    expect(tree.map.get("v")!.data.noteLines).toEqual(["how it looks"]);
     expect(tree.map.get("br:f")!.data.variant).toBe("bracket");
     const txt = serializeBoard(b);
     expect(txt).toContain("- p (branch)");
     expect(txt).toContain("-   v (branch)");
     expect(txt).toContain("-     f (branch)");
-    expect(txt).toContain('nota:"cómo se ve"');
+    expect(txt).toContain('nota:"how it looks"');
   });
 });

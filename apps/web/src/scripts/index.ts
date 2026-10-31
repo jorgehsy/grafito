@@ -1,4 +1,4 @@
-import type { Script } from "@grafito/board";
+import type { Demo } from "@grafito/board";
 import { arquitectura } from "./arquitectura";
 import { proceso } from "./proceso";
 import { contexto } from "./contexto";
@@ -7,7 +7,7 @@ import { antesAhora } from "./antes-ahora";
 import { prototipos } from "./prototipos";
 import { compactar } from "./compactar";
 
-export interface ScriptInfo { id: string; name: string; script: Script }
+export interface ScriptInfo { id: string; name: string; script: Demo }
 export const SCRIPTS: ScriptInfo[] = [
   { id: "arquitectura", name: "Arquitectura de una app web", script: arquitectura },
   { id: "proceso", name: "Proceso de un pedido", script: proceso },

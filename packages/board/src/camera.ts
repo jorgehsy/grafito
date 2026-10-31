@@ -1,18 +1,18 @@
-// Cámara pura: calcula el encuadre objetivo y lo suaviza.
+// Pure camera: computes the target framing and smooths it.
 import type { Rect } from "./layout";
 
-export interface Cam { cx: number; cy: number; scale: number } // scale = px de pantalla por unidad de mundo
+export interface Cam { cx: number; cy: number; scale: number } // scale = screen px per world unit
 export interface View { w: number; h: number }
 
 export const MIN_READABLE = 0.85;
-/** ms sin dibujar tras los que se muestra todo el tablero */
+/** ms without drawing after which the whole board is shown */
 export const IDLE_OVERVIEW_MS = 4000;
 export const MAX_AUTO = 1;
 const MARGIN = 70;
 
 /**
- * Encuadre objetivo. Siguiendo: todo el tablero si cabe con escala legible; si no, escala mínima legible
- * centrada en `focus`. `overview`: siempre todo el tablero (reposo).
+ * Target framing. Following: the whole board if it fits at a readable scale; otherwise the minimum readable
+ * scale centered on `focus`. `overview`: always the whole board (rest state).
  */
 export function targetCam(focus: Rect | null, bounds: Rect, view: View, overview = false): Cam {
   const bc = { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 };
@@ -32,7 +32,7 @@ export function targetCam(focus: Rect | null, bounds: Rect, view: View, overview
   };
 }
 
-/** Suavizado exponencial (ease-out); escala en espacio logarítmico para que el zoom sea uniforme. */
+/** Exponential smoothing (ease-out); scale is smoothed in log space so zoom feels uniform. */
 export function stepCam(cur: Cam, target: Cam, dtMs: number, tauMs = 380): Cam {
   const k = 1 - Math.exp(-dtMs / tauMs);
   const ls = Math.log(cur.scale) + (Math.log(target.scale) - Math.log(cur.scale)) * k;
@@ -44,10 +44,10 @@ export function viewBoxOf(cam: Cam, view: View): [number, number, number, number
   return [cam.cx - w / 2, cam.cy - h / 2, w, h];
 }
 
-/** Zoom con la rueda alrededor de un punto de pantalla. */
+/** Wheel zoom around a screen point. */
 export function zoomAt(cam: Cam, view: View, sx: number, sy: number, factor: number): Cam {
   const scale = Math.min(2.5, Math.max(0.12, cam.scale * factor));
-  // punto de mundo bajo el cursor se mantiene fijo
+  // the world point under the cursor stays fixed
   const wx = cam.cx + (sx - view.w / 2) / cam.scale, wy = cam.cy + (sy - view.h / 2) / cam.scale;
   return { scale, cx: wx - (sx - view.w / 2) / scale, cy: wy - (sy - view.h / 2) / scale };
 }

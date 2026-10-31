@@ -157,7 +157,7 @@ Usa `npm version minor` o `npm version patch` cuando salga de alfa.
 
 ## Licencia
 
-[MIT](LICENSE) © 2026 Jorge Simoes, excepto los iconos de `src/iconos/aws/` (ver [AVISO.md](src/iconos/aws/AVISO.md)).
+[MIT](LICENSE) © 2026 Jorge Simoes, excepto los iconos de `packages/icons/src/aws/` (ver [NOTICE.md](packages/icons/src/aws/NOTICE.md)).
 
 Amazon Web Services, AWS y los iconos de sus servicios son marcas de Amazon.com, Inc. o sus filiales. Grafito no está afiliado a AWS ni cuenta con su respaldo.
 

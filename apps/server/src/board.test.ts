@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { BOARD_SYSTEM_PROMPT, boardHandler, buildUserText, parseToolBlock, isRetryable, systemPromptFor, validateCatalogs } from "./board";
 import { OP_TOOLS, toolsFor, validateOp } from "@grafito/contract";
-import { SERVICIOS_AWS } from "@grafito/icons";
+import { AWS_SERVICES } from "@grafito/icons";
 
 describe("parseToolBlock", () => {
   it("acepta JSON válido", () => {
@@ -58,7 +58,7 @@ describe("isRetryable", () => {
 });
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
-const IDS = SERVICIOS_AWS.map((s) => s.id);
+const IDS = AWS_SERVICES.map((s) => s.id);
 
 describe("catálogo apagado (caché intacto)", () => {
   it("prompt y herramientas son byte a byte los de antes del catálogo", () => {
@@ -75,7 +75,7 @@ describe("catálogo apagado (caché intacto)", () => {
   });
   it("una op con service se rechaza (additionalProperties) y set_service no existe", () => {
     expect(validateOp("add_step", { zone: "z", id: "a", label: "A", service: "lambda" })).toMatch(/additional|service/i);
-    expect(validateOp("set_service", { id: "a", service: "lambda" })).toContain("desconocida");
+    expect(validateOp("set_service", { id: "a", service: "lambda" })).toContain("unknown");
     expect(parseToolBlock("add_step", '{"zone":"z","id":"a","label":"A","service":"lambda"}')).toMatchObject({ ok: false, invalid: true });
   });
 });
@@ -97,11 +97,11 @@ describe("catálogo AWS prendido", () => {
     expect(names[names.length - 1]).toBe("update_summary");
     expect(names).toHaveLength(OP_TOOLS.length + 1);
   });
-  it("el prompt es el base más un bloque con ids y sinónimos generados de servicios.ts", () => {
+  it("el prompt es el base más un bloque con ids y sinónimos generados de services.ts", () => {
     const p = systemPromptFor(on);
     expect(p.startsWith(BOARD_SYSTEM_PROMPT)).toBe(true);
     for (const id of IDS) expect(p).toContain(id);
-    for (const sin of SERVICIOS_AWS.flatMap((s) => s.sinonimos ?? [])) expect(p).toContain(sin);
+    for (const sin of AWS_SERVICES.flatMap((s) => s.synonyms ?? [])) expect(p).toContain(sin);
     expect(p).toContain("set_service");
     expect(p).toMatch(/nombra el servicio/);
     expect(p).toMatch(/genéricas/);

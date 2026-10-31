@@ -2,7 +2,7 @@
 import rough from "roughjs";
 import type { Options } from "roughjs/bin/core";
 import type { Drawable } from "roughjs/bin/core";
-import type { Geom, RItem } from "@grafito/board";
+import type { Geom, RenderItem } from "@grafito/board";
 import { LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "@grafito/board";
 import { BLUE, EDGES, FILLS, FONT_FAMILY, INK, PAPER, RED, TONES } from "@grafito/board";
 import { addServiceIcon } from "./sello";
@@ -149,7 +149,7 @@ function star(w: number): [number, number][] {
   return pts;
 }
 
-export function buildVisual(item: RItem, geom: Geom): Visual {
+export function buildVisual(item: RenderItem, geom: Geom): Visual {
   const { w, h } = geom;
   const translates = item.kind === "zone" || item.kind === "element" || item.kind === "emphasis" || item.kind === "question";
   const b = new Builder(item.key, translates);
@@ -261,7 +261,7 @@ export function buildVisual(item: RItem, geom: Geom): Visual {
       b.rough("path", "cloud", [d], { roughness: 1.1 }, { ...f, dash: true });
       b.text(lines, w / 2, h * 0.56);
     }
-  } else if (item.kind === "edge" && item.data.variant === "mark-stem") {
+  } else if (item.kind === "connection" && item.data.variant === "mark-stem") {
     // muesca que cruza la barra + tallo hasta la etiqueta + triángulo que apunta a la barra
     const [far, near, hook] = geom.pts!;
     const tone = TONES[item.data.tone ?? "neutral"] ?? TONES.neutral;
@@ -272,17 +272,17 @@ export function buildVisual(item: RItem, geom: Geom): Visual {
     b.rough("line", "tick", [far.x, far.y, near.x, near.y], { roughness: 0.8 }, { ...ts, width: 3.4 });
     b.rough("line", "stem", [base.x, base.y, hook.x, hook.y], { roughness: 0.9 }, ts);
     b.rough("poly", "tri", [[[base.x - u.y * 8, base.y + u.x * 8], [base.x + u.y * 8, base.y - u.x * 8], [near.x, near.y]]], { fillStyle: "solid", roughness: 0.7 }, { ...ts, width: 2, fill: tone.fill });
-  } else if (item.kind === "edge" && item.data.variant === "bracket") {
+  } else if (item.kind === "connection" && item.data.variant === "bracket") {
     // codo sin punta: la jerarquía se lee de izquierda a derecha
     b.rough("path", "line", [roundedPoly(geom.pts!, 10)], { roughness: 0.9, bowing: 0.6 }, { stroke: edge, width: 2.4 });
-  } else if (item.kind === "edge" && item.data.variant === "event-stem") {
+  } else if (item.kind === "connection" && item.data.variant === "event-stem") {
     // punto en el eje + tallo hasta la caja
     const [, dot, hook] = geom.pts!;
     const len = Math.hypot(hook.x - dot.x, hook.y - dot.y) || 1;
     const u = { x: (hook.x - dot.x) / len, y: (hook.y - dot.y) / len };
     b.rough("ellipse", "dot", [dot.x, dot.y, 15, 15], { fillStyle: "solid", roughness: 0.8 }, { stroke: edge, width: 2.4, fill: edge });
     b.rough("line", "stem", [dot.x + u.x * 8, dot.y + u.y * 8, hook.x, hook.y], { roughness: 0.9 }, { stroke: edge, width: 2.4 });
-  } else if (item.kind === "edge") {
+  } else if (item.kind === "connection") {
     const pts = geom.pts!;
     const cross = !!item.data.cross;
     const color = cross ? "#7b8794" : INK, wd = cross ? 1.7 : 2.2, dash = !!item.data.dashed || cross;

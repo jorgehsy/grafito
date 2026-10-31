@@ -1,6 +1,6 @@
-// Enrutado ortogonal para conexiones entre zonas: A* sobre una rejilla gruesa.
-// Los elementos son obstáculos, el interior de las zonas cuesta más que los pasillos entre ellas y los
-// caminos ya trazados se penalizan para que las paralelas no se apilen. Puro y determinista.
+// Orthogonal routing for connections between zones: A* over a coarse grid.
+// Elements are obstacles, zone interiors cost more than the corridors between them, and
+// already-routed paths are penalized so parallel ones don't stack. Pure and deterministic.
 import type { Pt, Rect } from "./layout";
 
 const G = 12;
@@ -47,7 +47,7 @@ export interface RouterInput {
   bounds: Rect;
   els: Rect[];
   zones: Rect[];
-  /** zonas "caras" de cruzar (cabeceras con el título) */
+  /** zones that are "expensive" to cross (headers with the title) */
   headers: Rect[];
 }
 
@@ -101,7 +101,7 @@ export class Router {
     this.grids = [12, 6, 1].map((m) => new Grid(inp, m, this.used));
   }
 
-  /** Ruta ortogonal de a a b (o null). Marca el camino para penalizar solapes posteriores. */
+  /** Orthogonal route from a to b (or null). Marks the path to penalize later overlaps. */
   route(a: Rect, b: Rect, startOut = 4, endOut = 6): Pt[] | null {
     for (const g of this.grids) {
       const r = this.run(g, a, b, startOut, endOut);
@@ -125,7 +125,7 @@ export class Router {
   private run(g: Grid, a: Rect, b: Rect, so: number, eo: number): { pts: Pt[]; cells: number[] } | null {
     const { cols, rows, ox, oy } = g;
     const cellOf = (p: Pt) => ({ i: Math.round((p.x - ox) / G), j: Math.round((p.y - oy) / G) });
-    // desbloquear los extremos: dentro de la caja siguen bloqueados, alrededor no
+    // unblock the endpoints: inside the box stays blocked, around it does not
     const undo: (() => void)[] = [];
     for (const r of [a, b]) {
       g.paint(r, g.margin, (c) => { g.blocked[c]--; });
@@ -198,7 +198,7 @@ export class Router {
       const sAnchor = startAnchor.get(chain[0])!;
       const dS = chain[0] & 3, dE = goal.dir;
       const pt = (c: number): Pt => ({ x: ox + (c % cols) * G, y: oy + ((c - (c % cols)) / cols) * G });
-      // esquinas
+      // corners
       let corners: Pt[] = [];
       chain.forEach((s, k) => {
         const p = pt(s >> 2);
@@ -223,7 +223,7 @@ export class Router {
         fix(n - 1, n - 2, dE, goal.anchor);
       }
       const pts: Pt[] = [sAnchor, ...corners, goal.anchor];
-      // quitar duplicados y puntos colineales
+      // drop duplicates and collinear points
       const out: Pt[] = [];
       for (const p of pts) {
         const l = out[out.length - 1];

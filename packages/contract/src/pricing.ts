@@ -1,5 +1,5 @@
-// Precios en USD por millón de tokens. ÚNICA fuente de verdad.
-// Escritura de caché = 5 min (1.25x entrada). Lectura de caché = 0.1x entrada.
+// Prices in USD per million tokens. SINGLE source of truth.
+// Cache write = 5 min (1.25x input). Cache read = 0.1x input.
 export interface Price { input: number; cacheWrite: number; cacheRead: number; output: number }
 
 export const PRICING: Record<string, Price> = {

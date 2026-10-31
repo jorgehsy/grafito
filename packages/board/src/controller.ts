@@ -1,5 +1,5 @@
-// Pega modelo + layout + diff + cola. Los ops se aplican al modelo de inmediato (en serie);
-// la animación va por detrás con la cola.
+// Glues model + layout + diff + queue. Ops are applied to the model immediately (in series);
+// the animation trails behind through the queue.
 import { applyOp, emptyBoard } from "./model";
 import type { Board } from "./model";
 import type { Op } from "@grafito/contract";

@@ -1,17 +1,17 @@
-// Reproductor de guiones: reloj virtual (pausa y velocidad) + subtítulos palabra a palabra
-// + entrega de ops tras la latencia simulada de Claude.
+// Demo player: virtual clock (pause and speed) + word-by-word subtitles
+// + delivery of ops after Claude's simulated latency.
 import type { Op } from "@grafito/contract";
 
-export interface ScriptChunk { at_ms: number; text: string; ops: Op[] }
-export type Script = ScriptChunk[];
+export interface DemoChunk { at_ms: number; text: string; ops: Op[] }
+export type Demo = DemoChunk[];
 
 export const MS_PER_WORD = 440;
 export const speakMs = (text: string) => text.trim().split(/\s+/).length * MS_PER_WORD;
-/** latencia determinista 1.5–3 s según el índice del fragmento */
+/** deterministic 1.5–3 s latency depending on the chunk index */
 export const latencyMs = (i: number) => 1500 + ((i * 7919) % 11) * 150;
 
-/** Constructor de guiones: calcula at_ms acumulando el tiempo de habla y una pausa corta. */
-export function timeline(chunks: { text: string; ops: Op[] }[], startMs = 600, pauseMs = 800): Script {
+/** Demo builder: computes at_ms by accumulating speaking time plus a short pause. */
+export function timeline(chunks: { text: string; ops: Op[] }[], startMs = 600, pauseMs = 800): Demo {
   let t = startMs;
   return chunks.map((c) => {
     const out = { at_ms: t, text: c.text, ops: c.ops };
@@ -36,7 +36,7 @@ export class Player {
   private endAt = 0;
   private ended = false;
 
-  constructor(private script: Script, private hooks: PlayerHooks) {
+  constructor(private script: Demo, private hooks: PlayerHooks) {
     this.build();
   }
 

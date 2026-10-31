@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { T } from "./ShapeGallery";
 import { ICONOS_AWS } from "../iconos/aws";
-import { SERVICIOS_AWS } from "@grafito/icons";
+import { AWS_SERVICES } from "@grafito/icons";
 
 interface Tile { value: string; label: string; sub?: string; thumb: ReactNode }
 
@@ -121,7 +121,7 @@ interface Catalog { id: string; label: string; title: string; samples: string[] 
 
 /** Un catálogo de iconos por tarjeta; más catálogos = más entradas aquí. */
 const CATALOGS: Catalog[] = [
-  { id: "aws", label: "AWS", title: `Lambda, S3, Cognito… ${SERVICIOS_AWS.length} servicios`, samples: ["lambda", "s3", "dynamodb"] },
+  { id: "aws", label: "AWS", title: `Lambda, S3, Cognito… ${AWS_SERVICES.length} servicios`, samples: ["lambda", "s3", "dynamodb"] },
 ];
 
 /** Tarjetas independientes (varias pueden ir prendidas); value = ids de catálogos prendidos. */

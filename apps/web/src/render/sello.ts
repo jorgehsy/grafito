@@ -1,9 +1,9 @@
 // El sello de servicio: icono oficial de 30 px, torcido, montado en la esquina de arriba a la izquierda.
 // Lo puro (orden, tiempos y el SVG en texto) se prueba sin DOM; lo demás arma nodos y los anima.
-import type { Geom, RItem } from "@grafito/board";
+import type { Geom, RenderItem } from "@grafito/board";
 import type { Visual } from "./visuals";
 import { ICONOS_AWS } from "../iconos/aws";
-import { AWS_PREFIJO_CATALOGO } from "@grafito/icons";
+import { AWS_CATALOG_ID } from "@grafito/icons";
 
 const NS = "http://www.w3.org/2000/svg";
 export const SELLO_PX = 30;
@@ -38,7 +38,7 @@ export function escalaSello(p: number): number {
 }
 
 /** `aws:lambda` -> `lambda`. */
-export const idDeServicio = (service: string) => service.replace(new RegExp(`^${AWS_PREFIJO_CATALOGO}:`), "");
+export const idDeServicio = (service: string) => service.replace(new RegExp(`^${AWS_CATALOG_ID}:`), "");
 
 /** Centro del sello en coordenadas locales del elemento. Rombo: sobre su lado de arriba a la izquierda; el resto, la esquina. */
 export function centroSello(variant: string, w: number, h: number): { x: number; y: number } {
@@ -80,7 +80,7 @@ export function selloMarkup(service: string, centro: { x: number; y: number }, p
 let selloN = 0;
 
 /** Añade el sello al Visual del elemento (coordenadas locales). */
-export function addServiceIcon(v: Visual, item: RItem, geom: Geom) {
+export function addServiceIcon(v: Visual, item: RenderItem, geom: Geom) {
   const service = item.data.service as string | undefined;
   if (!service || item.kind !== "element") return;
   const markup = selloMarkup(service, centroSello(item.data.variant as string, geom.w, geom.h), `sello${++selloN}-`);

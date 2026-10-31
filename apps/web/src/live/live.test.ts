@@ -155,7 +155,7 @@ describe("dictado y validación", () => {
     expect(validateOp("delete", { id: "a" })).toBeNull();
     expect(validateOp("delete", {})).not.toBeNull();
     expect(validateOp("create_zone", { id: "a", kind: "raro", title: "t" })).not.toBeNull();
-    expect(validateOp("nada", {})).toMatch(/desconocida/);
+    expect(validateOp("nada", {})).toMatch(/unknown/);
   });
   it("valida add_mark y set_level con el esquema", () => {
     expect(validateOp("create_zone", { id: "e", kind: "scale", title: "t", min_label: "0", max_label: "1M" })).toBeNull();

@@ -1,5 +1,5 @@
-// Cola de animación: diff entre árboles de render -> tareas.
-// draw / update / delete se ejecutan en secuencia; los movimientos van en paralelo.
+// Animation queue: diff between render trees -> tasks.
+// draw / update / delete run in sequence; moves run in parallel.
 import type { RenderTree } from "./tree";
 import { geomEqual } from "./tree";
 
@@ -10,7 +10,7 @@ export type SeqTask =
 export interface MoveTask { kind: "move"; key: string }
 export interface Diff { sequential: SeqTask[]; moves: MoveTask[] }
 
-const KIND_ORDER = ["zone", "element", "edge", "emphasis", "question", "callout"];
+const KIND_ORDER = ["zone", "element", "connection", "emphasis", "question", "callout"];
 
 export function diffTrees(prev: RenderTree, next: RenderTree): Diff {
   const sequential: SeqTask[] = [];
@@ -33,7 +33,7 @@ export function diffTrees(prev: RenderTree, next: RenderTree): Diff {
 }
 
 export const INSTANT = Infinity;
-/** 1x con <=2 tareas pendientes, sube hasta 4x a las 12, por encima termina al instante. */
+/** 1x with <=2 pending tasks, rises to 4x at 12, above that it finishes instantly. */
 export function speedForBacklog(pending: number): number {
   if (pending <= 2) return 1;
   if (pending > 12) return INSTANT;
@@ -51,7 +51,7 @@ export class AnimationQueue {
   private q: SeqTask[] = [];
   private running = false;
   private epoch = 0;
-  /** velocidades usadas por cada tarea ejecutada (útil para pruebas y depuración) */
+  /** speeds used by each executed task (useful for tests and debugging) */
   readonly log: { task: SeqTask; speed: number }[] = [];
   onChange?: (pending: number, speed: number) => void;
   private idle: (() => void)[] = [];

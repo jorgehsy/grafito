@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applyOps, emptyBoard } from "@grafito/board";
 import { op } from "@grafito/contract";
 import { bezierAt, clearLayoutCache, computeLayout, labelLines, labelRect, overlaps } from "@grafito/board";
-import type { EdgeGeom, Pt } from "@grafito/board";
+import type { ConnectionGeom, Pt } from "@grafito/board";
 import type { Rect } from "@grafito/board";
 import { SCRIPTS } from "./scripts";
 import { buildTree } from "@grafito/board";
@@ -48,7 +48,7 @@ describe.each(SCRIPTS)("layout del guion $id", ({ script }) => {
   it("las conexiones entre zonas no cruzan otros elementos y las etiquetas no pisan cajas", async () => {
     const lay = await computeLayout(board);
     const zoneOf = new Map(board.els.map((e) => [e.id, e.zone]));
-    const sample = (g: EdgeGeom): Pt[] => {
+    const sample = (g: ConnectionGeom): Pt[] => {
       if (g.kind === "curve") return Array.from({ length: 41 }, (_, i) => bezierAt(g.pts, i / 40));
       const out: Pt[] = [];
       for (let i = 1; i < g.pts.length; i++)

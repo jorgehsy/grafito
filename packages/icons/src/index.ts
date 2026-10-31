@@ -1,1 +1,1 @@
-export * from "./aws/servicios";
+export * from "./aws/services";
