@@ -1,9 +1,9 @@
 import { hasWakeWord } from "../instruction";
 
-// Agrupa finales de voz: vacía tras GROUP_WINDOW_MS sin finales nuevos, o ya si el búfer supera GROUP_MAX_CHARS.
+// Groups final speech results: flushes after GROUP_WINDOW_MS without a new one, or at once past GROUP_MAX_CHARS.
 export const GROUP_WINDOW_MS = 800;
 export const GROUP_MAX_CHARS = 250;
-/** Ventana más larga mientras el búfer lleva la palabra de activación: el reconocedor parte las órdenes. */
+/** Longer window while the buffer holds the wake word: the recognizer splits spoken instructions. */
 export const INSTRUCTION_WINDOW_MS = 2000;
 
 export interface Grouper {
@@ -12,7 +12,7 @@ export interface Grouper {
   cancel(): void;
 }
 
-/** flush recibe el texto junto y el instante (Date.now) en que llegó el ÚLTIMO final. */
+/** `flush` gets the joined text and the time (Date.now) the LAST result arrived. */
 export function createGrouper(
   flush: (text: string, lastFinalAt: number) => void,
   windowMs = GROUP_WINDOW_MS,

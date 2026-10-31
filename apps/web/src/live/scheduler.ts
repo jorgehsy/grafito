@@ -1,9 +1,9 @@
-// Cola con una sola petición en vuelo; lo que llega mientras tanto se junta.
-export type TextKind = "content" | "instruction";
+// Keeps one request in flight; fragments that arrive meanwhile are batched.
+export type RequestMode = "content" | "instruction";
 
 export interface TextInput {
-  /** Llamar con cada fragmento final de texto (dictado simulado hoy, voz mañana). */
-  onFinalText(text: string, kind?: TextKind): void;
+  /** Called with each finished fragment of text. */
+  onFragment(text: string, mode?: RequestMode): void;
 }
 
 export interface Scheduler extends TextInput {
@@ -12,24 +12,24 @@ export interface Scheduler extends TextInput {
   pending(): string;
 }
 
-export function createScheduler(send: (text: string, kind: TextKind) => Promise<void>, onIdle?: () => void): Scheduler {
-  let buffer: { text: string; kind: TextKind }[] = [];
+export function createScheduler(send: (batch: string, mode: RequestMode) => Promise<void>, onIdle?: () => void): Scheduler {
+  let buffer: { text: string; mode: RequestMode }[] = [];
   let inFlight = false;
   let stopped = false;
 
   async function pump() {
     if (inFlight || stopped || buffer.length === 0) return;
-    // Tanda inicial del mismo tipo: el contenido se junta, cada instrucción va sola.
-    const kind = buffer[0].kind;
+    // Content fragments are joined; each instruction goes alone.
+    const mode = buffer[0].mode;
     let n = 1;
-    if (kind === "content") while (n < buffer.length && buffer[n].kind === "content") n++;
-    const text = buffer.slice(0, n).map((b) => b.text).join(" ");
+    if (mode === "content") while (n < buffer.length && buffer[n].mode === "content") n++;
+    const batch = buffer.slice(0, n).map((b) => b.text).join(" ");
     buffer = buffer.slice(n);
     inFlight = true;
     try {
-      await send(text, kind);
+      await send(batch, mode);
     } catch {
-      /* el que envía registra su propio error */
+      /* send records its own error */
     } finally {
       inFlight = false;
     }
@@ -38,11 +38,11 @@ export function createScheduler(send: (text: string, kind: TextKind) => Promise<
   }
 
   return {
-    onFinalText(text, kind = "content") {
+    onFragment(text, mode = "content") {
       const t = text.trim();
       if (!t) return;
       stopped = false;
-      buffer.push({ text: t, kind });
+      buffer.push({ text: t, mode });
       void pump();
     },
     stop() {

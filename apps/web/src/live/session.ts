@@ -1,8 +1,7 @@
-// Sesión en vivo: scheduler (una petición en vuelo, junta lo acumulado) + streamBoard + controlador.
 import type { Board } from "@grafito/board";
 import type { Op } from "@grafito/contract";
 import { createScheduler } from "./scheduler";
-import type { Scheduler, TextKind } from "./scheduler";
+import type { RequestMode, Scheduler } from "./scheduler";
 import { splitInstruction } from "./instruction";
 import { serializeBoard } from "@grafito/board";
 import { streamBoard } from "./sse";
@@ -13,18 +12,17 @@ import type { Usage } from "@grafito/contract";
 export interface LogEntry {
   id: number;
   model: string;
-  delta: string;
-  /** "instruction" = orden hablada a Claude (palabra "Grafito"), no contenido. */
-  mode: "content" | "instruction";
-  /** Instrucción deshecha: sus operaciones ya no se reponen. */
+  batch: string;
+  mode: RequestMode;
+  /** Undone instruction: its ops are no longer replayed. */
   undone?: boolean;
   startedAt: number;
   firstOpMs: number | null;
-  /** ms desde el último final de voz del lote hasta la primera figura (null si no vino de voz). */
+  /** ms from the last speech result of the batch to the first shape (null if it did not come from speech). */
   voiceFirstMs: number | null;
   totalMs: number | null;
   ops: number;
-  /** Operaciones válidas recibidas (para el registro y la restauración). */
+  /** Valid ops received, for the session record and restore. */
   opList: Op[];
   usage: Usage;
   usageEstimated: boolean;
@@ -33,7 +31,7 @@ export interface LogEntry {
   error?: string;
   done: boolean;
 }
-/** Última instrucción terminada, sin error y sin deshacer (la que "Deshacer" revertiría). */
+/** The last instruction that finished, without error and not undone: the one Undo would revert. */
 export function lastUndoable(entries: LogEntry[]): LogEntry | null {
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
@@ -48,11 +46,13 @@ export interface SessionDeps {
   getBoard(): Board;
   submit(ops: Op[]): Promise<void>;
   getModel(): string;
-  /** "auto" o un ZoneKind: forma preferida para zonas nuevas. */
+  /** BCP 47 tag of the language setting, sent to the server with every request. */
+  getLang?(): string;
+  /** Shape preference: "auto" or a zone kind. */
   getShape?(): string;
-  /** Catálogos de iconos prendidos (p. ej. ["aws"]). Por defecto [] = apagado. */
+  /** Enabled icon catalogs, e.g. ["aws"]. Default [] = off. */
   getCatalogs?(): string[];
-  /** Instante (Date.now) del último final de voz del lote que se va a enviar; null si no es voz. */
+  /** Time (Date.now) of the last speech result of the batch about to be sent; null if not speech. */
   getVoiceAt?(): number | null;
   onLog(entries: LogEntry[], current: LogEntry | null, totals: Totals): void;
   onBusy?(busy: boolean): void;
@@ -61,9 +61,9 @@ export interface SessionDeps {
 
 export interface LiveSession extends Scheduler {
   reset(): void;
-  /** Carga filas y totales de un registro guardado (la numeración continúa tras la última). */
+  /** Loads rows and totals from a saved record; numbering continues after the last row. */
   restore(entries: LogEntry[], totals: Totals): void;
-  /** Marca la última instrucción aplicada como deshecha. Devuelve false si no hay ninguna. */
+  /** Marks the last applied instruction as undone. Returns false if there is none. */
   undoLastInstruction(): boolean;
 }
 
@@ -76,13 +76,13 @@ export function createLiveSession(d: SessionDeps): LiveSession {
 
   const emit = (cur: LogEntry | null) => d.onLog([...entries], cur, { ...totals });
 
-  async function send(delta: string, mode: TextKind) {
+  async function send(batch: string, mode: RequestMode) {
     const myEpoch = epoch;
     const t0 = Date.now();
     const model = d.getModel();
     const voiceAt = d.getVoiceAt?.() ?? null;
     const e: LogEntry = {
-      id: ++seq, model, delta, mode, startedAt: t0, firstOpMs: null, voiceFirstMs: null, totalMs: null, ops: 0, opList: [], usage: zeroUsage(),
+      id: ++seq, model, batch, mode, startedAt: t0, firstOpMs: null, voiceFirstMs: null, totalMs: null, ops: 0, opList: [], usage: zeroUsage(),
       usageEstimated: false, costUsd: 0, warnings: [], done: false,
     };
     entries.push(e);
@@ -97,7 +97,7 @@ export function createLiveSession(d: SessionDeps): LiveSession {
     };
     const catalogs = d.getCatalogs?.() ?? [];
     await streamBoard(
-      { delta, summary: d.getBoard().summary, board: serializeBoard(d.getBoard(), { catalog: catalogs.length > 0 }), model, shape: d.getShape?.() ?? "auto", mode, catalogs },
+      { delta: batch, lang: d.getLang?.(), summary: d.getBoard().summary, board: serializeBoard(d.getBoard(), { catalog: catalogs.length > 0 }), model, shape: d.getShape?.() ?? "auto", mode, catalogs },
       {
         onOp(o) {
           if (e.firstOpMs === null) { e.firstOpMs = Date.now() - t0; if (voiceAt !== null) e.voiceFirstMs = Date.now() - voiceAt; }
@@ -124,7 +124,7 @@ export function createLiveSession(d: SessionDeps): LiveSession {
     );
     if (e.totalMs === null) e.totalMs = Date.now() - t0;
     e.done = true;
-    await last; // el siguiente fragmento verá el tablero ya actualizado
+    await last; // the next batch must see the board already updated
     abort = null;
     d.onBusy?.(false);
     emit(null);
@@ -133,12 +133,12 @@ export function createLiveSession(d: SessionDeps): LiveSession {
   const sch = createScheduler(send);
   return {
     ...sch,
-    onFinalText(text, kind = "content") {
-      if (kind === "instruction") return sch.onFinalText(text, kind);
-      // El contenido va primero y la orden después, siempre por separado.
+    onFragment(text, kind = "content") {
+      if (kind === "instruction") return sch.onFragment(text, kind);
+      // Content goes first and the instruction after, always separately.
       const { content, instruction } = splitInstruction(text);
-      if (content) sch.onFinalText(content, "content");
-      if (instruction) sch.onFinalText(instruction, "instruction");
+      if (content) sch.onFragment(content, "content");
+      if (instruction) sch.onFragment(instruction, "instruction");
     },
     undoLastInstruction() {
       const e = lastUndoable(entries);

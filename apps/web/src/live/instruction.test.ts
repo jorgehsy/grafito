@@ -2,32 +2,32 @@ import { describe, it, expect } from "vitest";
 import { hasWakeWord, splitInstruction } from "./instruction";
 
 describe("splitInstruction", () => {
-  it("separa contenido e instrucción", () => {
-    expect(splitInstruction("El front llama al API. Grafito, separa en dos diagramas")).toEqual({
-      content: "El front llama al API.", instruction: "separa en dos diagramas",
+  it("splits content from the instruction", () => {
+    expect(splitInstruction("The front end calls the API. Grafito, split into two diagrams")).toEqual({
+      content: "The front end calls the API.", instruction: "split into two diagrams",
     });
   });
-  it("sin contenido previo", () => {
-    expect(splitInstruction("Grafito: agrupa los servicios")).toEqual({ content: "", instruction: "agrupa los servicios" });
+  it("no preceding content", () => {
+    expect(splitInstruction("Grafito: group the services")).toEqual({ content: "", instruction: "group the services" });
   });
-  it("variantes y mayúsculas", () => {
+  it("spelling variants and capitals", () => {
     for (const w of ["GRAFITO!", "gráfito,", "grafitto.", "Grafito"]) {
-      expect(splitInstruction(`${w} borra la nota`).instruction).toBe("borra la nota");
+      expect(splitInstruction(`${w} delete the note`).instruction).toBe("delete the note");
     }
   });
-  it("palabra de activación sola da instrucción vacía", () => {
-    expect(splitInstruction("hola grafito")).toEqual({ content: "hola", instruction: "" });
+  it("the wake word alone gives an empty instruction", () => {
+    expect(splitInstruction("hello grafito")).toEqual({ content: "hello", instruction: "" });
     expect(splitInstruction("Grafito, ")).toEqual({ content: "", instruction: "" });
   });
-  it("sin palabra de activación devuelve el texto", () => {
-    expect(splitInstruction("sólo contenido")).toEqual({ content: "sólo contenido", instruction: "" });
+  it("without the wake word it returns the text", () => {
+    expect(splitInstruction("content only")).toEqual({ content: "content only", instruction: "" });
   });
-  it("respeta límites de palabra", () => {
-    expect(hasWakeWord("grafitos y grafitoide")).toBe(false);
-    expect(hasWakeWord("mi_grafito")).toBe(false);
-    expect(hasWakeWord("oye, Grafito")).toBe(true);
+  it("respects word boundaries", () => {
+    expect(hasWakeWord("grafitos and grafitoide")).toBe(false);
+    expect(hasWakeWord("my_grafito")).toBe(false);
+    expect(hasWakeWord("hey, Grafito")).toBe(true);
   });
-  it("usa la primera aparición", () => {
+  it("uses the first occurrence", () => {
     expect(splitInstruction("a grafito b grafito c").instruction).toBe("b grafito c");
   });
 });

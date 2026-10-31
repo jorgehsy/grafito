@@ -1,22 +1,19 @@
+import { getLang, t } from "../../i18n";
+import type { MessageKey } from "../../i18n";
 import type { SpeechSource, SpeechState } from "./types";
 
 export const MAX_RETRIES = 5;
 export const BACKOFF_BASE_MS = 300;
-// si el reconocedor nuevo no dispara onstart en este tiempo, se da por colgado
+// a new recognizer that does not fire onstart in this time is considered hung
 export const START_TIMEOUT_MS = 4000;
 
-export const ERROR_MESSAGES: Record<string, string> = {
-  "not-allowed": "Permiso de micrófono denegado. Permítelo en el candado de la barra de direcciones.",
-  "service-not-allowed": "El navegador no permite el reconocimiento de voz en esta página.",
-  "no-speech": "No se oyó nada. Habla más cerca del micrófono.",
-  "audio-capture": "No se encontró ningún micrófono.",
-  network: "Error de red del reconocimiento de voz (Chrome lo envía a un servidor).",
-  "language-not-supported": "Idioma no soportado.",
+const KNOWN_ERRORS = new Set(["not-allowed", "service-not-allowed", "no-speech", "audio-capture", "network", "language-not-supported"]);
+
+const errorMessage = (code: string): string | undefined => {
+  const key = `speech.error.${code}`;
+  return KNOWN_ERRORS.has(code) ? t(key as MessageKey) : undefined;
 };
 const FATAL = new Set(["not-allowed", "service-not-allowed", "audio-capture", "language-not-supported"]);
-
-export const UNAVAILABLE_MESSAGE =
-  "Este navegador no soporta reconocimiento de voz. Usa Chrome o Safari; el resto del panel funciona igual.";
 
 export function getRecognitionCtor(w: any = typeof window !== "undefined" ? window : undefined): any | null {
   return w?.SpeechRecognition ?? w?.webkitSpeechRecognition ?? null;
@@ -34,8 +31,8 @@ export class WebSpeechSource implements SpeechSource {
   private watchdog: ReturnType<typeof setTimeout> | undefined;
   private lastError = "";
 
-  // setTimeout/clearTimeout van envueltos: llamados como this.setT(...) con `this` = la clase, Chrome lanza "Illegal invocation"
-  constructor(lang = "es-CL", private ctor: any = getRecognitionCtor(), private setT: typeof setTimeout = ((f: any, ms?: number) => setTimeout(f, ms)) as typeof setTimeout, private clearT: (t: any) => void = (t) => clearTimeout(t)) {
+  // setTimeout/clearTimeout are wrapped: called as this.setT(...) with `this` = the class, Chrome throws "Illegal invocation"
+  constructor(lang: string = getLang(), private ctor: any = getRecognitionCtor(), private setT: typeof setTimeout = ((f: any, ms?: number) => setTimeout(f, ms)) as typeof setTimeout, private clearT: (t: any) => void = (t) => clearTimeout(t)) {
     this.lang = lang;
   }
 
@@ -43,7 +40,7 @@ export class WebSpeechSource implements SpeechSource {
   isActive() { return this.active; }
 
   start() {
-    if (!this.ctor) { this.onState("error", UNAVAILABLE_MESSAGE); return; }
+    if (!this.ctor) { this.onState("error", t("speech.unavailable")); return; }
     if (this.active) return;
     this.active = true;
     this.retries = 0;
@@ -66,29 +63,29 @@ export class WebSpeechSource implements SpeechSource {
     this.watchdog = undefined;
   }
 
-  // suelta una instancia: sin handlers (sus eventos tardíos no cuentan) y la aborta
+  // drops an instance: without handlers (its late events must not count) and aborted
   private discard(r: any, gentle = false) {
     if (!r) return;
     r.onstart = r.onresult = r.onerror = r.onend = null;
-    try { gentle && r.stop ? r.stop() : r.abort?.(); } catch { /* ya parada */ }
+    try { gentle && r.stop ? r.stop() : r.abort?.(); } catch { /* already stopped */ }
   }
 
   private scheduleRestart() {
     if (!this.active) return;
     if (this.lastError !== "no-speech" && this.retries >= MAX_RETRIES) {
       this.active = false;
-      this.onState("error", (ERROR_MESSAGES[this.lastError] ?? "El reconocimiento se detuvo") + " Se agotaron los reintentos; pulsa Hablar otra vez.");
+      this.onState("error", t("speech.retriesExhausted", { reason: errorMessage(this.lastError) ?? t("speech.stopped") }));
       return;
     }
-    // el silencio (no-speech) es normal: reinicia sin gastar reintentos
+    // silence (no-speech) is normal: restart without spending retries
     const delay = this.lastError === "no-speech" ? BACKOFF_BASE_MS : BACKOFF_BASE_MS * 2 ** this.retries++;
-    this.onState("restarting", this.lastError ? ERROR_MESSAGES[this.lastError] : undefined);
+    this.onState("restarting", this.lastError ? errorMessage(this.lastError) : undefined);
     if (this.timer !== undefined) this.clearT(this.timer);
     this.timer = this.setT(() => { this.timer = undefined; if (this.active) this.spawn(); }, delay);
   }
 
   private spawn() {
-    // nunca dos instancias vivas
+    // never two live instances
     this.discard(this.rec);
     this.rec = null;
     if (this.watchdog !== undefined) this.clearT(this.watchdog);
@@ -111,8 +108,8 @@ export class WebSpeechSource implements SpeechSource {
       let interim = "";
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
         const res = ev.results[i];
-        const t: string = res[0]?.transcript ?? "";
-        if (res.isFinal) { if (t.trim()) this.onFinal(t.trim()); } else interim += t;
+        const text: string = res[0]?.transcript ?? "";
+        if (res.isFinal) { if (text.trim()) this.onFinal(text.trim()); } else interim += text;
       }
       this.onInterim(interim.trim());
     };
@@ -124,7 +121,7 @@ export class WebSpeechSource implements SpeechSource {
       if (FATAL.has(code)) {
         this.active = false;
         this.clearTimers();
-        this.onState("error", ERROR_MESSAGES[code] ?? `Error de voz: ${code}`);
+        this.onState("error", errorMessage(code) ?? t("speech.errorCode", { code }));
       }
     };
     r.onend = () => {
@@ -135,7 +132,7 @@ export class WebSpeechSource implements SpeechSource {
       this.scheduleRestart();
     };
     this.rec = r;
-    // si onstart no llega, la instancia está colgada: se descarta y cuenta como reintento
+    // if onstart never arrives the instance is hung: drop it and count a retry
     this.watchdog = this.setT(() => {
       this.watchdog = undefined;
       if (!mine() || !this.active) return;
@@ -147,7 +144,7 @@ export class WebSpeechSource implements SpeechSource {
     try {
       r.start();
     } catch {
-      // start() que lanza no dispara onend: reprogramar a mano
+      // a start() that throws does not fire onend: reschedule by hand
       if (this.watchdog !== undefined) this.clearT(this.watchdog);
       this.watchdog = undefined;
       this.discard(r);

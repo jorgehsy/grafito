@@ -1,4 +1,3 @@
-// Exportar: descarga de archivos y SVG del tablero con estilos en línea (se ve igual abierto solo).
 const STYLE_PROPS = [
   "fill", "fill-opacity", "stroke", "stroke-width", "stroke-opacity", "stroke-dasharray", "stroke-dashoffset",
   "stroke-linecap", "stroke-linejoin", "opacity", "font-family", "font-size", "font-weight", "font-style",
@@ -13,7 +12,7 @@ export function download(name: string, content: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Serializa el SVG del tablero copiando los estilos calculados a cada elemento. null si no hay tablero. */
+/** Serializes the board SVG with computed styles inlined so it looks the same opened alone. null if there is no board. */
 export function boardSvgText(): string | null {
   const src = document.querySelector<SVGSVGElement>(".canvas2 svg");
   if (!src) return null;

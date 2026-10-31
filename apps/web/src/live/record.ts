@@ -1,24 +1,25 @@
-// Registro de sesión: todo lo necesario para analizar una prueba sin conexión.
-// Puro (sin DOM), salvo las funciones de localStorage/guardado que reciben sus dependencias o toleran su ausencia.
+// Session record: everything needed to analyze a session offline.
+// Pure, except the localStorage/save helpers, which tolerate missing dependencies.
 import type { Op } from "@grafito/contract";
 import type { LogEntry, Totals } from "./session";
 import { zeroUsage } from "@grafito/contract";
+import { t } from "../i18n";
 
 export interface RecordRequest {
   n: number;
   model: string;
-  /** Texto completo enviado (sin truncar). */
+  /** Full text sent, untruncated. */
   text: string;
-  /** Ausente en registros antiguos: contenido. */
+  /** Absent in old records: content. */
   mode?: "content" | "instruction";
   undone?: boolean;
   startedAt: number;
   firstOpMs: number | null;
   voiceFirstMs: number | null;
   totalMs: number | null;
-  /** Operaciones válidas recibidas, en orden. */
+  /** Valid ops received, in order. */
   ops: { name: string; input: unknown }[];
-  /** Avisos de operaciones inválidas. */
+  /** Warnings for invalid ops. */
   invalid: string[];
   usage: { input: number; cacheRead: number; cacheWrite: number; output: number };
   costUsd: number;
@@ -30,7 +31,7 @@ export interface SessionRecord {
   startedAt: number;
   updatedAt: number;
   model: string;
-  /** "Forma del dibujo"; puede faltar en registros antiguos. */
+  /** Shape preference; may be missing in old records. */
   shape?: string;
   lang: string;
   requests: RecordRequest[];
@@ -69,7 +70,7 @@ export function buildRecord(meta: RecordMeta, entries: LogEntry[], totals: Total
     requests: entries.map((e) => ({
       n: e.id,
       model: e.model,
-      text: e.delta,
+      text: e.batch,
       mode: e.mode,
       ...(e.undone ? { undone: true } : {}),
       startedAt: e.startedAt,
@@ -92,12 +93,12 @@ export function buildRecord(meta: RecordMeta, entries: LogEntry[], totals: Total
   };
 }
 
-/** Reconstruye las filas del registro y los totales a partir de un registro guardado. */
+/** Rebuilds the log rows and totals from a saved record. */
 export function entriesFromRecord(rec: SessionRecord): { entries: LogEntry[]; totals: Totals } {
   const entries: LogEntry[] = rec.requests.map((r) => ({
     id: r.n,
     model: r.model,
-    delta: r.text,
+    batch: r.text,
     mode: r.mode === "instruction" ? "instruction" : "content",
     ...(r.undone ? { undone: true } : {}),
     startedAt: r.startedAt,
@@ -122,14 +123,14 @@ export function entriesFromRecord(rec: SessionRecord): { entries: LogEntry[]; to
   return { entries, totals: { requests: rec.totals?.requests ?? entries.length, usage, costUsd: rec.totals?.costUsd ?? entries.reduce((a, e) => a + e.costUsd, 0) } };
 }
 
-/** Validación mínima de un registro leído de disco/localStorage/archivo. */
+/** Minimal validation of a record read from disk, localStorage or a file. */
 export function isRecord(x: any): x is SessionRecord {
   return !!x && typeof x === "object" && x.version === 1 && typeof x.id === "string" && Array.isArray(x.requests) && Array.isArray(x.transcript);
 }
 
 const LS_KEY = "grafito.sessionRecord";
 export function saveLocal(rec: SessionRecord) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(rec)); } catch { /* sin almacenamiento: se ignora */ }
+  try { localStorage.setItem(LS_KEY, JSON.stringify(rec)); } catch { /* storage unavailable: ignored */ }
 }
 export function loadLocal(): SessionRecord | null {
   try {
@@ -139,20 +140,20 @@ export function loadLocal(): SessionRecord | null {
   } catch { return null; }
 }
 export function clearLocal() {
-  try { localStorage.removeItem(LS_KEY); } catch { /* idem */ }
+  try { localStorage.removeItem(LS_KEY); } catch { /* storage unavailable: ignored */ }
 }
 
-/** Guarda en el servidor (pruebas/). Devuelve null si fue bien, o el mensaje de error. */
+/** Saves to the server (sessions/). Returns null on success, or the error message. */
 export async function postRecord(rec: SessionRecord, fetchImpl: typeof fetch = fetch): Promise<string | null> {
   try {
     const res = await fetchImpl("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) });
     return res.ok ? null : `HTTP ${res.status}`;
   } catch (e: any) {
-    return e?.message ?? "sin conexión";
+    return e?.message ?? t("net.offline");
   }
 }
 
-/** Operaciones que deben reponerse al restaurar o deshacer: las de las filas no deshechas. */
+/** Ops to replay on restore or undo: those of the rows not undone. */
 export function replayOps(entries: LogEntry[]): Op[] {
   return entries.filter((e) => !e.undone).flatMap((e) => e.opList);
 }

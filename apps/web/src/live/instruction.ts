@@ -1,4 +1,5 @@
-// Palabra de activación: lo que se dice tras "Grafito" es una instrucción para Claude, no contenido.
+// What is said after the wake word "Grafito" is an instruction for Claude, not content.
+// Includes the spellings speech recognizers produce.
 const WAKE = /(?<![\p{L}\p{N}_])(?:grafito|gráfito|grafitto)(?![\p{L}\p{N}_])[,:.!]*/iu;
 
 export function hasWakeWord(text: string): boolean {

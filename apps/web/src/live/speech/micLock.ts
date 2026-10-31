@@ -1,7 +1,5 @@
-// Candado del micrófono entre pestañas: Chrome sólo deja un reconocedor vivo por origen.
-// Cuando una pestaña reclama el mic, las demás lo sueltan (en vez de pelear reiniciándolo).
+// Chrome allows one recognizer per origin: when a tab claims the mic the others release it instead of fighting over restarts.
 export const MIC_CHANNEL = "grafito.mic";
-export const MIC_TAKEN_MESSAGE = "El micrófono se activó en otra pestaña. Pulsa Hablar aquí para recuperarlo.";
 
 type Msg = { type: "claim"; id: string };
 type ChannelLike = { postMessage(m: Msg): void; onmessage: ((ev: any) => void) | null; close(): void };

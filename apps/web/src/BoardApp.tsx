@@ -5,15 +5,17 @@ import type { Subtitle } from "@grafito/board";
 import { SCRIPTS } from "./scripts";
 import { Engine } from "./render/engine";
 import { LivePanel } from "./live/LivePanel";
+import { useT } from "./i18n";
 import { IconChevron, IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
 
 type Status = "idle" | "playing" | "paused" | "done";
-type Mode = "script" | "claude";
+type Mode = "demo" | "live";
 
-const urlMode = (): Mode | null => { const m = new URLSearchParams(location.search).get("mode"); return m === "claude" || m === "script" ? m : null; };
+const urlMode = (): Mode | null => { const m = new URLSearchParams(location.search).get("mode"); return m === "live" || m === "demo" ? m : null; };
 const readTranscript = () => { try { return localStorage.getItem("grafito.transcript") !== "0"; } catch { return true; } };
 
 export function BoardApp() {
+  const t = useT();
   const svgRef = useRef<SVGSVGElement>(null);
   const engine = useRef<Engine | null>(null);
   const ctrl = useRef<BoardController | null>(null);
@@ -22,7 +24,7 @@ export function BoardApp() {
   const speedRef = useRef(1);
   const subRef = useRef<HTMLDivElement>(null);
 
-  const [scriptId, setScriptId] = useState(() => new URLSearchParams(location.search).get("script") ?? SCRIPTS[0].id);
+  const [demoId, setDemoId] = useState(() => new URLSearchParams(location.search).get("demo") ?? SCRIPTS[0].id);
   const [st, setSt] = useState<Status>("idle");
   const [speed, setSpeed] = useState(() => Number(new URLSearchParams(location.search).get("speed")) || 1);
   const [follow, setFollow] = useState(true);
@@ -30,7 +32,7 @@ export function BoardApp() {
   const [sub, setSub] = useState<Subtitle>({ spoken: [], current: "" });
   const [warnings, setWarnings] = useState<string[]>([]);
   const [summary, setSummary] = useState("");
-  // Sin ?mode= en la URL, el modo por defecto depende de si el servidor tiene API key: en vivo si la hay, guion si no.
+  // Without ?mode= in the URL the default depends on whether the server has an API key: live if so, demo if not.
   const [mode, setMode] = useState<Mode | null>(urlMode);
   const [showTranscript, setShowTranscript] = useState(readTranscript);
 
@@ -67,12 +69,12 @@ export function BoardApp() {
     fetch("/api/health")
       .then((r) => r.json())
       .then((h) => h?.hasKey === true, () => false)
-      .then((key) => { if (alive) setMode((m) => m ?? (key ? "claude" : "script")); });
+      .then((key) => { if (alive) setMode((m) => m ?? (key ? "live" : "demo")); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time health probe on mount
   }, []);
 
-  useEffect(() => { try { localStorage.setItem("grafito.transcript", showTranscript ? "1" : "0"); } catch { /* sin almacenamiento */ } }, [showTranscript]);
+  useEffect(() => { try { localStorage.setItem("grafito.transcript", showTranscript ? "1" : "0"); } catch { /* storage unavailable */ } }, [showTranscript]);
 
   useEffect(() => { speedRef.current = speed; if (engine.current) engine.current.userSpeed = speed; }, [speed]);
 
@@ -90,7 +92,7 @@ export function BoardApp() {
     if (status.current === "paused") { engine.current?.setPaused(false); setStatus("playing"); return; }
     if (status.current === "playing") return;
     resetAll();
-    const id = new URLSearchParams(location.search).get("auto") ?? scriptRef.current;
+    const id = new URLSearchParams(location.search).get("auto") ?? demoRef.current;
     const info = SCRIPTS.find((s) => s.id === id) ?? SCRIPTS[0];
     player.current = new Player(info.script, {
       onSubtitle: setSub,
@@ -100,8 +102,8 @@ export function BoardApp() {
     setStatus("playing");
   }, [resetAll]);
 
-  const scriptRef = useRef(scriptId);
-  useEffect(() => { scriptRef.current = scriptId; }, [scriptId]);
+  const demoRef = useRef(demoId);
+  useEffect(() => { demoRef.current = demoId; }, [demoId]);
 
   const pause = () => {
     if (status.current !== "playing") return;
@@ -119,27 +121,27 @@ export function BoardApp() {
     <div className="v2">
       <div className="canvas2">
         <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" />
-        {st === "idle" && mode === "script" && <div className="hint">Elige un guion y pulsa Play para ver el tablero dibujarse mientras se "dicta".</div>}
+        {st === "idle" && mode === "demo" && <div className="hint">{t("app.demoHint")}</div>}
       </div>
 
       <header className="brand">
         <Logo />
         <span className="word">grafito</span>
-        {mode === "claude" && <span className="board">Claude en vivo</span>}
-        {mode === "script" && (
-          <div className="scriptbar" role="group" aria-label="Guion">
-            <select aria-label="Guion" value={scriptId} disabled={locked} onChange={(e) => setScriptId(e.target.value)}>
+        {mode === "live" && <span className="board">{t("app.liveBadge")}</span>}
+        {mode === "demo" && (
+          <div className="scriptbar" role="group" aria-label={t("app.demoBar")}>
+            <select aria-label={t("app.demoBar")} value={demoId} disabled={locked} onChange={(e) => setDemoId(e.target.value)}>
               {SCRIPTS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             {st === "playing" ? (
-              <button className="tb sm" aria-label="Pausa" title="Pausa" onClick={pause}><IconPause /></button>
+              <button className="tb sm" aria-label={t("app.pause")} title={t("app.pause")} onClick={pause}><IconPause /></button>
             ) : (
-              <button className="tb sm on" aria-label={st === "paused" ? "Seguir" : "Play"} title={st === "paused" ? "Seguir" : "Play"} onClick={play}><IconPlay /></button>
+              <button className="tb sm on" aria-label={st === "paused" ? t("app.resume") : t("app.play")} title={st === "paused" ? t("app.resume") : t("app.play")} onClick={play}><IconPlay /></button>
             )}
-            <button className="tb sm" aria-label="Reiniciar" title="Reiniciar" onClick={restart}><IconRestart /></button>
+            <button className="tb sm" aria-label={t("app.restart")} title={t("app.restart")} onClick={restart}><IconRestart /></button>
             <label className="spd">
               {speed}x
-              <input type="range" aria-label="Velocidad" min={0.5} max={2} step={0.25} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
+              <input type="range" aria-label={t("app.speed")} min={0.5} max={2} step={0.25} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
             </label>
           </div>
         )}
@@ -149,7 +151,7 @@ export function BoardApp() {
         getCtrl={() => ctrl.current}
         onSubtitle={setSub}
         onClear={() => { resetAll(); }}
-        active={mode === "claude"}
+        active={mode === "live"}
         onMode={changeMode}
         modeLocked={locked}
         follow={follow}
@@ -160,7 +162,7 @@ export function BoardApp() {
         onShowTranscript={setShowTranscript}
       />
 
-      <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? "Ocultar transcripción" : "Mostrar transcripción"} title={showTranscript ? "Ocultar transcripción" : "Mostrar transcripción"} onClick={() => setShowTranscript((v) => !v)}>
+      <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} title={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} onClick={() => setShowTranscript((v) => !v)}>
         <IconChevron up={!showTranscript} />
       </button>
 
@@ -168,14 +170,14 @@ export function BoardApp() {
         <span className="wv"><IconWave /></span>
         <div className="txt">
           {!sub.spoken.length && !sub.current ? (
-            <p className="old">Aquí aparecerá lo que se va diciendo.</p>
+            <p className="old">{t("app.transcript.empty")}</p>
           ) : (
             <>
               {sub.spoken.slice(-1).map((t, i) => (sub.current ? <p key={i} className="old">{t}</p> : <p key={i} className="now">{t}</p>))}
               {sub.current && <p className={sub.interim ? "now interim" : "now"}>{sub.current}</p>}
             </>
           )}
-          <div className="backlog" data-testid="backlog">{queued} {queued === 1 ? "frase" : "frases"} en cola</div>
+          <div className="backlog" data-testid="backlog">{t("app.queue", { count: queued })}</div>
         </div>
       </div>
     </div>

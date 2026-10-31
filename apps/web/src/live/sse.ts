@@ -1,10 +1,10 @@
-// Cliente SSE de /api/board: parser incremental + streamBoard.
+import { t } from "../i18n";
 import type { Op } from "@grafito/contract";
 import type { Usage } from "@grafito/contract";
 
 export interface SseEvent { event: string; data: any }
 
-/** Parser incremental: acepta trozos arbitrarios y devuelve los eventos completos. */
+/** Incremental parser: accepts arbitrary chunks and returns the complete events. */
 export function createSseParser() {
   let buf = "";
   return {
@@ -18,7 +18,7 @@ export function createSseParser() {
         const event = /^event: (.*)$/m.exec(raw)?.[1];
         const data = /^data: (.*)$/m.exec(raw)?.[1];
         if (!event || data === undefined) continue;
-        try { out.push({ event, data: JSON.parse(data) }); } catch { /* evento corrupto: se ignora */ }
+        try { out.push({ event, data: JSON.parse(data) }); } catch { /* corrupt event: ignored */ }
       }
       return out;
     },
@@ -41,7 +41,7 @@ export interface BoardHandlers {
 }
 
 export async function streamBoard(
-  body: { delta: string; summary: string; board: string; model: string; shape?: string; mode?: "content" | "instruction"; catalogs?: string[] },
+  body: { delta: string; summary: string; board: string; model: string; shape?: string; mode?: "content" | "instruction"; catalogs?: string[]; lang?: string },
   h: BoardHandlers,
   signal?: AbortSignal,
   fetchImpl: typeof fetch = fetch,
@@ -55,10 +55,10 @@ export async function streamBoard(
       signal,
     });
   } catch (e: any) {
-    if (e?.name !== "AbortError") h.onError("No se pudo conectar con el servidor: " + e.message);
+    if (e?.name !== "AbortError") h.onError(t("net.connect", { message: e.message }));
     return;
   }
-  if (!res.ok || !res.body) return h.onError(`Error del servidor (HTTP ${res.status})`);
+  if (!res.ok || !res.body) return h.onError(t("net.http", { status: res.status }));
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   const parser = createSseParser();
@@ -74,6 +74,6 @@ export async function streamBoard(
       }
     }
   } catch (e: any) {
-    if (e?.name !== "AbortError") h.onError("Se cortó la conexión: " + e.message);
+    if (e?.name !== "AbortError") h.onError(t("net.dropped", { message: e.message }));
   }
 }

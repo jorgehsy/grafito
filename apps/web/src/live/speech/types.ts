@@ -1,6 +1,6 @@
-// Interfaz de entrada de voz. Una STT en la nube (AssemblyAI/Deepgram) puede sustituir a WebSpeechSource sin tocar el resto.
 export type SpeechState = "idle" | "listening" | "restarting" | "error";
 
+/** A speech-to-text source; a cloud service can replace WebSpeechSource without touching the rest. */
 export interface SpeechSource {
   start(): void;
   stop(): void;
@@ -8,11 +8,3 @@ export interface SpeechSource {
   onFinal(text: string): void;
   onState(state: SpeechState, detail?: string): void;
 }
-
-export const SPEECH_LANGS = [
-  { code: "es-CL", label: "Español (Chile)" },
-  { code: "es-AR", label: "Español (Argentina)" },
-  { code: "es-MX", label: "Español (México)" },
-  { code: "es-ES", label: "Español (España)" },
-  { code: "en-US", label: "English (US)" },
-];

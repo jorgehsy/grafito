@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { createMicLock } from "./micLock";
 
-// canal falso compartido: lo que una pestaña publica llega a las demás
+// fake shared channel: what one tab posts reaches the others
 function fakeBus() {
   const subs: any[] = [];
   return () => {
@@ -12,7 +12,7 @@ function fakeBus() {
 }
 
 describe("micLock", () => {
-  it("la otra pestaña suelta el mic cuando ésta lo reclama", () => {
+  it("the other tab releases the mic when this one claims it", () => {
     const open = fakeBus();
     const takenA = vi.fn(); const takenB = vi.fn();
     const a = createMicLock(takenA, open());
@@ -23,7 +23,7 @@ describe("micLock", () => {
     b.claim();
     expect(takenA).toHaveBeenCalledTimes(1);
   });
-  it("sin BroadcastChannel no rompe", () => {
+  it("works without BroadcastChannel", () => {
     const l = createMicLock(() => {}, null);
     expect(() => { l.claim(); l.close(); }).not.toThrow();
   });

@@ -10,10 +10,10 @@ import { diffTrees } from "@grafito/board";
 
 const finalBoard = (ops: Parameters<typeof applyOps>[1]) => applyOps(emptyBoard(), ops).board;
 
-describe.each(SCRIPTS)("layout del guion $id", ({ script }) => {
+describe.each(SCRIPTS)("layout of demo $id", ({ script }) => {
   const board = finalBoard(script.flatMap((c) => c.ops));
 
-  it("las zonas no se solapan", async () => {
+  it("zones do not overlap", async () => {
     const lay = await computeLayout(board);
     const zs = Object.entries(lay.zones);
     expect(zs.length).toBe(board.zones.length);
@@ -21,7 +21,7 @@ describe.each(SCRIPTS)("layout del guion $id", ({ script }) => {
       for (let j = i + 1; j < zs.length; j++) expect(overlaps(zs[i][1], zs[j][1]), `${zs[i][0]} vs ${zs[j][0]}`).toBe(false);
   });
 
-  it("los elementos de una zona no se solapan y quedan dentro de ella", async () => {
+  it("elements of a zone do not overlap and stay inside it", async () => {
     const lay = await computeLayout(board);
     for (const z of board.zones) {
       const zr = lay.zones[z.id];
@@ -81,7 +81,7 @@ describe.each(SCRIPTS)("layout del guion $id", ({ script }) => {
     }
   });
 
-  it("todas las conexiones y notas tienen geometría", async () => {
+  it("all connections and callouts have geometry", async () => {
     const lay = await computeLayout(board);
     for (const c of board.connections) expect(lay.connections[c.id], c.id).toBeDefined();
     for (const c of board.callouts) expect(lay.callouts[c.id], c.id).toBeDefined();
@@ -90,8 +90,8 @@ describe.each(SCRIPTS)("layout del guion $id", ({ script }) => {
   });
 });
 
-describe("estabilidad", () => {
-  it("añadir un paso al final de un flujo apenas mueve los existentes", async () => {
+describe("stability", () => {
+  it("adding a step at the end of a flow barely moves the existing ones", async () => {
     const chunks = SCRIPTS[1].script;
     const ops = chunks.slice(0, 2).flatMap((c) => c.ops);
     const b0 = finalBoard(ops);
@@ -170,10 +170,10 @@ describe("scale", () => {
     }
   });
 
-  it("la barra, el nivel y las marcas salen en el árbol de render, y emphasize/callout apuntan a una marca", async () => {
+  it("the bar, level and marks appear in the render tree, and emphasize/callout point at a mark", async () => {
     const board = withMarks([20, 90], [
       op.emphasize({ target: "m0", style: "circle" }),
-      op.add_callout({ id: "n", target: "m1", text: "ojo" }),
+      op.add_callout({ id: "n", target: "m1", text: "look" }),
     ]);
     const lay = await computeLayout(board);
     expect(lay.callouts.n).toBeDefined();
@@ -181,13 +181,13 @@ describe("scale", () => {
     for (const k of ["bar:e", "level:e", "m0", "m1", "stem:m0", "stem:m1", "emphasis:m0", "n"]) expect(tree.map.has(k), k).toBe(true);
     const lvl = tree.map.get("level:e")!;
     expect(lvl.geom.w).toBeCloseTo(0.6 * lay.scales.e.w, 5);
-    // sin nivel no hay relleno
+    // without a level there is no fill
     const noLevel = buildTree(finalBoard([op.create_zone({ id: "e", kind: "scale", title: "T" })]), await computeLayout(finalBoard([op.create_zone({ id: "e", kind: "scale", title: "T" })])));
     expect(noLevel.map.has("bar:e")).toBe(true);
     expect(noLevel.map.has("level:e")).toBe(false);
   });
 
-  it("cambiar el nivel mueve el relleno sin tocar el resto", async () => {
+  it("changing the level moves the fill without touching the rest", async () => {
     const a = buildTree(withMarks([20]), await computeLayout(withMarks([20])));
     const b2 = withMarks([20], [op.set_level({ zone: "e", at: 80 })]);
     const b = buildTree(b2, await computeLayout(b2));
@@ -196,46 +196,46 @@ describe("scale", () => {
   });
 });
 
-describe("etiquetas de arista en flujos con textos largos", () => {
-  // Sesión real (auth con BFF): las etiquetas eran más anchas que el hueco entre capas y caían sobre las cajas.
+describe("connection labels in flows with long texts", () => {
+  // Real session (auth with a BFF): the labels were wider than the gap between layers and fell on top of the boxes.
   const board = finalBoard([
-  op.create_zone({"id":"auth_bff","kind":"system","title":"Autenticación con BFF"}),
+  op.create_zone({"id":"auth_bff","kind":"system","title":"BFF authentication"}),
   op.add_component({"zone":"auth_bff","id":"bff","label":"BFF (Backend for Frontend)","type":"service"}),
-  op.add_component({"zone":"auth_bff","id":"usuario","label":"Usuario","type":"actor"}),
-  op.add_component({"zone":"auth_bff","id":"sitio","label":"Sitio público","type":"client"}),
-  op.connect({"id":"c_usuario_sitio","from":"usuario","to":"sitio","label":"click en login"}),
+  op.add_component({"zone":"auth_bff","id":"user","label":"User","type":"actor"}),
+  op.add_component({"zone":"auth_bff","id":"site","label":"Public site","type":"client"}),
+  op.connect({"id":"c_user_site","from":"user","to":"site","label":"click on login"}),
   op.add_component({"zone":"auth_bff","id":"cognito","label":"Cognito","type":"external"}),
-  op.connect({"id":"c_sitio_cognito","from":"sitio","to":"cognito","label":"petición de login"}),
-  op.connect({"id":"c_usuario_cognito","from":"usuario","to":"cognito","label":"ingresa credenciales"}),
-  op.connect({"id":"c_cognito_sitio","from":"cognito","to":"sitio","label":"retorna con código"}),
-  op.connect({"id":"c_sitio_bff","from":"sitio","to":"bff","label":"envía token para cambiarlo por cookies"}),
+  op.connect({"id":"c_site_cognito","from":"site","to":"cognito","label":"login request"}),
+  op.connect({"id":"c_user_cognito","from":"user","to":"cognito","label":"enters credentials"}),
+  op.connect({"id":"c_cognito_site","from":"cognito","to":"site","label":"returns with code"}),
+  op.connect({"id":"c_site_bff","from":"site","to":"bff","label":"sends token to swap it for cookies"}),
   ]);
 
-  it("ninguna etiqueta pisa una caja ni otra etiqueta", async () => {
+  it("no label covers a box or another label", async () => {
     const lay = await computeLayout(board);
     const labels = Object.entries(lay.connections).flatMap(([id, g]) => (g.label ? [[id, labelRect(g.label)] as [string, Rect]] : []));
     expect(labels.length).toBe(5);
     for (const [id, l] of labels) {
-      for (const [eid, r] of Object.entries(lay.elements)) expect(overlaps(l, r), `${id} sobre ${eid}`).toBe(false);
-      for (const [oid, o] of labels) if (oid !== id) expect(overlaps(l, o), `${id} sobre ${oid}`).toBe(false);
+      for (const [eid, r] of Object.entries(lay.elements)) expect(overlaps(l, r), `${id} over ${eid}`).toBe(false);
+      for (const [oid, o] of labels) if (oid !== id) expect(overlaps(l, o), `${id} over ${oid}`).toBe(false);
     }
   });
 });
 
 describe("labelLines", () => {
-  it("deja las etiquetas cortas en una línea", () => {
-    expect(labelLines("click en login")).toEqual(["click en login"]);
+  it("keeps short labels on one line", () => {
+    expect(labelLines("click on login")).toEqual(["click on login"]);
   });
-  it("parte las largas en dos líneas parejas", () => {
-    expect(labelLines("envía token para cambiarlo por cookies")).toEqual(["envía token para", "cambiarlo por cookies"]);
+  it("splits long ones into two even lines", () => {
+    expect(labelLines("sends token to swap it for cookies")).toEqual(["sends token to swap", "it for cookies"]);
   });
-  it("no parte una sola palabra larga", () => {
-    expect(labelLines("autenticaciónfederadaconcognito")).toEqual(["autenticaciónfederadaconcognito"]);
+  it("does not split a single long word", () => {
+    expect(labelLines("federatedauthenticationwithcognito")).toEqual(["federatedauthenticationwithcognito"]);
   });
 });
 
-describe("service no cambia la firma de render", () => {
-  it("set_service sobre un elemento ya dibujado no genera update (ni mueve la caja) y deja service en data", async () => {
+describe("service does not change the render signature", () => {
+  it("set_service on an already drawn element generates no update (nor moves the box) and leaves service in data", async () => {
     const before = finalBoard([
       op.create_zone({ id: "s", kind: "system", title: "S" }),
       op.add_component({ zone: "s", id: "fn", label: "Fn", type: "service", icon: "⚡" }),
