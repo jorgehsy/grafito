@@ -4,6 +4,8 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 
 ## Unreleased
 
+## v0.2.0-alpha.5 · 2026-10-31
+
 - The first version (Excalidraw mind map, `/api/draw`) is removed.
 - The repository is a pnpm + Turborepo monorepo (`apps/*`, `packages/*`).
 - The codebase is in English.
