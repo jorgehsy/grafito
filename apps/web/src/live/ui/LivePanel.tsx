@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { IconBars, IconDoc, IconExport, IconGear, IconImport, IconMic, IconStop, IconTrash, IconUndo, IconWave } from "../../ui/icons";
 import type { BoardController, Subtitle } from "@grafito/board";
-import { fmtUsd, isModelId, MODELS, parseRecord } from "@grafito/contract";
+import { isModelId, MODELS, parseRecord } from "@grafito/contract";
 import type { Settings } from "../session";
 import { useLiveSession } from "./useLiveSession";
 import { useMic } from "./useMic";
@@ -10,6 +10,7 @@ import { SHAPE_OPTIONS } from "./ShapeGallery";
 import { OptionsPopover } from "./OptionsPopover";
 import { hhmm, StatsPanel } from "./StatsPanel";
 import { loadCatalogs, saveCatalogs } from "../catalogs";
+import { totalCost, usableModel } from "../models";
 import { isLang, LANGS, setLang, useLang, useT } from "../../i18n";
 import { readFlag, writeFlag } from "../../storage";
 
@@ -41,6 +42,10 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
   const gearRef = useRef<HTMLButtonElement>(null);
   const fileIn = useRef<HTMLInputElement>(null);
   const [model, setModel] = useState(MODELS[0].id);
+  // Model ids the server offers; null until /api/health answers (and if it fails).
+  const [available, setAvailable] = useState<string[] | null>(null);
+  const availableRef = useRef(available);
+  availableRef.current = available;
   const [shape, setShape] = useState("auto");
   const [catalogs, setCatalogs] = useState<string[]>(loadCatalogs);
   const [importWarn, setImportWarn] = useState("");
@@ -51,12 +56,23 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
     { get: () => getCtrl()!.board, submit: (ops) => getCtrl()!.submit(ops), clear: onClear },
     settings,
     (s) => {
-      if (isModelId(s.model)) setModel(s.model);
+      if (isModelId(s.model)) setModel(usableModel(s.model, availableRef.current));
       if (SHAPE_OPTIONS.some((o) => o.value === s.shape)) setShape(s.shape);
       if (isLang(s.speechLang)) setLang(s.speechLang);
     },
   );
   useEffect(() => { (window as any).__live = session; }, [session]);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((h) => (Array.isArray(h?.models) ? (h.models as unknown[]).filter((x): x is string => typeof x === "string") : null), () => null)
+      .then((ids) => { if (alive) setAvailable(ids); });
+    return () => { alive = false; };
+  }, []);
+  // A choice the server does not offer falls back to the default.
+  useEffect(() => { setModel((m) => usableModel(m, available)); }, [available]);
 
   const spoken = useRef<string[]>([]);
   useEffect(() => {
@@ -133,7 +149,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
 
       <OptionsPopover
         open={optsOpen} anchor={gearRef} onClose={() => setOptsOpen(false)}
-        model={model} onModel={setModel} shape={shape} onShape={setShape}
+        model={model} availableModels={available} onModel={setModel} shape={shape} onShape={setShape}
         catalogs={catalogs} onCatalogs={(v) => { setCatalogs(v); saveCatalogs(v); }}
         langLocked={micOn} follow={follow} onFollow={onFollow} showTranscript={showTranscript} onShowTranscript={onShowTranscript}
       />
@@ -148,7 +164,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
       <div className="toasts">
         {active && live.unclosed && (
           <div className="toast" data-testid="restore-banner">
-            {t("restore.banner", { count: live.unclosed.requests.length, cost: fmtUsd(live.unclosed.totals.costUsd) })}
+            {t("restore.banner", { count: live.unclosed.requests.length, cost: totalCost(live.unclosed.requests.map((r) => r.model), live.unclosed.totals.costUsd, t("cost.included")) })}
             <button className="pbtn" onClick={() => live.unclosed && session.restore(live.unclosed)}>{t("restore.restore")}</button>
             <button className="pbtn" onClick={clear}>{t("restore.discard")}</button>
           </div>

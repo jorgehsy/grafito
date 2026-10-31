@@ -10,6 +10,8 @@ interface Props {
   anchor: RefObject<HTMLButtonElement | null>;
   onClose(): void;
   model: string;
+  /** Model ids the server offers; null while unknown. */
+  availableModels: readonly string[] | null;
   onModel(v: string): void;
   shape: string;
   onShape(v: string): void;
@@ -23,7 +25,7 @@ interface Props {
   onShowTranscript(v: boolean): void;
 }
 
-export function OptionsPopover({ open, anchor, onClose, model, onModel, shape, onShape, catalogs, onCatalogs, langLocked, follow, onFollow, showTranscript, onShowTranscript }: Props) {
+export function OptionsPopover({ open, anchor, onClose, model, availableModels, onModel, shape, onShape, catalogs, onCatalogs, langLocked, follow, onFollow, showTranscript, onShowTranscript }: Props) {
   const t = useT();
   const lang = useLang();
   const ref = useRef<HTMLDivElement>(null);
@@ -46,7 +48,7 @@ export function OptionsPopover({ open, anchor, onClose, model, onModel, shape, o
     <div className="popover" ref={ref} role="dialog" aria-label={t("toolbar.options")} hidden={!open}>
       <div className="field">
         {t("options.model")}
-        <ModelTiles value={model} onChange={onModel} />
+        <ModelTiles value={model} onChange={onModel} available={availableModels} />
       </div>
       <div className="field">
         {t("options.shape")}

@@ -2,6 +2,7 @@ import { IconClose, IconWand } from "../../ui/icons";
 import { fmtUsd } from "@grafito/contract";
 import type { LiveSessionState } from "../session";
 import { getLang, useT } from "../../i18n";
+import { planOnly, totalCost } from "../models";
 
 const tok = (n: number) => n.toLocaleString(getLang());
 export const hhmm = (t: number) => new Date(t).toLocaleTimeString(getLang(), { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -19,6 +20,10 @@ export function StatsPanel({ session: { entries, current, totals, busy, medianVo
   const cur = current ?? entries[entries.length - 1] ?? null;
   const avg = totals.requests ? totals.costUsd / totals.requests : 0;
   const tu = totals.usage;
+  const models = entries.map((e) => e.model);
+  const curCost = !cur ? "—" : cur.costUsd === null ? t("cost.included") : (cur.usageEstimated ? "≈" : "") + fmtUsd(cur.costUsd);
+  // The session total stays in real dollars, even when the current request is a plan model.
+  const cost = planOnly(models) ? t("cost.included") : `${curCost} · ${totalCost(models, totals.costUsd, t("cost.included"))} · ${t("stats.perRequest", { cost: fmtUsd(avg) })}`;
   return (
     <aside className="stats" aria-label={t("toolbar.stats")}>
       <header>
@@ -32,7 +37,7 @@ export function StatsPanel({ session: { entries, current, totals, busy, medianVo
         <div><span>{t("stats.requestTokens")}{busy ? t("stats.inProgress") : ""}</span><b>{cur ? t("stats.tokens", { input: tok(cur.usage.input_tokens), output: (cur.usageEstimated ? "≈" : "") + tok(cur.usage.output_tokens) }) : "—"}</b></div>
         <div><span>{t("stats.sessionTokens")}</span><b>{t("stats.tokens", { input: tok(tu.input_tokens), output: tok(tu.output_tokens) })}</b></div>
         <div><span>{t("stats.cache")}</span><b>{tok(tu.cache_read_input_tokens)} / {tok(tu.cache_creation_input_tokens)}</b></div>
-        <div><span>{t("stats.cost")}</span><b>{cur?.costUsd === null ? t("cost.included") : <>{cur ? (cur.usageEstimated ? "≈" : "") + fmtUsd(cur.costUsd) : "—"} · {fmtUsd(totals.costUsd)} · {t("stats.perRequest", { cost: fmtUsd(avg) })}</>}</b></div>
+        <div><span>{t("stats.cost")}</span><b>{cost}</b></div>
       </div>
       <div className="log" data-testid="live-log">
         {entries.slice().reverse().map((e) => (

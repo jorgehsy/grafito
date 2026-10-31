@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import { T } from "./ShapeGallery";
 import { AWS_ICONS } from "../../icons/aws";
 import { CATALOGS } from "@grafito/icons";
-import { MODELS } from "@grafito/contract";
 import type { ModelInfo } from "@grafito/contract";
 import { LANGS, useT } from "../../i18n";
+import { visibleModels } from "../models";
 import type { MessageKey } from "../../i18n";
 
 interface Tile { value: string; label: string; sub?: string; thumb: ReactNode }
@@ -19,8 +19,8 @@ const MODEL_THUMBS: Record<ModelInfo["tier"], ReactNode> = {
   faster: <T><path d="M27 3L14 18h9l-3 11 14-16h-9z" /><path d="M6 10h5M4 17h6M7 24h4" /></T>,
 };
 
-const modelTiles = (t: ReturnType<typeof useT>): Tile[] =>
-  MODELS.map((m) => ({ value: m.id, label: m.label, sub: t(m.tier === "best" ? "options.model.best" : "options.model.faster"), thumb: MODEL_THUMBS[m.tier] }));
+const modelTiles = (t: ReturnType<typeof useT>, available: readonly string[] | null): Tile[] =>
+  visibleModels(available).map((m) => ({ value: m.id, label: m.label, sub: t(m.tier === "best" ? "options.model.best" : "options.model.faster"), thumb: MODEL_THUMBS[m.tier] }));
 
 const LANG_TILES: Tile[] = LANGS.map((l) => ({ value: l.code, label: l.short, thumb: <Code>{l.code.split("-")[1]}</Code> }));
 
@@ -76,9 +76,10 @@ function RadioTiles({ tiles, value, onChange, label, id, cols = 3, disabled, tes
   );
 }
 
-export function ModelTiles({ value, onChange }: { value: string; onChange(v: string): void }) {
+/** `available`: model ids the server offers; null while unknown. */
+export function ModelTiles({ value, onChange, available }: { value: string; onChange(v: string): void; available: readonly string[] | null }) {
   const t = useT();
-  return <RadioTiles tiles={modelTiles(t)} value={value} onChange={onChange} label={t("options.model")} id="model" cols={2} />;
+  return <RadioTiles tiles={modelTiles(t, available)} value={value} onChange={onChange} label={t("options.model")} id="model" cols={2} />;
 }
 
 export function LangTiles({ value, onChange, disabled }: { value: string; onChange(v: string): void; disabled?: boolean }) {
