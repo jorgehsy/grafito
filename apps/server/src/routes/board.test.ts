@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import express from "express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { createBoardHandler } from "./board";
+import { availableModelIds, createBoardHandler } from "./board";
+import type { Clients } from "./board";
 import type { ClaudeClient } from "../claude/client";
 import { fakeClaude, fail, start, stop, toolBlock } from "../claude/fake";
 import type { FakeAttempt } from "../claude/fake";
@@ -16,10 +17,13 @@ afterEach(() => {
   return new Promise<void>((resolve) => (server ? server.close(() => resolve()) : resolve()));
 });
 
-async function listen(client: ClaudeClient | null): Promise<string> {
+// A bare client (or null = no key) stands for the API adapter alone.
+const asClients = (c: ClaudeClient | null | Clients): Clients => (c === null ? {} : "stream" in c ? { "anthropic-api": c } : c);
+
+async function listen(client: ClaudeClient | null | Clients): Promise<string> {
   const app = express();
   app.use(express.json({ limit: "10mb" }));
-  app.post("/api/board", createBoardHandler(client));
+  app.post("/api/board", createBoardHandler(asClients(client)));
   server = app.listen(0);
   await new Promise<void>((resolve) => server!.once("listening", () => resolve()));
   return `http://127.0.0.1:${(server!.address() as AddressInfo).port}/api/board`;
@@ -36,7 +40,7 @@ function parseSse(text: string): Ev[] {
     });
 }
 
-async function post(client: ClaudeClient | null, body: unknown): Promise<Ev[]> {
+async function post(client: ClaudeClient | null | Clients, body: unknown): Promise<Ev[]> {
   const url = await listen(client);
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   expect(res.headers.get("content-type")).toBe("text/event-stream");
@@ -185,5 +189,59 @@ describe("POST /api/board", () => {
       if (client) expect((client as ReturnType<typeof fakeClaude>).calls).toHaveLength(0);
       server!.close();
     }
+  });
+
+  describe("providers", () => {
+    const PLAN = "claude-sonnet-5-5@subscription";
+    const API = "claude-sonnet-5-5";
+    const HAIKU = "claude-haiku-5-5";
+
+    it("the switch off hides the plan models", () => {
+      expect(availableModelIds({ "anthropic-api": fakeClaude([]) })).toEqual([API, HAIKU]);
+      expect(availableModelIds({ "anthropic-api": fakeClaude([]), "claude-subscription": fakeClaude([]) })).toEqual([API, HAIKU, PLAN, "claude-haiku-5-5@subscription"]);
+      expect(availableModelIds({})).toEqual([]);
+    });
+
+    it("a plan model goes to the subscription client with its plan id", async () => {
+      const api = fakeClaude([]);
+      const plan = fakeClaude([ok]);
+      const evs = await post({ "anthropic-api": api, "claude-subscription": plan }, { delta: "hola", model: PLAN });
+      expect(evs.at(-1)!.data).toMatchObject({ model: PLAN });
+      expect(plan.calls.map((c) => c.params.model)).toEqual([PLAN]);
+      expect(api.calls).toHaveLength(0);
+    });
+
+    it("an API model still goes to the API client when the plan is on", async () => {
+      const api = fakeClaude([ok]);
+      const plan = fakeClaude([]);
+      await post({ "anthropic-api": api, "claude-subscription": plan }, { delta: "hola", model: API });
+      expect(api.calls.map((c) => c.params.model)).toEqual([API]);
+      expect(plan.calls).toHaveLength(0);
+    });
+
+    it("a plan model with the switch off falls back to the default, never to its API twin", async () => {
+      const api = fakeClaude([ok]);
+      const evs = await post({ "anthropic-api": api }, { delta: "hola", model: PLAN });
+      expect(evs.at(-1)!.data).toMatchObject({ model: HAIKU });
+      expect(api.calls.map((c) => c.params.model)).toEqual([HAIKU]);
+    });
+
+    it("with no API key, an API model does not fall back to a plan model: it errors", async () => {
+      const plan = fakeClaude([]);
+      const evs = await post({ "claude-subscription": plan }, { delta: "hola", model: API });
+      expect(evs).toEqual([{ event: "error", data: { message: "Missing API key in .env" } }]);
+      expect(plan.calls).toHaveLength(0);
+    });
+
+    it("login and plan-limit errors show without the HTTP status; others keep it", async () => {
+      const msg = async (status: number, text: string) => {
+        const evs = await post({ "claude-subscription": fakeClaude([[fail(status, text)]]), "anthropic-api": fakeClaude([]) }, { delta: "hola", model: PLAN });
+        server!.close();
+        return evs.find((e) => e.event === "error")!.data.message;
+      };
+      expect(await msg(401, "not logged in")).toBe("Error calling Claude: not logged in");
+      expect(await msg(402, "plan limit reached")).toBe("Error calling Claude: plan limit reached");
+      expect(await msg(400, "bad")).toBe("Error calling Claude (HTTP 400): bad");
+    });
   });
 });

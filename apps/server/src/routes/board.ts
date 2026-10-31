@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
-import { DEFAULT_LANG, DEFAULT_MODEL, ZONE_KINDS, isLang, isModelId, normalizeCatalogs } from "@grafito/contract";
+import { DEFAULT_LANG, DEFAULT_MODEL, MODELS, ZONE_KINDS, isLang, normalizeCatalogs } from "@grafito/contract";
+import type { Provider } from "@grafito/contract";
 import { isCatalogId } from "@grafito/icons";
 import type { ClaudeClient } from "../claude/client";
 import { systemPrompt } from "../prompt/system";
@@ -14,26 +15,39 @@ function validateCatalogs(raw: unknown): string | null {
   return bad === undefined ? null : `Invalid catalog: ${JSON.stringify(bad)}`;
 }
 
+/** The adapters that are on, by provider. A missing provider is not available (no key, or the switch is off). */
+export type Clients = Partial<Record<Provider, ClaudeClient>>;
+
+/** Ids of the models whose provider has an adapter, in catalog order. */
+export function availableModelIds(clients: Clients): string[] {
+  return MODELS.filter((m) => clients[m.provider]).map((m) => m.id);
+}
+
 function sse(res: Response, event: string, data: unknown) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
 /**
  * `POST /api/board`: validates the request, streams Claude's ops back over SSE
- * (events `op`, `usage`, `error`, `done`). `client` is null when there is no usable API key.
+ * (events `op`, `usage`, `error`, `done`). The adapter is picked by the model's provider; a model
+ * whose provider is off falls back to `DEFAULT_MODEL` (never to the API twin of a plan model).
  */
-export function createBoardHandler(client: ClaudeClient | null) {
+export function createBoardHandler(clients: Clients) {
   return async function boardHandler(req: Request, res: Response) {
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
     });
+    const { delta, summary, board, model, shape, mode: rawMode, catalogs: rawCatalogs, lang: rawLang } = req.body ?? {};
+    // An unknown or unavailable model falls back quietly to the default.
+    const available = availableModelIds(clients);
+    const useModel = available.includes(model) ? model : DEFAULT_MODEL;
+    const client = clients[MODELS.find((m) => m.id === useModel)!.provider];
     if (!client) {
       sse(res, "error", { message: "Missing API key in .env" });
       return res.end();
     }
-    const { delta, summary, board, model, shape, mode: rawMode, catalogs: rawCatalogs, lang: rawLang } = req.body ?? {};
     if (typeof delta !== "string" || !delta.trim()) {
       sse(res, "error", { message: "The text is empty" });
       return res.end();
@@ -53,7 +67,6 @@ export function createBoardHandler(client: ClaudeClient | null) {
     }
     const catalogs = normalizeCatalogs(rawCatalogs ?? []);
     const mode: BoardMode = rawMode === "instruction" ? "instruction" : "content";
-    const useModel = isModelId(model) ? model : DEFAULT_MODEL;
     // Like the model, an unknown language falls back instead of failing the request.
     const lang = isLang(rawLang) ? rawLang : DEFAULT_LANG;
 
@@ -96,7 +109,8 @@ export function createBoardHandler(client: ClaudeClient | null) {
       }
     } catch (e: any) {
       if (!abort.signal.aborted) {
-        const status = e?.status ? ` (HTTP ${e.status})` : "";
+        // Login and plan-limit errors already say it all; the status would only add noise.
+        const status = e?.status && e.status !== 401 && e.status !== 402 ? ` (HTTP ${e.status})` : "";
         sse(res, "error", { message: `Error calling Claude${status}: ${e?.message ?? e}` });
       }
     }
