@@ -11,6 +11,7 @@ import { addServiceIcon, enterStamp, hideStamp, entrancePlan, removeStamp } from
 import { RED } from "@grafito/board";
 import { buildVisual, hideForDraw, hideText, measure, showAll } from "./visuals";
 import type { Visual } from "./visuals";
+import { standaloneSvg } from "./svg-export";
 
 const NS = "http://www.w3.org/2000/svg";
 class Cancel extends Error {}
@@ -101,6 +102,11 @@ export class Engine implements Sink, Executor {
     cancelAnimationFrame(this.raf);
     this.ro.disconnect();
     this.cleanup.forEach((f) => f());
+  }
+
+  /** The board as a standalone SVG file, styles inlined. */
+  exportSvg(): string {
+    return standaloneSvg(this.svg);
   }
 
   setTarget(tree: RenderTree, bounds: Rect) {

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { en } from "./en";
 import { es } from "./es";
+import { browserStore } from "../storage";
 
 /** The one language setting: UI text, speech recognition, `<html lang>` and the `lang` sent to the server. */
 export const LANGS = [
@@ -31,10 +32,8 @@ export function matchLang(tag: string | undefined): Lang {
 }
 
 function initialLang(): Lang {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (isLang(saved)) return saved;
-  } catch { /* storage unavailable */ }
+  const saved = browserStore.get(STORAGE_KEY);
+  if (isLang(saved)) return saved;
   return matchLang(typeof navigator !== "undefined" ? navigator.language : undefined);
 }
 
@@ -48,7 +47,7 @@ export const getLang = (): Lang => current;
 export function setLang(lang: Lang): void {
   if (lang === current) return;
   current = lang;
-  try { localStorage.setItem(STORAGE_KEY, lang); } catch { /* storage unavailable */ }
+  browserStore.set(STORAGE_KEY, lang);
   applyHtmlLang();
   listeners.forEach((f) => f());
 }

@@ -4,15 +4,16 @@ import { Player } from "@grafito/board";
 import type { Subtitle } from "@grafito/board";
 import { DEMOS } from "./demos";
 import { Engine } from "./render/engine";
-import { LivePanel } from "./live/LivePanel";
+import { LivePanel } from "./live/ui/LivePanel";
 import { useT } from "./i18n";
+import { readFlag, writeFlag } from "./storage";
 import { IconChevron, IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
 
 type Status = "idle" | "playing" | "paused" | "done";
 type Mode = "demo" | "live";
+const TRANSCRIPT_KEY = "grafito.transcript";
 
 const urlMode = (): Mode | null => { const m = new URLSearchParams(location.search).get("mode"); return m === "live" || m === "demo" ? m : null; };
-const readTranscript = () => { try { return localStorage.getItem("grafito.transcript") !== "0"; } catch { return true; } };
 
 export function BoardApp() {
   const t = useT();
@@ -34,7 +35,7 @@ export function BoardApp() {
   const [summary, setSummary] = useState("");
   // Without ?mode= in the URL the default depends on whether the server has an API key: live if so, demo if not.
   const [mode, setMode] = useState<Mode | null>(urlMode);
-  const [showTranscript, setShowTranscript] = useState(readTranscript);
+  const [showTranscript, setShowTranscript] = useState(() => readFlag(TRANSCRIPT_KEY, true));
 
   const setStatus = (s: Status) => { status.current = s; setSt(s); };
 
@@ -74,7 +75,7 @@ export function BoardApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time health probe on mount
   }, []);
 
-  useEffect(() => { try { localStorage.setItem("grafito.transcript", showTranscript ? "1" : "0"); } catch { /* storage unavailable */ } }, [showTranscript]);
+  useEffect(() => writeFlag(TRANSCRIPT_KEY, showTranscript), [showTranscript]);
 
   useEffect(() => { speedRef.current = speed; if (engine.current) engine.current.userSpeed = speed; }, [speed]);
 
@@ -149,6 +150,7 @@ export function BoardApp() {
 
       <LivePanel
         getCtrl={() => ctrl.current}
+        exportSvg={() => engine.current?.exportSvg() ?? null}
         onSubtitle={setSub}
         onClear={() => { resetAll(); }}
         active={mode === "live"}

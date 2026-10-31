@@ -69,6 +69,7 @@ export const es = {
   "save.failed": "No se pudo guardar en sessions/ ({error}); queda copia en el navegador.",
   "import.failed": "No se pudo importar: {error}",
   "import.notRecord": "no es un registro de grafito",
+  "record.outdated": "Esta sesión la guardó una versión anterior de grafito y no se puede restaurar.",
   "mic.error": "Error de voz",
   "mic.reconnecting": "Reconectando el micrófono…",
   "mic.listening": "Escuchando",

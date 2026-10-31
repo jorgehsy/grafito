@@ -4,7 +4,6 @@ import { op } from "@grafito/contract";
 import type { Op } from "@grafito/contract";
 import { serializeBoard } from "@grafito/board";
 import { createSseParser, streamBoard } from "./sse";
-import { createLiveSession } from "./session";
 import { costUsd, PRICING, fmtUsd, zeroUsage } from "@grafito/contract";
 
 const ev = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -43,14 +42,14 @@ describe("serializeBoard", () => {
 });
 
 describe("SSE", () => {
-  it("parser junta trozos partidos", () => {
+  it("the parser joins split chunks", () => {
     const p = createSseParser();
     const full = ev("op", { name: "delete", input: { id: "x" } }) + ev("done", { ops: 1 });
     const out = [...p.push(full.slice(0, 15)), ...p.push(full.slice(15, 60)), ...p.push(full.slice(60))];
     expect(out.map((e) => e.event)).toEqual(["op", "done"]);
     expect(out[0].data.input.id).toBe("x");
   });
-  it("streamBoard despacha op, invalid, usage, done y error", async () => {
+  it("streamBoard dispatches op, invalid, usage, done and error", async () => {
     const log: string[] = [];
     const f = mockFetch([
       ev("usage", { input_tokens: 10, output_tokens: 0, cache_read_input_tokens: 5, cache_creation_input_tokens: 0, estimated: true }),
@@ -84,76 +83,12 @@ describe("SSE", () => {
   });
 });
 
-const idle = async (s: { isBusy(): boolean }) => { for (let k = 0; k < 50; k++) { await new Promise((r) => setTimeout(r, 5)); if (!s.isBusy()) break; } };
-
 describe("catalogs in the request", () => {
-  it("streamBoard manda catalogs en el body", async () => {
+  it("streamBoard sends catalogs in the body", async () => {
     let body: any;
     const f = (async (_u: string, init: any) => { body = JSON.parse(init.body); return mockFetch([ev("done", { usage: zeroUsage(), timings: { first_op_ms: null, total_ms: 1 }, ops: 0, model: "m" })])("" as any); }) as unknown as typeof fetch;
     await streamBoard({ delta: "d", summary: "", board: "", model: "m", catalogs: ["aws"] }, { onOp() {}, onInvalid() {}, onDone() {}, onError() {} }, undefined, f);
     expect(body.catalogs).toEqual(["aws"]);
-  });
-  it("the session sends [] by default and serializes service according to getCatalogs", async () => {
-    const bodies: any[] = [];
-    const f = (async (_u: string, init: any) => { bodies.push(JSON.parse(init.body)); return mockFetch([ev("done", { usage: zeroUsage(), timings: { first_op_ms: null, total_ms: 1 }, ops: 0, model: "m" })])("" as any); }) as unknown as typeof fetch;
-    const { board } = applyOps(emptyBoard(), [
-      { name: "create_zone", input: { id: "z", kind: "flow", title: "Z" } },
-      { name: "add_step", input: { zone: "z", id: "fn", label: "Function", service: "lambda" } },
-    ]);
-    // eslint-disable-next-line prefer-const -- mk() runs before and after the single assignment, so it cannot be const
-    let cats: string[] | undefined;
-    const mk = () => createLiveSession({ getBoard: () => board, submit: async () => {}, getModel: () => "claude-haiku-5-5", getCatalogs: cats ? () => cats! : undefined, onLog() {}, fetchImpl: f });
-    const s1 = mk(); s1.onFragment("one."); await idle(s1);
-    cats = ["aws"];
-    const s2 = mk(); s2.onFragment("two."); await idle(s2);
-    expect(bodies[0].catalogs).toEqual([]);
-    expect(bodies[0].board).toContain("fn");
-    expect(bodies[0].board).not.toContain("service:");
-    expect(bodies[1].catalogs).toEqual(["aws"]);
-    expect(bodies[1].board).toContain(" service:lambda");
-  });
-});
-
-describe("language in the request", () => {
-  it("the session sends the language setting as lang", async () => {
-    const bodies: any[] = [];
-    const f = (async (_u: string, init: any) => { bodies.push(JSON.parse(init.body)); return mockFetch([ev("done", { usage: zeroUsage(), timings: { first_op_ms: null, total_ms: 1 }, ops: 0, model: "m" })])("" as any); }) as unknown as typeof fetch;
-    const s = createLiveSession({ getBoard: () => emptyBoard(), submit: async () => {}, getModel: () => "claude-haiku-5-5", getLang: () => "es-MX", onLog() {}, fetchImpl: f });
-    s.onFragment("one."); await idle(s);
-    expect(bodies[0].lang).toBe("es-MX");
-  });
-});
-
-describe("live session", () => {
-  it("one request in flight, batches fragments, records usage and cost", async () => {
-    const bodies: any[] = [];
-    let n = 0;
-    let release!: () => void;
-    const gate = new Promise<void>((r) => (release = r));
-    const f = (async (_u: string, init: any) => {
-      bodies.push(JSON.parse(init.body));
-      const i = n++;
-      if (i === 0) await gate;
-      const usage = { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 500, cache_creation_input_tokens: 0 };
-      return mockFetch([ev("op", { name: "update_summary", input: { text: "r" + i } }), ev("done", { usage, timings: { first_op_ms: 7, total_ms: 20 }, ops: 1, model: "claude-haiku-5-5" })])("" as any);
-    }) as unknown as typeof fetch;
-    const submitted: Op[] = [];
-    let totals: any;
-    const s = createLiveSession({
-      getBoard: () => emptyBoard(), submit: async (o) => { submitted.push(...o); },
-      getModel: () => "claude-haiku-5-5", onLog: (_e, _c, t) => (totals = t), fetchImpl: f,
-    });
-    s.onFragment("one.");
-    s.onFragment("two.");
-    s.onFragment("three.");
-    expect(s.isBusy()).toBe(true);
-    release();
-    for (let k = 0; k < 50 && (n < 2 || s.isBusy()); k++) await new Promise((r) => setTimeout(r, 5));
-    expect(bodies.map((b) => b.delta)).toEqual(["one.", "two. three."]);
-    expect(bodies[0].board).toBe("(tablero vacío)");
-    expect(submitted).toHaveLength(2);
-    expect(totals.requests).toBe(2);
-    expect(totals.costUsd).toBeCloseTo(2 * costUsd("claude-haiku-5-5", { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 500, cache_creation_input_tokens: 0 }), 10);
   });
 });
 

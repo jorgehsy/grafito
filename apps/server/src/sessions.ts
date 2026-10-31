@@ -3,9 +3,9 @@ import type { Request, Response } from "express";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseRecord } from "@grafito/contract";
 
 export const DEFAULT_DIR = resolve(fileURLToPath(new URL("..", import.meta.url)), "sessions");
-const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const FILE_RE = /^[A-Za-z0-9_-]+\.json$/;
 const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -14,17 +14,6 @@ export const fileTimestamp = (t: number) => {
   const d = new Date(t);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
 };
-
-/** Minimal validation; returns the rejection reason or null. */
-export function validateRecord(r: any): string | null {
-  if (!r || typeof r !== "object" || Array.isArray(r)) return "The record must be an object";
-  if (r.version !== 1) return "version must be 1";
-  if (typeof r.id !== "string" || !ID_RE.test(r.id)) return "invalid id";
-  if (typeof r.startedAt !== "number" || !Number.isFinite(r.startedAt)) return "invalid startedAt";
-  if (!Array.isArray(r.requests)) return "requests must be a list";
-  if (r.transcript !== undefined && !Array.isArray(r.transcript)) return "transcript must be a list";
-  return null;
-}
 
 export function createSessionsHandlers(dir: string = DEFAULT_DIR) {
   const root = resolve(dir);
@@ -37,9 +26,10 @@ export function createSessionsHandlers(dir: string = DEFAULT_DIR) {
   }
 
   async function save(req: Request, res: Response) {
-    const rec = req.body;
-    const bad = validateRecord(rec);
-    if (bad) return void res.status(400).json({ error: bad });
+    const parsed = parseRecord(req.body);
+    if (!parsed.ok) return void res.status(400).json({ error: parsed.error });
+    // The parsed record, not the body: a record id is safe in a file name, and unknown keys are dropped.
+    const rec = parsed.record;
     const body = JSON.stringify(rec, null, 2);
     if (Buffer.byteLength(body) > MAX_BYTES) return void res.status(413).json({ error: "Record too large" });
     try {

@@ -4,18 +4,8 @@ const STYLE_PROPS = [
   "text-anchor", "dominant-baseline", "visibility", "display",
 ];
 
-export function download(name: string, content: string, type: string) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
-  const a = document.createElement("a");
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-/** Serializes the board SVG with computed styles inlined so it looks the same opened alone. null if there is no board. */
-export function boardSvgText(): string | null {
-  const src = document.querySelector<SVGSVGElement>(".canvas2 svg");
-  if (!src) return null;
+/** Serializes an SVG with its computed styles inlined, so it looks the same opened alone. */
+export function standaloneSvg(src: SVGSVGElement): string {
   const clone = src.cloneNode(true) as SVGSVGElement;
   const a = [src, ...Array.from(src.querySelectorAll("*"))];
   const b = [clone, ...Array.from(clone.querySelectorAll("*"))];

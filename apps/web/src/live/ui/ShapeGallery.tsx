@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { useT } from "../i18n";
-import type { MessageKey } from "../i18n";
+import { useT } from "../../i18n";
+import type { MessageKey } from "../../i18n";
 
 /** 48×32 thumbnail sketches in thin strokes: just enough to recognize a shape at a glance. */
 export const T = ({ children }: { children: ReactNode }) => (

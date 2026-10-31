@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { BOARD_SYSTEM_PROMPT, systemPromptFor } from "./system";
-import { toolDefs } from "@grafito/contract";
+import { PROMPT_VERSION, toolDefs } from "@grafito/contract";
 import { AWS_SERVICES } from "@grafito/icons";
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -12,6 +12,8 @@ describe("catalog off (cache intact)", () => {
   it("prompt and tools are byte for byte what they were before the catalog", () => {
     expect(sha(BOARD_SYSTEM_PROMPT)).toBe("bef3c145ac02388481e2598134e648d54533e68e0b5a92c1e789f0289c99f67e");
     expect(sha(JSON.stringify(toolDefs([])))).toBe("b1e29c3b1aeab8be449e9564342b5991f5552b0ec74b6fb575b14e28c9b2dbd7");
+    // Session records stamp each request with PROMPT_VERSION: bump it whenever these hashes change.
+    expect(PROMPT_VERSION).toBe(1);
     expect(systemPromptFor([])).toBe(BOARD_SYSTEM_PROMPT);
   });
   it("Claude receives nothing from the catalog", () => {

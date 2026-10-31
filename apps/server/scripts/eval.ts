@@ -5,7 +5,7 @@ import { emptyBoard, applyOps } from "@grafito/board";
 import type { Board } from "@grafito/board";
 import type { Op } from "@grafito/contract";
 import { serializeBoard } from "@grafito/board";
-import { CATALOG_IDS, costUsd, parseOp } from "@grafito/contract";
+import { CATALOG_IDS, costUsd, parseOp, parseRecord } from "@grafito/contract";
 import { buildUserText } from "../src/prompt/user-text";
 
 const USAGE = `Usage: pnpm eval <command> [options]
@@ -33,14 +33,20 @@ if (!file || !instruction) {
 const URL = "http://localhost:8787/api/board";
 const MODEL = "claude-sonnet-5-5";
 
+const parsed = parseRecord(JSON.parse(readFileSync(file, "utf8")));
+if (!parsed.ok) {
+  console.error(`${file}: ${parsed.error}`);
+  process.exit(1);
+}
+const rec = parsed.record;
+
 // Rebuild the board from the ops of the requests that did not fail.
-const rec = JSON.parse(readFileSync(file, "utf8"));
 let board: Board = emptyBoard();
 // --upto N: only the first N requests (failed ones count).
-for (const r of (rec.requests ?? []).slice(0, upto)) {
+for (const r of rec.requests.slice(0, upto)) {
   if (r.error) continue;
   // Recorded ops may carry service icons: parse them with every known catalog on.
-  const ops = (r.ops ?? []).flatMap((o: unknown) => {
+  const ops = r.ops.flatMap((o) => {
     const p = parseOp(o, CATALOG_IDS);
     return p.ok ? [p.op] : [];
   });

@@ -289,7 +289,7 @@ Every finished speech result of a live session, in order, with its time.
 _Avoid_: transcripción, subtitles, log
 
 **Session record**:
-The saved file of a live session: Claude model, shape preference, language, requests, transcript and summary. It can be exported, imported and restored.
+The saved file of a live session: Claude model, shape preference, language (`speechLang`), requests (each with its batch, ops, warnings and prompt version), transcript and summary. It can be exported, imported and restored. Version 2; version 1 records (0.2.0-alpha.4 and earlier) are rejected.
 _Avoid_: registro, registro de sesión, prueba, log, save file
 
 **Claude model**:

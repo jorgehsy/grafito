@@ -12,7 +12,14 @@ const fakeRes = () => {
   r.send = (b: unknown) => { r.body = b; return r; };
   return r;
 };
-const rec = (id: string, extra: object = {}) => ({ version: 1, id, startedAt: new Date(2026, 0, 2, 3, 4, 5).getTime(), requests: [{ n: 1 }], transcript: [], totals: { requests: 1, costUsd: 0.25 }, ...extra });
+const request = (n: number) => ({
+  n, model: "m", promptVersion: 1, batch: "t", mode: "content", startedAt: 0, firstOpMs: null, voiceFirstMs: null, totalMs: null,
+  ops: [], warnings: [], usage: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 }, costUsd: 0.25,
+});
+const rec = (id: string, extra: object = {}) => ({
+  version: 2, id, startedAt: new Date(2026, 0, 2, 3, 4, 5).getTime(), updatedAt: 0, model: "m", shape: "auto", speechLang: "en-US",
+  requests: [request(1)], transcript: [], summary: "", totals: { requests: 1, costUsd: 0.25, medianVoiceFirstMs: null }, ...extra,
+});
 
 let dir: string;
 beforeEach(async () => { dir = join(await mkdtemp(join(tmpdir(), "grafito-")), "sessions"); });
@@ -25,17 +32,20 @@ describe("saved sessions", () => {
     await h.save({ body: rec("abc") } as any, r);
     expect(r.body.file).toBe("2026-01-02_03-04-05_abc.json");
     r = fakeRes();
-    await h.save({ body: rec("abc", { startedAt: 5, requests: [{ n: 1 }, { n: 2 }] }) } as any, r);
+    await h.save({ body: rec("abc", { startedAt: 5, requests: [request(1), request(2)] }) } as any, r);
     expect(await readdir(dir)).toEqual(["2026-01-02_03-04-05_abc.json"]);
     expect(JSON.parse(await readFile(join(dir, r.body.file), "utf8")).requests).toHaveLength(2);
   });
   it("rejects invalid records and ids with a path", async () => {
     const h = createSessionsHandlers(dir);
-    for (const body of [null, { version: 2 }, rec("../x"), rec("a/b"), rec("abc", { requests: "no" })]) {
+    for (const body of [null, { version: 2 }, rec("abc", { version: 1 }), rec("../x"), rec("a/b"), rec("abc", { requests: "no" })]) {
       const r = fakeRes();
       await h.save({ body } as any, r);
       expect(r.code).toBe(400);
     }
+    const old = fakeRes();
+    await h.save({ body: rec("abc", { version: 1 }) } as any, old);
+    expect(old.body.error).toBe("This session was saved by an older grafito and cannot be restored.");
     await expect(readdir(dir)).rejects.toThrow(); // nothing was created
   });
   it("lists and reads; rejects traversal", async () => {

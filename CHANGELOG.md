@@ -12,6 +12,7 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 - Demos have English ids, the `architecture` demo is in English, and the URL is `?mode=demo&demo=<id>`.
 - New command: `pnpm --filter @grafito/server eval instruction ...`.
 - Server error messages are in English.
+- **Breaking:** saved sessions from 0.2.0-alpha.4 and earlier no longer load. Session records are now version 2, with clearer field names (`batch`, `warnings`, `speechLang`) and the prompt version of each request.
 
 ## v0.2.0-alpha.4 · 2026-10-27
 

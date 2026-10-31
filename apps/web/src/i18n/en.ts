@@ -72,6 +72,7 @@ export const en = {
   "save.failed": "Could not save to sessions/ ({error}); a copy stays in the browser.",
   "import.failed": "Could not import: {error}",
   "import.notRecord": "not a grafito session record",
+  "record.outdated": "This session was saved by an older grafito and cannot be restored.",
   "mic.error": "Voice error",
   "mic.reconnecting": "Reconnecting the microphone…",
   "mic.listening": "Listening",

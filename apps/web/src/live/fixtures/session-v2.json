@@ -1,0 +1,96 @@
+{
+  "version": 2,
+  "id": "fixture2a7k",
+  "startedAt": 1792773180000,
+  "updatedAt": 1792773290000,
+  "model": "claude-sonnet-5-5",
+  "shape": "auto",
+  "speechLang": "en-US",
+  "requests": [
+    {
+      "n": 1,
+      "model": "claude-sonnet-5-5",
+      "promptVersion": 1,
+      "batch": "let's draw how an order goes from the shop to the warehouse",
+      "mode": "content",
+      "startedAt": 1792773200000,
+      "firstOpMs": 2100,
+      "voiceFirstMs": 2900,
+      "totalMs": 3400,
+      "ops": [
+        { "name": "create_zone", "input": { "id": "orders", "kind": "flow", "title": "Order flow" } },
+        { "name": "add_step", "input": { "zone": "orders", "id": "shop", "label": "Shop takes the order" } },
+        { "name": "add_step", "input": { "zone": "orders", "id": "pay", "label": "Payment" } },
+        { "name": "connect", "input": { "id": "c_shop_pay", "from": "shop", "to": "pay" } },
+        { "name": "update_summary", "input": { "text": "An order goes from the shop to payment." } }
+      ],
+      "warnings": [],
+      "usage": { "input": 166, "cacheRead": 0, "cacheWrite": 10062, "output": 240 },
+      "costUsd": 0.028887
+    },
+    {
+      "n": 2,
+      "model": "claude-sonnet-5-5",
+      "promptVersion": 1,
+      "batch": "then a function sends it to the warehouse",
+      "mode": "content",
+      "startedAt": 1792773230000,
+      "firstOpMs": 1800,
+      "voiceFirstMs": 3100,
+      "totalMs": 2600,
+      "ops": [
+        { "name": "add_step", "input": { "zone": "orders", "id": "ship", "label": "Send to warehouse", "service": "lambda" } },
+        { "name": "connect", "input": { "id": "c_pay_ship", "from": "pay", "to": "ship", "label": "paid" } },
+        { "name": "update_summary", "input": { "text": "An order goes from the shop to payment, and a function sends it to the warehouse." } }
+      ],
+      "warnings": ["add_mark: zone: Invalid input"],
+      "usage": { "input": 220, "cacheRead": 10062, "cacheWrite": 0, "output": 180 },
+      "costUsd": 0.004252
+    },
+    {
+      "n": 3,
+      "model": "claude-sonnet-5-5",
+      "promptVersion": 1,
+      "batch": "make it a tree",
+      "mode": "instruction",
+      "undone": true,
+      "startedAt": 1792773250000,
+      "firstOpMs": 2500,
+      "voiceFirstMs": null,
+      "totalMs": 4100,
+      "ops": [
+        { "name": "delete", "input": { "id": "orders" } },
+        { "name": "create_zone", "input": { "id": "orders_tree", "kind": "tree", "title": "Order flow" } },
+        { "name": "add_branch", "input": { "zone": "orders_tree", "id": "shop2", "label": "Shop" } },
+        { "name": "update_summary", "input": { "text": "The order flow as a tree." } }
+      ],
+      "warnings": [],
+      "usage": { "input": 300, "cacheRead": 10062, "cacheWrite": 0, "output": 400 },
+      "costUsd": 0.007212
+    },
+    {
+      "n": 4,
+      "model": "claude-sonnet-5-5",
+      "promptVersion": 1,
+      "batch": "and the warehouse ships it",
+      "mode": "content",
+      "startedAt": 1792773270000,
+      "firstOpMs": null,
+      "voiceFirstMs": null,
+      "totalMs": 900,
+      "ops": [],
+      "warnings": [],
+      "usage": { "input": 0, "cacheRead": 0, "cacheWrite": 0, "output": 0 },
+      "costUsd": 0,
+      "error": "Error calling Claude: overloaded"
+    }
+  ],
+  "transcript": [
+    { "text": "let's draw how an order goes from the shop to the warehouse", "at": 1792773197100 },
+    { "text": "then a function sends it to the warehouse", "at": 1792773226900 },
+    { "text": "grafito make it a tree", "at": 1792773249000 },
+    { "text": "and the warehouse ships it", "at": 1792773269000 }
+  ],
+  "summary": "An order goes from the shop to payment, and a function sends it to the warehouse.",
+  "totals": { "requests": 3, "costUsd": 0.040351, "medianVoiceFirstMs": 3000 }
+}
