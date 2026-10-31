@@ -1,37 +1,49 @@
 // Eval CLI for the server. It replays saved session records against instructions to compare prompt
-// changes; only `instruction` and `baseline` without --dry call the Claude API, through a running server.
+// changes; only `instruction` and `baseline` without --dry call Claude, through a board handler it serves itself.
+import { fileURLToPath } from "node:url";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { config } from "dotenv";
+import express from "express";
 import { applyOps, emptyBoard, serializeBoard } from "@grafito/board";
 import type { Board } from "@grafito/board";
-import { DEFAULT_LANG, EVAL_MODEL, costUsd, isLang, parseOp, parseRecord } from "@grafito/contract";
+import { DEFAULT_LANG, EVAL_MODEL, MODELS, costUsd, isLang, isModelId, parseOp, parseRecord } from "@grafito/contract";
 import type { Lang, Op, SessionRecord } from "@grafito/contract";
 import { CATALOG_IDS } from "@grafito/icons";
+import { buildClients } from "../src/claude/clients";
+import { createBoardHandler } from "../src/routes/board";
 import { languageLine } from "../src/prompt/system";
 import { buildUserText } from "../src/prompt/user-text";
 import { convertV1 } from "./convert-v1";
 
+// The .env key wins over one inherited from the shell, as in the server.
+config({ override: true, path: fileURLToPath(new URL("../.env", import.meta.url)) });
+
 const USAGE = `Usage: pnpm eval <command> [options]
 
 Commands:
-  instruction <record.json> "<instruction>" [--dry] [--upto N]
+  instruction <record.json> "<instruction>" [--dry] [--upto N] [--model <id>]
       Replay a saved session record and run an instruction against it.
       --dry     print the board, the language line and the user text only, without calling Claude
       --upto N  replay only the first N requests of the record
-  baseline <record.json | dir>... [--dry] [--json <out.json>]
+  baseline <record.json | dir>... [--dry] [--json <out.json>] [--model <id>]
       Run each baseline instruction against each record (the eval of #5: 3 records x 2 instructions)
       and end with a table: invalid ops, missing labels, zones and cost per run.
       --json    also write the results, labels included, to a file
+  Both accept --model <id>: the model to run (default ${EVAL_MODEL}). Models: ${MODELS.map((m) => m.id).join(", ")}.
+      A "@subscription" model runs on your Claude plan (cost "included in plan"): no ANTHROPIC_API_KEY
+      and no GRAFITO_SUBSCRIPTION needed, only a logged-in Claude Code.
+      e.g. pnpm eval instruction rec.json "..." --model claude-sonnet-5-5@subscription
   convert-v1 <record.json | dir>... --out <dir>
       Convert version 1 session records to version 2 (same file names) into <dir>.
 
-Instruction and baseline runs post to the server at http://localhost:8787 (start it with an API key).`;
+Instruction and baseline runs need ANTHROPIC_API_KEY (apps/server/.env) unless the model is a plan model.`;
 
 /** The instructions of the recorded baseline, verbatim: they are what the user said. */
 const BASELINE_INSTRUCTIONS = ["separa esto en dos diagramas", "convierte esto en un árbol"];
 
-const URL = "http://localhost:8787/api/board";
-const MODEL = EVAL_MODEL;
+let MODEL: string = EVAL_MODEL;
+let url: string | null = null;
 
 function fail(message: string): never {
   console.error(message);
@@ -50,6 +62,30 @@ function parseArgs(args: string[], flags: Record<string, boolean>) {
     else values[a] = args[++k];
   }
   return { positional, values };
+}
+
+/** Reads `--model` (default EVAL_MODEL) and makes it the model of the runs. */
+function pickModel(value: string | true | undefined) {
+  if (value === undefined) return;
+  if (!isModelId(value)) fail(`Unknown model: ${String(value)}. Models: ${MODELS.map((m) => m.id).join(", ")}`);
+  MODEL = value;
+}
+
+/** Serves the board handler in this process, with only the adapter the model needs; returns its URL. */
+async function boardUrl(): Promise<string> {
+  if (url) return url;
+  const provider = MODELS.find((m) => m.id === MODEL)!.provider;
+  const clients = buildClients({ apiKey: process.env.ANTHROPIC_API_KEY, subscription: provider === "claude-subscription" });
+  if (!clients[provider]) fail(`Missing API key: set ANTHROPIC_API_KEY in apps/server/.env, or use a plan model (--model ${MODEL}@subscription).`);
+  const app = express();
+  app.use(express.json({ limit: "10mb" }));
+  app.post("/api/board", createBoardHandler(clients));
+  const server = await new Promise<import("node:http").Server>((ok) => {
+    const s = app.listen(0, "127.0.0.1", () => ok(s));
+  });
+  server.unref();
+  url = `http://127.0.0.1:${(server.address() as import("node:net").AddressInfo).port}/api/board`;
+  return url;
 }
 
 const jsonFiles = (paths: string[]) =>
@@ -112,7 +148,7 @@ async function run(rec: SessionRecord, name: string, instruction: string, opts: 
     return null;
   }
 
-  const res = await fetch(URL, {
+  const res = await fetch(await boardUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ delta: instruction, summary, board: original, model: MODEL, mode: "instruction", lang }),
@@ -219,14 +255,16 @@ function printTable(results: RunResult[]) {
 const [command, ...args] = process.argv.slice(2);
 
 if (command === "instruction") {
-  const { positional, values } = parseArgs(args, { "--dry": false, "--upto": true });
+  const { positional, values } = parseArgs(args, { "--dry": false, "--upto": true, "--model": true });
   const [file, instruction] = positional;
   if (!file || !instruction) fail(USAGE);
+  pickModel(values["--model"]);
   const upto = values["--upto"] === undefined ? Infinity : Number(values["--upto"]);
   await run(loadRecord(file), basename(file, ".json"), instruction, { dry: !!values["--dry"], upto });
 } else if (command === "baseline") {
-  const { positional, values } = parseArgs(args, { "--dry": false, "--json": true });
+  const { positional, values } = parseArgs(args, { "--dry": false, "--json": true, "--model": true });
   if (!positional.length) fail(USAGE);
+  pickModel(values["--model"]);
   const files = jsonFiles(positional);
   const results: RunResult[] = [];
   for (const file of files) {
