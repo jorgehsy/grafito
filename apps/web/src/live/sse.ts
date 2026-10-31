@@ -1,4 +1,5 @@
 import { t } from "../i18n";
+import { parseOp } from "@grafito/contract";
 import type { Op } from "@grafito/contract";
 import type { Usage } from "@grafito/contract";
 
@@ -67,7 +68,13 @@ export async function streamBoard(
       const { value, done } = await reader.read();
       if (done) break;
       for (const { event, data } of parser.push(dec.decode(value, { stream: true }))) {
-        if (event === "op") data.invalid ? h.onInvalid(data.warning) : h.onOp({ name: data.name, input: data.input } as Op);
+        if (event === "op") {
+          // The server already checked it; parsing again makes the browser trust only what it can type.
+          const p = data.invalid ? null : parseOp(data, body.catalogs ?? []);
+          if (!p) h.onInvalid(data.warning);
+          else if (p.ok) h.onOp(p.op);
+          else h.onInvalid(p.error);
+        }
         else if (event === "usage") h.onUsage?.(data);
         else if (event === "done") h.onDone(data);
         else if (event === "error") h.onError(data.message);

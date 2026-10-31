@@ -1,34 +1,18 @@
 import { describe, expect, it } from "vitest";
-import Ajv from "ajv";
-import { OP_SCHEMAS, OP_TOOLS } from "@grafito/contract";
+import { parseOp } from "@grafito/contract";
 import { applyOps, emptyBoard } from "@grafito/board";
 import { DEMOS } from "./index";
 import { Player, latencyMs } from "@grafito/board";
-
-const ajv = new Ajv({ strict: true, allErrors: true });
-const validators = Object.fromEntries(OP_TOOLS.map((t) => [t.name, ajv.compile(t.input_schema)]));
-
-describe("herramientas", () => {
-  it("tienen forma de herramienta de Anthropic", () => {
-    for (const t of OP_TOOLS) {
-      expect(t.description.length).toBeGreaterThan(10);
-      expect(t.input_schema.type).toBe("object");
-      expect(Object.keys(OP_SCHEMAS)).toContain(t.name);
-    }
-    expect(OP_TOOLS).toHaveLength(21);
-  });
-});
 
 /** Guiones cortos de una sola zona: sin mínimo de zonas ni autocorrección, duración propia. */
 const SHORT = ["context", "cycle", "before-after", "prototypes", "compact"];
 
 describe.each(DEMOS)("demo $id", ({ id, demo }) => {
-  it("todas las ops validan contra su JSON Schema", () => {
+  it("todas las ops pasan parseOp", () => {
     const errors: string[] = [];
     for (const c of demo) for (const o of c.ops) {
-      const v = validators[o.name];
-      if (!v) errors.push(`op desconocida ${o.name}`);
-      else if (!v(o.input)) errors.push(`${o.name}: ${ajv.errorsText(v.errors)}`);
+      const r = parseOp(o, []);
+      if (!r.ok) errors.push(r.error);
     }
     expect(errors).toEqual([]);
   });

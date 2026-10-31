@@ -1,5 +1,4 @@
 // Pure board model. No React, no coordinates.
-import { MARK_TONES, TEXT_FIELDS, ZONE_KINDS } from "@grafito/contract";
 import { AWS_CATALOG_ID, AWS_SERVICES } from "@grafito/icons";
 import type { ComponentType, EmphasisStyle, MarkTone, Op, ZoneKind } from "@grafito/contract";
 
@@ -112,32 +111,25 @@ export function parseService(v: unknown): string | null {
   return AWS_SERVICES.some((s) => s.id === id) ? `${AWS_CATALOG_ID}:${id}` : null;
 }
 
-function inRange(v: unknown): v is number {
-  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100;
-}
-
+/**
+ * Applies one op. The op's shape is the contract's job (parseOp in @grafito/contract);
+ * here only the checks that need the board: ids that exist or are taken, zones of the right kind.
+ */
 export function applyOp(board: Board, op: Op): ApplyResult {
   const warnings: string[] = [];
-  const bad = (msg: string): ApplyResult => ({ board, warnings: [`${op?.name ?? "?"}: ${msg}`] });
-  if (!op || typeof op !== "object" || !op.input || typeof op.input !== "object") return bad("malformed operation");
+  const bad = (msg: string): ApplyResult => ({ board, warnings: [`${op.name}: ${msg}`] });
   const b = clone(board);
   const i = op.input as unknown as Record<string, any>;
 
-  const needNew = (v: unknown) => {
-    if (!str(v)) return "missing id";
-    if (idTaken(b, v)) return `id '${v}' already exists`;
-    return null;
-  };
+  const needNew = (v: string) => (idTaken(b, v) ? `id '${v}' already exists` : null);
 
   switch (op.name) {
     case "create_zone": {
       const e = needNew(i.id);
       if (e) return bad(e);
-      if (!ZONE_KINDS.includes(i.kind)) return bad("invalid kind");
-      if (!str(i.title)) return bad("missing title");
       let place: Zone["place"];
       if (i.place) {
-        if (!["right_of", "below"].includes(i.place.relation) || !findZone(b, i.place.of))
+        if (!findZone(b, i.place.of))
           warnings.push(`create_zone: place ignored (unknown zone '${i.place?.of}')`);
         else place = { relation: i.place.relation, of: i.place.of };
       }
@@ -161,12 +153,8 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (!ELEMENT_ZONE[type].includes(zone.kind)) return bad(`cannot add ${type} to a ${zone.kind} zone`);
       const label = type === "decision" ? i.question : type === "item" ? i.text : i.label;
-      if (!str(label)) return bad("missing text");
       const element: Element = { id: i.id, zone: zone.id, type, label };
-      if (type === "component") {
-        if (!["actor", "client", "service", "database", "queue", "storage", "external"].includes(i.type)) return bad("invalid component type");
-        element.comp = i.type;
-      }
+      if (type === "component") element.comp = i.type;
       const svc = type === "step" || type === "decision" || type === "component" ? parseService(i.service) : null;
       if (str(i.service) && (type === "step" || type === "decision" || type === "component") && !svc) {
         warnings.push(`${op.name}: unknown service '${i.service}'; ignored`);
@@ -196,7 +184,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const zone = findZone(b, i.zone);
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (zone.kind !== "tree") return bad(`cannot add branch to a ${zone.kind} zone`);
-      if (!str(i.label)) return bad("missing label");
       const element: Element = { id: i.id, zone: zone.id, type: "branch", label: i.label, ...(str(i.note) ? { note: i.note } : {}) };
       if (i.parent !== undefined) {
         const p = findElement(b, i.parent);
@@ -212,9 +199,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const zone = findZone(b, i.zone);
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (zone.kind !== "scale") return bad(`cannot add mark to a ${zone.kind} zone`);
-      if (!inRange(i.at)) return bad("at must be a number between 0 and 100");
-      if (!str(i.label)) return bad("missing label");
-      if (i.tone !== undefined && !MARK_TONES.includes(i.tone)) return bad("invalid tone");
       b.elements.push({
         id: i.id, zone: zone.id, type: "mark", label: i.label, at: i.at,
         ...(str(i.note) ? { note: i.note } : {}), tone: i.tone ?? "neutral",
@@ -227,7 +211,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const zone = findZone(b, i.zone);
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (zone.kind !== "cycle") return bad(`cannot add stage to a ${zone.kind} zone`);
-      if (!str(i.label)) return bad("missing label");
       const element: Element = { id: i.id, zone: zone.id, type: "stage", label: i.label, ...(str(i.note) ? { note: i.note } : {}) };
       if (i.after !== undefined) {
         const prev = findElement(b, i.after);
@@ -243,8 +226,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const zone = findZone(b, i.zone);
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (zone.kind !== "timeline") return bad(`cannot add event to a ${zone.kind} zone`);
-      if (!str(i.label)) return bad("missing label");
-      if (i.at !== undefined && !inRange(i.at)) return bad("at must be a number between 0 and 100");
       b.elements.push({
         id: i.id, zone: zone.id, type: "event", label: i.label,
         ...(str(i.when) ? { when: i.when } : {}), ...(str(i.note) ? { note: i.note } : {}),
@@ -258,10 +239,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const zone = findZone(b, i.zone);
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (zone.kind !== "timeline") return bad(`cannot add span to a ${zone.kind} zone`);
-      if (!inRange(i.from) || !inRange(i.to)) return bad("from and to must be numbers between 0 and 100");
-      if (!(i.from < i.to)) return bad("from must be less than to");
-      if (!str(i.label)) return bad("missing label");
-      if (i.tone !== undefined && !MARK_TONES.includes(i.tone)) return bad("invalid tone");
       b.elements.push({ id: i.id, zone: zone.id, type: "span", label: i.label, at: i.from, to: i.to, tone: i.tone ?? "neutral" });
       return { board: b, warnings };
     }
@@ -269,7 +246,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const zone = findZone(b, i.zone);
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (zone.kind !== "scale") return bad(`set_level only works on a scale zone, not ${zone.kind}`);
-      if (!inRange(i.at)) return bad("at must be a number between 0 and 100");
       zone.level = { at: i.at, ...(str(i.label) ? { label: i.label } : {}) };
       return { board: b, warnings };
     }
@@ -278,7 +254,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (e) return bad(e);
       if (!findElement(b, i.from)) return bad(`source '${i.from}' does not exist`);
       if (!findElement(b, i.to)) return bad(`target '${i.to}' does not exist`);
-      if (i.from === i.to) return bad("source and target are the same");
       b.connections.push({
         id: i.id, from: i.from, to: i.to, label: str(i.label) ? i.label : undefined,
         style: i.style === "dashed" ? "dashed" : "solid", both: !!i.both_ways,
@@ -287,7 +262,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
     }
     case "emphasize": {
       if (!isTarget(b, i.target)) return bad(`target '${i.target}' does not exist`);
-      if (!["circle", "underline", "star"].includes(i.style)) return bad("invalid style");
       b.emphasis = b.emphasis.filter((x) => x.target !== i.target);
       b.emphasis.push({ target: i.target, style: i.style });
       return { board: b, warnings };
@@ -302,12 +276,10 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       const e = needNew(i.id);
       if (e) return bad(e);
       if (!isTarget(b, i.target)) return bad(`target '${i.target}' does not exist`);
-      if (!str(i.text)) return bad("missing text");
       b.callouts.push({ id: i.id, target: i.target, text: i.text });
       return { board: b, warnings };
     }
     case "update_label": {
-      if (!str(i.label)) return bad("missing label");
       const z = findZone(b, i.id);
       if (z) { z.title = i.label; return { board: b, warnings }; }
       const element = findElement(b, i.id);
@@ -319,7 +291,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       return bad(`id '${i.id}' does not exist`);
     }
     case "set_service": {
-      if (typeof i.service !== "string") return bad("missing service");
       const element = findElement(b, i.id);
       if (!element) return bad(findZone(b, i.id) ? `'${i.id}' is a zone; set_service only works on elements` : `id '${i.id}' does not exist`);
       if (!i.service.trim()) { delete element.service; return { board: b, warnings }; }
@@ -330,8 +301,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       return { board: b, warnings };
     }
     case "update_text": {
-      if (typeof i.value !== "string") return bad("missing value");
-      if (!TEXT_FIELDS.includes(i.field)) return bad(`invalid field '${i.field}'`);
       const empty = !i.value.trim();
       const missing = () => bad(`'${i.id}' has no ${i.field}`);
       const required = () => bad(`${i.field} of '${i.id}' cannot be left empty; use delete to remove the element`);
@@ -405,7 +374,6 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       return { board: b, warnings };
     }
     case "update_summary": {
-      if (!str(i.text)) return bad("missing text");
       b.summary = i.text;
       return { board: b, warnings };
     }

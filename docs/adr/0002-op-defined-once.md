@@ -8,6 +8,8 @@ We decided that a valid op is defined exactly once, in `packages/contract`, and 
 
 Whether the single source is a Zod schema (exported with `z.toJSONSchema`) or JSON Schema plus `json-schema-to-ts` is settled by a short spike: Zod only if its output matches today's tool definitions except for key order.
 
+Spike result: Zod. `z.toJSONSchema` matched the hand-written tool definitions deep-equal once the top-level `$schema` was dropped; the only byte difference was key order (Zod puts an object's `description` last, the old definitions put it right after `type`). `toolDefs` applies that one fix-up, and snapshot tests pin the bytes.
+
 ## Consequences
 
 - Snapshot tests of the tool definitions make any change to what Claude sees show up as a diff.

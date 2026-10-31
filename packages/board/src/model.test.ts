@@ -29,8 +29,6 @@ describe("model", () => {
       op.emphasize({ target: "zzz", style: "circle" }),
       op.delete({ id: "zzz" }),
       op.move_to_zone({ id: "a", zone: "s" }), // step does not fit in system
-      { name: "inventada", input: {} } as any,
-      null as any,
     ]) {
       const r = applyOp(b, bad);
       expect(r.board).toBe(b);
@@ -112,13 +110,6 @@ describe("scale", () => {
       op.add_mark({ zone: "f", id: "x", at: 5, label: "x" }), // flow zone
       op.add_mark({ zone: "e", id: "m1", at: 5, label: "dup" }), // duplicate id
       op.add_mark({ zone: "e", id: "f", at: 5, label: "dup" }), // zone id
-      op.add_mark({ zone: "e", id: "x", at: 101, label: "x" }),
-      op.add_mark({ zone: "e", id: "x", at: -0.5, label: "x" }),
-      op.add_mark({ zone: "e", id: "x", at: NaN, label: "x" }),
-      op.add_mark({ zone: "e", id: "x", at: Infinity, label: "x" }),
-      op.add_mark({ zone: "e", id: "x", at: "5" as any, label: "x" }),
-      op.add_mark({ zone: "e", id: "x", at: 5, label: " " }),
-      op.add_mark({ zone: "e", id: "x", at: 5, label: "x", tone: "azul" as any }),
       op.add_step({ zone: "e", id: "x", label: "step" }), // step in a scale zone
     ]) {
       const r = applyOp(b, bad);
@@ -137,9 +128,6 @@ describe("scale", () => {
     for (const bad of [
       op.set_level({ zone: "nope", at: 5 }),
       op.set_level({ zone: "f", at: 5 }),
-      op.set_level({ zone: "e", at: 101 }),
-      op.set_level({ zone: "e", at: -1 }),
-      op.set_level({ zone: "e", at: NaN }),
     ]) {
       const r = applyOp(b, bad);
       expect(r.board).toBe(b);
@@ -198,9 +186,9 @@ describe("scale", () => {
       b = upd(b, "n1", "text", "New").board;
       expect(b.callouts[0].text).toBe("New");
     });
-    it("clear errors: missing field, empty required text, unknown id", () => {
+    it("clear errors: missing field, empty required text, unknown id (an invalid field is the contract's job)", () => {
       const b = tl();
-      for (const [id, f, v] of [["a", "note", "x"], ["a", "when", "x"], ["e1", "text", "x"], ["n1", "label", "x"], ["a", "label", ""], ["n1", "text", ""], ["nope", "note", "x"], ["a", "otro", "x"]] as const) {
+      for (const [id, f, v] of [["a", "note", "x"], ["a", "when", "x"], ["e1", "text", "x"], ["n1", "label", "x"], ["a", "label", ""], ["n1", "text", ""], ["nope", "note", "x"]] as const) {
         const r = upd(b, id, f, v);
         expect(r.board).toBe(b);
         expect(r.warnings).toHaveLength(1);

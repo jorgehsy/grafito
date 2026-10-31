@@ -6,7 +6,6 @@ import { computeLayout, overlaps } from "./layout";
 import type { Rect } from "./layout";
 import { buildTree } from "./tree";
 import { serializeBoard } from "./serialize";
-import { validateOp } from "@grafito/contract";
 
 const finalBoard = (ops: Op[]) => applyOps(emptyBoard(), ops).board;
 const inside = (r: Rect, z: Rect) => r.x >= z.x && r.y >= z.y && r.x + r.w <= z.x + z.w && r.y + r.h <= z.y + z.h;
@@ -14,25 +13,6 @@ const noOverlap = (rs: [string, Rect][]) => {
   for (let i = 0; i < rs.length; i++)
     for (let j = i + 1; j < rs.length; j++) expect(overlaps(rs[i][1], rs[j][1]), `${rs[i][0]} vs ${rs[j][0]}`).toBe(false);
 };
-
-describe("schema validation", () => {
-  it("add_stage, add_event, add_span and center_label", () => {
-    expect(validateOp("create_zone", { id: "c", kind: "cycle", title: "t", center_label: "Window" })).toBeNull();
-    expect(validateOp("create_zone", { id: "c", kind: "timeline", title: "t" })).toBeNull();
-    expect(validateOp("add_stage", { zone: "c", id: "s", label: "x", note: "n", after: "a" })).toBeNull();
-    expect(validateOp("add_stage", { zone: "c", id: "s" })).not.toBeNull();
-    expect(validateOp("add_event", { zone: "t", id: "e", label: "x", when: "Before", note: "n", at: 0 })).toBeNull();
-    expect(validateOp("add_event", { zone: "t", id: "e", label: "x", at: 100 })).toBeNull();
-    expect(validateOp("add_event", { zone: "t", id: "e", label: "x", at: 101 })).not.toBeNull();
-    expect(validateOp("add_event", { zone: "t", id: "e", label: "x", at: "5" })).not.toBeNull();
-    expect(validateOp("add_event", { zone: "t", id: "e", label: "x", extra: 1 })).not.toBeNull();
-    expect(validateOp("add_span", { zone: "t", id: "p", from: 0, to: 50, label: "x", tone: "warn" })).toBeNull();
-    expect(validateOp("add_span", { zone: "t", id: "p", from: 0, to: 150, label: "x" })).not.toBeNull();
-    expect(validateOp("add_span", { zone: "t", id: "p", from: -1, to: 50, label: "x" })).not.toBeNull();
-    expect(validateOp("add_span", { zone: "t", id: "p", from: 0, to: 50 })).not.toBeNull();
-    expect(validateOp("add_span", { zone: "t", id: "p", from: 0, to: 50, label: "x", tone: "azul" })).not.toBeNull();
-  });
-});
 
 describe("modelo cycle", () => {
   const cyc = () => applyOps(emptyBoard(), [op.create_zone({ id: "c", kind: "cycle", title: "Cycle", center_label: "Window" }), op.create_zone({ id: "f", kind: "flow", title: "F" })]).board;
@@ -48,7 +28,6 @@ describe("modelo cycle", () => {
       op.add_stage({ zone: "nope", id: "x", label: "x" }),
       op.add_stage({ zone: "f", id: "x", label: "x" }),
       op.add_stage({ zone: "c", id: "a", label: "dup" }),
-      op.add_stage({ zone: "c", id: "x", label: " " }),
       op.add_step({ zone: "c", id: "x", label: "step one" }),
     ]) {
       const r = applyOp(b, bad);
@@ -96,17 +75,7 @@ describe("modelo timeline", () => {
       op.add_event({ zone: "nope", id: "x", label: "x" }),
       op.add_event({ zone: "t", id: "e", label: "dup" }),
       op.add_event({ zone: "t", id: "p", label: "dup" }),
-      op.add_event({ zone: "t", id: "x", label: "" }),
-      op.add_event({ zone: "t", id: "x", label: "x", at: 101 }),
-      op.add_event({ zone: "t", id: "x", label: "x", at: NaN }),
-      op.add_event({ zone: "t", id: "x", label: "x", at: -1 }),
       op.add_span({ zone: "c", id: "x", from: 0, to: 5, label: "x" }),
-      op.add_span({ zone: "t", id: "x", from: 50, to: 50, label: "x" }),
-      op.add_span({ zone: "t", id: "x", from: 60, to: 50, label: "x" }),
-      op.add_span({ zone: "t", id: "x", from: 0, to: 101, label: "x" }),
-      op.add_span({ zone: "t", id: "x", from: Infinity, to: 101, label: "x" }),
-      op.add_span({ zone: "t", id: "x", from: 0, to: 5, label: " " }),
-      op.add_span({ zone: "t", id: "x", from: 0, to: 5, label: "x", tone: "azul" as any }),
       op.add_span({ zone: "t", id: "e", from: 0, to: 5, label: "dup" }),
     ]) {
       const r = applyOp(b, bad);
@@ -288,9 +257,7 @@ describe("tree zone", () => {
     op.add_branch({ zone: "t", id: "m", label: "Postman Collection", parent: "s" }),
   ];
 
-  it("validates add_branch and rejects zones of another kind", () => {
-    expect(validateOp("add_branch", { zone: "t", id: "x", label: "L", parent: "p", note: "n" })).toBeNull();
-    expect(validateOp("add_branch", { zone: "t", id: "x" })).not.toBeNull();
+  it("rejects zones of another kind", () => {
     const r = applyOps(emptyBoard(), [op.create_zone({ id: "l", kind: "list", title: "L" }), op.add_branch({ zone: "l", id: "x", label: "X" })]);
     expect(r.warnings[0]).toContain("cannot add branch");
   });

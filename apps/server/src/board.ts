@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Request, Response } from "express";
-import { CATALOG_IDS, ZONE_KINDS, normalizeCatalogs, toolSetFor, validateOp } from "@grafito/contract";
+import { CATALOG_IDS, ZONE_KINDS, normalizeCatalogs, parseOp, toolDefs } from "@grafito/contract";
+import type { Op } from "@grafito/contract";
 import { AWS_CATALOG_ID, AWS_SERVICES } from "@grafito/icons";
 
 export const MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"] as const;
@@ -83,7 +84,7 @@ export function buildUserText(a: { board?: unknown; summary?: unknown; delta: st
   return `TABLERO ACTUAL:\n${boardText}\n\nRESUMEN HASTA AHORA:\n${summary}\n\nNUEVO FRAGMENTO DICHO:\n${a.delta}${hint}`;
 }
 
-export type ParsedBlock = { ok: true; name: string; input: unknown } | { ok: false; name: string; warning: string; invalid: true };
+export type ParsedBlock = { ok: true; name: string; op: Op } | { ok: false; name: string; warning: string; invalid: true };
 
 // Parses and validates a finished tool_use block. An empty buffer means {}.
 export function parseToolBlock(name: string, json: string, catalogs: readonly string[] = []): ParsedBlock {
@@ -93,9 +94,9 @@ export function parseToolBlock(name: string, json: string, catalogs: readonly st
   } catch {
     return { ok: false, invalid: true, name, warning: `${name}: malformed JSON (skipped)` };
   }
-  const bad = validateOp(name, input, catalogs);
-  if (bad) return { ok: false, invalid: true, name, warning: `${name}: ${bad}` };
-  return { ok: true, name, input };
+  const r = parseOp({ name, input }, catalogs);
+  if (!r.ok) return { ok: false, invalid: true, name, warning: r.error };
+  return { ok: true, name, op: r.op };
 }
 
 // Retryable: network error, 5xx or 429; other 4xx are not.
@@ -162,7 +163,7 @@ export async function boardHandler(req: Request, res: Response) {
     model: useModel,
     max_tokens: mode === "instruction" ? 8192 : 4096,
     system: [{ type: "text", text: systemPromptFor(catalogs), cache_control: { type: "ephemeral" } }],
-    tools: toolSetFor(catalogs).tools,
+    tools: toolDefs(catalogs),
     tool_choice: { type: "auto" },
     output_config: { effort: mode === "instruction" ? "medium" : "low" },
     messages: [{ role: "user", content: userText }],
@@ -202,7 +203,7 @@ export async function boardHandler(req: Request, res: Response) {
         }
         if (firstOp === null) firstOp = Date.now() - t0;
         ops++;
-        sse(res, "op", { name: r.name, input: r.input });
+        sse(res, "op", r.op);
       } else if (ev.type === "message_delta") {
         if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
         if (ev.usage?.output_tokens != null) {

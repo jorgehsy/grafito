@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { applyOps, emptyBoard } from "@grafito/board";
-import { op } from "@grafito/contract";
+import { op, zeroUsage } from "@grafito/contract";
 import type { Op } from "@grafito/contract";
 import { createLiveSession } from "./session";
 import type { LogEntry, Totals } from "./session";
@@ -54,12 +54,30 @@ describe("session record", () => {
 
     // round trip
     const back = entriesFromRecord(rec);
-    expect(back.entries[0].opList).toEqual([{ name: "update_summary", input: { text: "r" } } as Op]);
+    expect(back.entries[0].opList).toEqual([op.update_summary({ text: "r" })]);
     expect(back.entries[1].error).toContain("boom");
     expect(back.totals.requests).toBe(1);
     // restore continues the numbering
     const s2 = createLiveSession({ getBoard: () => emptyBoard(), submit: async () => {}, getModel: () => "m", onLog: () => {} });
     s2.restore(back.entries, back.totals);
+  });
+
+  it("restoring parses the recorded ops: invalid ones are dropped and join the warnings", () => {
+    const rec = buildRecord({ id: "a", startedAt: 0, model: "m", lang: "es-CL", transcript: [], summary: "" }, [], { requests: 0, usage: zeroUsage(), costUsd: 0 });
+    rec.requests.push({
+      n: 1, model: "m", text: "t", startedAt: 0, firstOpMs: null, voiceFirstMs: null, totalMs: null, costUsd: 0,
+      usage: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 }, invalid: ["zz: bad"],
+      ops: [
+        { name: "add_step", input: { zone: "z", id: "s", label: "S", service: "lambda" } }, // catalog ops restore
+        { name: "add_mark", input: { zone: "e", id: "m", at: 500, label: "x" } },
+        { name: "nada", input: {} },
+      ],
+    });
+    const [e] = entriesFromRecord(rec).entries;
+    expect(e.opList).toEqual([op.add_step({ zone: "z", id: "s", label: "S", service: "lambda" })]);
+    expect(e.ops).toBe(1);
+    expect(e.warnings[0]).toBe("zz: bad");
+    expect(e.warnings.slice(1).map((w) => w.split(":")[0])).toEqual(["add_mark", "nada"]);
   });
 
   it("median and totals, tolerating a missing shape", () => {
@@ -80,8 +98,8 @@ describe("session record", () => {
     const base = { id: 1, model: "m", batch: "t", startedAt: 0, firstOpMs: 1, voiceFirstMs: null, totalMs: 2, ops: 1,
       usage: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
       usageEstimated: false, costUsd: 0, warnings: [], done: true };
-    const a: LogEntry = { ...base, id: 1, mode: "content", opList: [{ name: "update_summary", input: { text: "a" } } as Op] };
-    const b: LogEntry = { ...base, id: 2, mode: "instruction", undone: true, opList: [{ name: "update_summary", input: { text: "b" } } as Op] };
+    const a: LogEntry = { ...base, id: 1, mode: "content", opList: [op.update_summary({ text: "a" })] };
+    const b: LogEntry = { ...base, id: 2, mode: "instruction", undone: true, opList: [op.update_summary({ text: "b" })] };
     const tot = { requests: 2, usage: base.usage, costUsd: 0 };
     const rec = buildRecord({ id: "a", startedAt: 0, model: "m", lang: "es-CL", transcript: [], summary: "" }, [a, b], tot);
     expect(rec.requests[0].undone).toBeUndefined();

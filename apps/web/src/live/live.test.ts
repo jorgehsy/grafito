@@ -6,8 +6,6 @@ import { serializeBoard } from "@grafito/board";
 import { createSseParser, streamBoard } from "./sse";
 import { createLiveSession } from "./session";
 import { costUsd, PRICING, fmtUsd, zeroUsage } from "@grafito/contract";
-import { OP_TOOLS } from "@grafito/contract";
-import { validateOp } from "@grafito/contract";
 
 const ev = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 const mockFetch = (chunks: string[]): typeof fetch =>
@@ -66,6 +64,17 @@ describe("SSE", () => {
       onUsage: (u) => log.push("usage:" + u.input_tokens), onDone: (d) => log.push("done:" + d.ops), onError: (m) => log.push("err:" + m),
     }, undefined, f);
     expect(log).toEqual(["usage:10", "op:delete", "inv:x: bad", "done:1", "err:boom"]);
+  });
+  it("streamBoard parses every op with the request's catalogs: what does not parse goes to onInvalid", async () => {
+    const log: string[] = [];
+    const ops = [
+      ev("op", { name: "delete", input: {} }),
+      ev("op", { name: "set_service", input: { id: "a", service: "s3" } }),
+    ];
+    const h = { onOp: (o: { name: string }) => log.push("op:" + o.name), onInvalid: (w: string) => log.push("inv:" + w), onDone() {}, onError() {} };
+    await streamBoard({ delta: "d", summary: "", board: "", model: "m" }, h, undefined, mockFetch(ops));
+    await streamBoard({ delta: "d", summary: "", board: "", model: "m", catalogs: ["aws"] }, h, undefined, mockFetch(ops));
+    expect(log.map((l) => l.split(" ")[0])).toEqual(["inv:delete:", "inv:set_service:", "inv:delete:", "op:set_service"]);
   });
   it("HTTP error", async () => {
     const f = (async () => new Response("x", { status: 500 })) as unknown as typeof fetch;
@@ -159,29 +168,7 @@ describe("cost", () => {
   });
 });
 
-describe("fragments and validation", () => {
-  it("validates tool inputs against the schema", () => {
-    expect(OP_TOOLS.length).toBe(21);
-    expect(validateOp("delete", { id: "a" })).toBeNull();
-    expect(validateOp("delete", {})).not.toBeNull();
-    expect(validateOp("create_zone", { id: "a", kind: "raro", title: "t" })).not.toBeNull();
-    expect(validateOp("nada", {})).toMatch(/unknown/);
-  });
-  it("validates add_mark and set_level against the schema", () => {
-    expect(validateOp("create_zone", { id: "e", kind: "scale", title: "t", min_label: "0", max_label: "1M" })).toBeNull();
-    expect(validateOp("add_mark", { zone: "e", id: "m", at: 20, label: "20%", note: "n", tone: "warn" })).toBeNull();
-    expect(validateOp("add_mark", { zone: "e", id: "m", at: 0, label: "x" })).toBeNull();
-    expect(validateOp("add_mark", { zone: "e", id: "m", at: 100, label: "x" })).toBeNull();
-    expect(validateOp("add_mark", { zone: "e", id: "m", at: 101, label: "x" })).not.toBeNull();
-    expect(validateOp("add_mark", { zone: "e", id: "m", at: -1, label: "x" })).not.toBeNull();
-    expect(validateOp("add_mark", { zone: "e", id: "m", at: "20", label: "x" })).not.toBeNull();
-    expect(validateOp("add_mark", { zone: "e", id: "m", at: 20 })).not.toBeNull();
-    expect(validateOp("add_mark", { zone: "e", id: "m", at: 20, label: "x", tone: "rojo" })).not.toBeNull();
-    expect(validateOp("add_mark", { zone: "e", id: "m", at: 20, label: "x", extra: 1 })).not.toBeNull();
-    expect(validateOp("set_level", { zone: "e", at: 60, label: "se llena" })).toBeNull();
-    expect(validateOp("set_level", { zone: "e", at: 160 })).not.toBeNull();
-    expect(validateOp("set_level", { at: 60 })).not.toBeNull();
-  });
+describe("fragments", () => {
   it("serializes the marks and level of a scale", () => {
     const b = applyOps(emptyBoard(), [
       op.create_zone({ id: "e", kind: "scale", title: "Ventana" }),

@@ -5,7 +5,7 @@ import { emptyBoard, applyOps } from "@grafito/board";
 import type { Board } from "@grafito/board";
 import type { Op } from "@grafito/contract";
 import { serializeBoard } from "@grafito/board";
-import { costUsd } from "@grafito/contract";
+import { CATALOG_IDS, costUsd, parseOp } from "@grafito/contract";
 import { buildUserText } from "../src/board";
 
 const USAGE = `Usage: pnpm eval <command> [options]
@@ -39,7 +39,11 @@ let board: Board = emptyBoard();
 // --upto N: only the first N requests (failed ones count).
 for (const r of (rec.requests ?? []).slice(0, upto)) {
   if (r.error) continue;
-  const ops = (r.ops ?? []).filter((o: any) => o && o.name && !o.invalid) as Op[];
+  // Recorded ops may carry service icons: parse them with every known catalog on.
+  const ops = (r.ops ?? []).flatMap((o: unknown) => {
+    const p = parseOp(o, CATALOG_IDS);
+    return p.ok ? [p.op] : [];
+  });
   board = applyOps(board, ops).board;
 }
 const summary: string = board.summary || rec.summary || "";
@@ -85,7 +89,9 @@ const handle = (chunk: string) => {
   if (event === "op") {
     if (d.invalid) warnings.push(d.warning);
     else {
-      received.push({ name: d.name, input: d.input } as Op);
+      const p = parseOp(d, []);
+      if (p.ok) received.push(p.op);
+      else warnings.push(p.error);
       console.log(`${d.name} ${JSON.stringify(d.input)}`);
     }
   } else if (event === "error") warnings.push(`ERROR: ${d.message}`);

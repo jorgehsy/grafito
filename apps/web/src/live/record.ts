@@ -2,7 +2,7 @@
 // Pure, except the localStorage/save helpers, which tolerate missing dependencies.
 import type { Op } from "@grafito/contract";
 import type { LogEntry, Totals } from "./session";
-import { zeroUsage } from "@grafito/contract";
+import { CATALOG_IDS, parseOp, zeroUsage } from "@grafito/contract";
 import { t } from "../i18n";
 
 export interface RecordRequest {
@@ -93,27 +93,46 @@ export function buildRecord(meta: RecordMeta, entries: LogEntry[], totals: Total
   };
 }
 
+/**
+ * Recorded ops parsed again: a record from disk, localStorage or a file is not trusted.
+ * Every known catalog is on, since the record does not say which were. Invalid ops are
+ * dropped and their message joins the request's warnings.
+ */
+function parseRecordedOps(ops: unknown[]): { opList: Op[]; invalid: string[] } {
+  const opList: Op[] = [];
+  const invalid: string[] = [];
+  for (const o of ops) {
+    const p = parseOp(o, CATALOG_IDS);
+    if (p.ok) opList.push(p.op);
+    else invalid.push(p.error);
+  }
+  return { opList, invalid };
+}
+
 /** Rebuilds the log rows and totals from a saved record. */
 export function entriesFromRecord(rec: SessionRecord): { entries: LogEntry[]; totals: Totals } {
-  const entries: LogEntry[] = rec.requests.map((r) => ({
-    id: r.n,
-    model: r.model,
-    batch: r.text,
-    mode: r.mode === "instruction" ? "instruction" : "content",
-    ...(r.undone ? { undone: true } : {}),
-    startedAt: r.startedAt,
-    firstOpMs: r.firstOpMs,
-    voiceFirstMs: r.voiceFirstMs,
-    totalMs: r.totalMs,
-    ops: r.ops.length,
-    opList: r.ops.map((o) => ({ name: o.name, input: o.input }) as Op),
-    usage: { input_tokens: r.usage.input, output_tokens: r.usage.output, cache_read_input_tokens: r.usage.cacheRead, cache_creation_input_tokens: r.usage.cacheWrite },
-    usageEstimated: false,
-    costUsd: r.costUsd,
-    warnings: [...r.invalid],
-    error: r.error,
-    done: true,
-  }));
+  const entries: LogEntry[] = rec.requests.map((r) => {
+    const { opList, invalid } = parseRecordedOps(r.ops);
+    return {
+      id: r.n,
+      model: r.model,
+      batch: r.text,
+      mode: r.mode === "instruction" ? "instruction" : "content",
+      ...(r.undone ? { undone: true } : {}),
+      startedAt: r.startedAt,
+      firstOpMs: r.firstOpMs,
+      voiceFirstMs: r.voiceFirstMs,
+      totalMs: r.totalMs,
+      ops: opList.length,
+      opList,
+      usage: { input_tokens: r.usage.input, output_tokens: r.usage.output, cache_read_input_tokens: r.usage.cacheRead, cache_creation_input_tokens: r.usage.cacheWrite },
+      usageEstimated: false,
+      costUsd: r.costUsd,
+      warnings: [...r.invalid, ...invalid],
+      error: r.error,
+      done: true,
+    };
+  });
   const usage = entries.reduce((a, e) => ({
     input_tokens: a.input_tokens + e.usage.input_tokens,
     output_tokens: a.output_tokens + e.usage.output_tokens,
