@@ -85,6 +85,7 @@ export const es = {
   "stats.sessionTokens": "Tokens sesión",
   "stats.cache": "Caché leída / escrita",
   "stats.cost": "Costo",
+  "cost.included": "incluido en el plan",
   "stats.perRequest": "{cost}/pet.",
   "stats.tokens": "{input} in · {output} out",
   "stats.instruction": "instrucción:",

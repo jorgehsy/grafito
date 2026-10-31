@@ -3,7 +3,7 @@ export type { ComponentType, EmphasisStyle, MarkTone, Op, OpInputs, OpName, Text
 export { normalizeCatalogs, parseOp, toolDefs } from "./parse";
 export type { ParsedOp, ToolDef } from "./parse";
 export { DEFAULT_MODEL, EVAL_MODEL, MODELS, isModelId, priceOf } from "./models";
-export type { ModelInfo, Price } from "./models";
+export type { ModelInfo, Price, Provider } from "./models";
 export * from "./pricing";
 export { DEFAULT_LANG, LANGS, isLang, languageName } from "./lang";
 export type { Lang } from "./lang";

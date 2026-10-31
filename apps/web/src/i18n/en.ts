@@ -88,6 +88,7 @@ export const en = {
   "stats.sessionTokens": "Session tokens",
   "stats.cache": "Cache read / written",
   "stats.cost": "Cost",
+  "cost.included": "included in plan",
   "stats.perRequest": "{cost}/req.",
   "stats.tokens": "{input} in · {output} out",
   "stats.instruction": "instruction:",

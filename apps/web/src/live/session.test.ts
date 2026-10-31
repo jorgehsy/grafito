@@ -79,7 +79,7 @@ describe("requests", () => {
     expect(h.board().summary).toBe("r1");
     expect(h.state().transcript.map((x) => x.text)).toEqual(["one.", "two.", "three."]);
     expect(h.state().totals.requests).toBe(2);
-    expect(h.state().totals.costUsd).toBeCloseTo(2 * costUsd("claude-haiku-5-5", usage), 10);
+    expect(h.state().totals.costUsd).toBeCloseTo(2 * costUsd("claude-haiku-5-5", usage)!, 10);
   });
 
   it("groups speech results until the turn ends, and sends an instruction after its content", async () => {

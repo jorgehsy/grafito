@@ -31,7 +31,8 @@ export interface LogEntry {
   opList: Op[];
   usage: Usage;
   usageEstimated: boolean;
-  costUsd: number;
+  /** `null` when the model is included in a plan. */
+  costUsd: number | null;
   warnings: string[];
   error?: string;
   done: boolean;
@@ -125,7 +126,7 @@ function entryFromRequest(r: RecordRequest): LogEntry {
     id: r.n, model: r.model, promptVersion: r.promptVersion, batch: r.batch, mode: r.mode, ...(r.undone ? { undone: true } : {}),
     startedAt: r.startedAt, firstOpMs: r.firstOpMs, voiceFirstMs: r.voiceFirstMs, totalMs: r.totalMs, ops: opList.length, opList,
     usage: { input_tokens: r.usage.input, output_tokens: r.usage.output, cache_read_input_tokens: r.usage.cacheRead, cache_creation_input_tokens: r.usage.cacheWrite },
-    usageEstimated: false, costUsd: r.costUsd, warnings, error: r.error, done: true,
+    usageEstimated: false, costUsd: costUsd(r.model, zeroUsage()) === null ? null : r.costUsd, warnings, error: r.error, done: true,
   };
 }
 
@@ -236,7 +237,7 @@ export function createLiveSession(d: LiveSessionDeps): LiveSession {
           e.usageEstimated = false;
           e.firstOpMs = info.timings.first_op_ms ?? e.firstOpMs;
           e.totalMs = info.timings.total_ms;
-          if (myEpoch === epoch) totals = { requests: totals.requests + 1, usage: addUsage(totals.usage, e.usage), costUsd: totals.costUsd + e.costUsd };
+          if (myEpoch === epoch) totals = { requests: totals.requests + 1, usage: addUsage(totals.usage, e.usage), costUsd: totals.costUsd + (e.costUsd ?? 0) };
         },
         onError(m) { e.error = m; },
       },
@@ -275,7 +276,7 @@ export function createLiveSession(d: LiveSessionDeps): LiveSession {
         ops: e.opList.map((o) => ({ name: o.name, input: o.input })),
         warnings: [...e.warnings],
         usage: { input: e.usage.input_tokens, cacheRead: e.usage.cache_read_input_tokens, cacheWrite: e.usage.cache_creation_input_tokens, output: e.usage.output_tokens },
-        costUsd: e.costUsd,
+        costUsd: e.costUsd ?? 0,
         ...(e.error ? { error: e.error } : {}),
       })),
       transcript: transcript.map((x) => ({ ...x })),

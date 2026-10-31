@@ -171,7 +171,7 @@ async function run(rec: SessionRecord, name: string, instruction: string, opts: 
   console.log(`Invalid ops: ${invalidOps} of ${received.length + invalidOps}`);
 
   console.log("\n--- COST ---");
-  if (done) console.log(`${JSON.stringify(done.usage)} USD ${usd!.toFixed(4)}`);
+  if (done) console.log(`${JSON.stringify(done.usage)} ${usd === null ? "included in plan" : `USD ${usd.toFixed(4)}`}`);
   else console.log("(no done event)");
 
   console.log("\n--- FINAL BOARD ---");

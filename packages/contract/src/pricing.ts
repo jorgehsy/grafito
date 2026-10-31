@@ -17,8 +17,10 @@ export function addUsage(a: Usage, b: Usage): Usage {
   };
 }
 
-export function costUsd(model: string, u: Usage): number {
+/** `null` when the model is included in a plan (no price), never 0. */
+export function costUsd(model: string, u: Usage): number | null {
   const p = priceOf(model);
+  if (!p) return null;
   return (
     (u.input_tokens * p.input + u.cache_creation_input_tokens * p.cacheWrite + u.cache_read_input_tokens * p.cacheRead + u.output_tokens * p.output) /
     1_000_000
