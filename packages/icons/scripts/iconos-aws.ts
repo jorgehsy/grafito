@@ -12,7 +12,7 @@ const DESTINO_POR_DEFECTO = resolve(dirname(fileURLToPath(import.meta.url)), "..
 // Quita el prólogo <?xml?>, el width/height fijos de la raíz y prefija con `<id>-` los id internos
 // (se repiten entre iconos) junto con sus referencias url(#..) y href="#..". No cambia el aspecto.
 export function limpiarSvg(svg: string, id: string): string {
-  let s = svg.replace(/^﻿/, "").replace(/<\?xml[\s\S]*?\?>/g, "").trim();
+  let s = svg.replace(/^\uFEFF/, "").replace(/<\?xml[\s\S]*?\?>/g, "").trim();
   s = s.replace(/<svg\b[^>]*>/, (tag) => tag.replace(/\s(?:width|height)=("[^"]*"|'[^']*')/g, ""));
   const ids = new Set<string>();
   for (const m of s.matchAll(/\sid=(?:"([^"]*)"|'([^']*)')/g)) ids.add(m[1] ?? m[2]);

@@ -49,7 +49,6 @@ export const LABEL_LH = 24;
 /** Etiquetas de flecha más largas que esto se parten en dos líneas. */
 const LABEL_MAX_1LINE = 22;
 const LABEL_CW = 10.3;
-const CALLOUT_SIZE = 24;
 const CALLOUT_CW = 12.2;
 const CALLOUT_LH = 29;
 const ROW_MAX = 2300;
@@ -647,7 +646,7 @@ function layoutStack(zone: Zone, els: El[]): ZoneLocal {
     const cols = { left: 0, right: 0 } as Record<string, number>;
     const widths = { left: 170, right: 170 } as Record<string, number>;
     for (const e of els) widths[e.column ?? "left"] = Math.max(widths[e.column ?? "left"], elSize(e).w);
-    const leftW = widths.left, rightW = widths.right;
+    const leftW = widths.left;
     for (const e of els) {
       const c = e.column ?? "left";
       const s = elSize(e);

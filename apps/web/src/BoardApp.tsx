@@ -58,7 +58,7 @@ export function BoardApp() {
     const auto = new URLSearchParams(location.search).get("auto");
     if (auto) setTimeout(() => play(), 200);
     return () => { cancelAnimationFrame(raf); e.dispose(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only setup; later changes are read through refs
   }, []);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export function BoardApp() {
       .then((h) => h?.hasKey === true, () => false)
       .then((key) => { if (alive) setMode((m) => m ?? (key ? "claude" : "script")); });
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time health probe on mount
   }, []);
 
   useEffect(() => { try { localStorage.setItem("grafito.transcript", showTranscript ? "1" : "0"); } catch { /* sin almacenamiento */ } }, [showTranscript]);

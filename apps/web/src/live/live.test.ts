@@ -91,6 +91,7 @@ describe("catálogos en el pedido", () => {
       { name: "create_zone", input: { id: "z", kind: "flow", title: "Z" } },
       { name: "add_step", input: { zone: "z", id: "fn", label: "Función", service: "lambda" } },
     ]);
+    // eslint-disable-next-line prefer-const -- mk() runs before and after the single assignment, so it cannot be const
     let cats: string[] | undefined;
     const mk = () => createLiveSession({ getBoard: () => board, submit: async () => {}, getModel: () => "claude-haiku-5-5", getCatalogs: cats ? () => cats! : undefined, onLog() {}, fetchImpl: f });
     const s1 = mk(); s1.onFinalText("uno."); await idle(s1);

@@ -116,7 +116,7 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
         onLog: (e, c, t) => { latest.current.entries = e; latest.current.totals = t; dirty.current = true; setEntries(e); setCurrent(c); setTotals(t); if (!c) flushSoon(); },
         onBusy: (b) => { latest.current.busy = b; setBusy(b); },
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- session is created once; callbacks read current values through refs
     [],
   );
   useEffect(() => { (window as any).__live = session; return () => { speech.current?.stop(); session.stop(); }; }, [session]);
@@ -257,7 +257,6 @@ export function LivePanel({ getCtrl, onSubtitle, onClear, active, onMode, modeLo
   const tu = totals.usage;
   const voiceMed = median(entries.filter((e) => e.voiceFirstMs !== null).map((e) => e.voiceFirstMs as number));
   const listening = mic.state === "listening";
-  const micLabel = mic.state === "listening" ? "Escuchando…" : mic.state === "restarting" ? "Reconectando…" : mic.state === "error" ? (mic.detail ?? "Error") : "";
 
   const lang_label = SPEECH_LANGS.find((l) => l.code === lang)?.label ?? lang;
 
