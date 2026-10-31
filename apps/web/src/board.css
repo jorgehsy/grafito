@@ -89,6 +89,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .subtitles p { margin: 0 0 4px; }
 .subtitles .old { color: var(--humo); }
 .subtitles .now.interim { color: var(--humo); font-style: italic; }
+.subtitles .tb { flex: none; margin: -6px -8px -6px 0; }
 .subtitles[hidden] { display: none; }
 .backlog { font-size: 13px; color: var(--humo); }
 

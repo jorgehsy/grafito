@@ -7,7 +7,7 @@ import { Engine } from "./render/engine";
 import { LivePanel } from "./live/ui/LivePanel";
 import { useT } from "./i18n";
 import { readFlag, writeFlag } from "./storage";
-import { IconChevron, IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
+import { IconChevron, IconMicOff, IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
 
 type Status = "idle" | "playing" | "paused" | "done";
 type Mode = "demo" | "live";
@@ -35,6 +35,7 @@ export function BoardApp() {
   const [summary, setSummary] = useState("");
   // Without ?mode= in the URL the default depends on whether the server has an API key: live if so, demo if not.
   const [mode, setMode] = useState<Mode | null>(urlMode);
+  const [mute, setMute] = useState<{ muted: boolean; toggle(): void } | null>(null);
   const [showTranscript, setShowTranscript] = useState(() => readFlag(TRANSCRIPT_KEY, true));
 
   const setStatus = (s: Status) => { status.current = s; setSt(s); };
@@ -162,6 +163,7 @@ export function BoardApp() {
         warnings={warnings}
         showTranscript={showTranscript}
         onShowTranscript={setShowTranscript}
+        onMuteControl={setMute}
       />
 
       <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} title={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} onClick={() => setShowTranscript((v) => !v)}>
@@ -181,6 +183,11 @@ export function BoardApp() {
           )}
           <div className="backlog" data-testid="backlog">{t("app.queue", { count: queued })}</div>
         </div>
+        {mute && (
+          <button className={"tb sm" + (mute.muted ? " on" : "")} data-testid="mute" aria-pressed={mute.muted} aria-label={mute.muted ? t("toolbar.mic.unmute") : t("toolbar.mic.mute")} title={mute.muted ? t("toolbar.mic.unmuteTitle") : t("toolbar.mic.muteTitle")} onClick={mute.toggle}>
+            <IconMicOff />
+          </button>
+        )}
       </div>
     </div>
   );

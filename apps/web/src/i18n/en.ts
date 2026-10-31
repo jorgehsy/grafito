@@ -23,6 +23,10 @@ export const en = {
   "toolbar.mic.stopTitle": "Stop (space bar)",
   "toolbar.mic.talk": "Talk",
   "toolbar.mic.talkTitle": "Talk (space bar)",
+  "toolbar.mic.mute": "Mute",
+  "toolbar.mic.muteTitle": "Mute: keep talking without drawing (M)",
+  "toolbar.mic.unmute": "Unmute",
+  "toolbar.mic.unmuteTitle": "Unmute: draw again (M)",
   "toolbar.import": "Import",
   "toolbar.importTitle": "Import session",
   "toolbar.liveMode": "Live mode",
@@ -76,6 +80,7 @@ export const en = {
   "mic.error": "Voice error",
   "mic.reconnecting": "Reconnecting the microphone…",
   "mic.listening": "Listening",
+  "mic.muted": "Muted",
   "corner.saved": "saved {time}",
 
   "stats.title": "STATS",

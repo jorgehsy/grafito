@@ -32,9 +32,11 @@ interface Props {
   warnings: string[];
   showTranscript: boolean;
   onShowTranscript(v: boolean): void;
+  /** The mute control while the mic is on, null while it is off; shown next to the subtitles. */
+  onMuteControl(c: { muted: boolean; toggle(): void } | null): void;
 }
 
-export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript }: Props) {
+export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript, onMuteControl }: Props) {
   const t = useT();
   const lang = useLang();
   const [statsOpen, setStatsOpen] = useState(() => readFlag(STATS_KEY, true));
@@ -81,11 +83,16 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new transcript changes the subtitles
   }, [live.transcript]);
 
-  const { micOn, mic, toggle: toggleMic } = useMic({
+  const { micOn, muted, mic, toggle: toggleMic, toggleMute } = useMic({
     lang, active,
     onFinal: (text, endOfTurn) => session.onFinalText(text, { endOfTurn }),
     onInterim: (text) => onSubtitle({ spoken: [...spoken.current], current: text, interim: !!text }),
   });
+
+  useEffect(() => {
+    onMuteControl(micOn ? { muted, toggle: toggleMute } : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toggleMute reads current values through refs
+  }, [micOn, muted]);
 
   // Typed text (no microphone) enters like a speech result and closes the turn, as stopping the mic does.
   const sendTyped = () => {
@@ -176,7 +183,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
 
       {statsOpen && <StatsPanel session={live} model={model} summary={summary} warnings={warnings} onClose={() => setStatsOpen(false)} />}
 
-      <div className="corner">{listening && <span className="dot" />}{listening ? t("mic.listening") + " · " : ""}{langLabel}{live.savedAt ? ` · ${t("corner.saved", { time: hhmm(live.savedAt) })}` : ""}</div>
+      <div className="corner">{listening && <span className="dot" />}{listening ? t(muted ? "mic.muted" : "mic.listening") + " · " : ""}{langLabel}{live.savedAt ? ` · ${t("corner.saved", { time: hhmm(live.savedAt) })}` : ""}</div>
     </div>
   );
 }

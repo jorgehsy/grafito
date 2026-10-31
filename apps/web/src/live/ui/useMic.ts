@@ -6,7 +6,7 @@ import { useT } from "../../i18n";
 
 interface MicOptions {
   lang: string;
-  /** Live mode; the mic stops when it turns off, and Space toggles it only while on. */
+  /** Live mode; the mic stops when it turns off, and Space (mic) and M (mute) work only while on. */
   active: boolean;
   onFinal(text: string, endOfTurn: boolean): void;
   onInterim(text: string): void;
@@ -15,6 +15,9 @@ interface MicOptions {
 export function useMic({ lang, active, onFinal, onInterim }: MicOptions) {
   const t = useT();
   const [micOn, setMicOn] = useState(false);
+  // Muted: the mic keeps listening but its text is dropped, so the user can speak without Grafito drawing.
+  const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(false);
   const [mic, setMic] = useState<{ state: SpeechState; detail?: string }>({ state: "idle" });
   const speech = useRef<SpeechSource | null>(null);
   const micLock = useRef<ReturnType<typeof createMicLock> | null>(null);
@@ -24,6 +27,7 @@ export function useMic({ lang, active, onFinal, onInterim }: MicOptions) {
   const toggle = () => {
     if (speech.current) {
       const cur = speech.current; speech.current = null; setMicOn(false);
+      mutedRef.current = false; setMuted(false);
       cur.stop();
       cb.current.onFinal("", true);
       cb.current.onInterim("");
@@ -31,11 +35,11 @@ export function useMic({ lang, active, onFinal, onInterim }: MicOptions) {
     }
     const src = new WebSpeechSource(lang);
     if (!src.available) { setMic({ state: "error", detail: t("speech.unavailable") }); return; }
-    src.onInterim = (x) => cb.current.onInterim(x);
-    src.onFinal = (x) => cb.current.onFinal(x, false);
+    src.onInterim = (x) => { if (!mutedRef.current) cb.current.onInterim(x); };
+    src.onFinal = (x) => { if (!mutedRef.current) cb.current.onFinal(x, false); };
     src.onState = (state, detail) => {
       setMic({ state, detail });
-      if (state === "error" || state === "idle") { if (speech.current === src) { speech.current = null; setMicOn(false); } if (state === "error") cb.current.onFinal("", true); }
+      if (state === "error" || state === "idle") { if (speech.current === src) { speech.current = null; setMicOn(false); mutedRef.current = false; setMuted(false); } if (state === "error") cb.current.onFinal("", true); }
     };
     speech.current = src; setMicOn(true);
     micLock.current?.claim();
@@ -43,6 +47,16 @@ export function useMic({ lang, active, onFinal, onInterim }: MicOptions) {
   };
   const toggleRef = useRef(toggle);
   toggleRef.current = toggle;
+
+  // Muting closes the turn, so what was said before it still gets drawn.
+  const toggleMute = () => {
+    if (!speech.current) return;
+    const next = !mutedRef.current;
+    mutedRef.current = next; setMuted(next);
+    if (next) { cb.current.onFinal("", true); cb.current.onInterim(""); }
+  };
+  const toggleMuteRef = useRef(toggleMute);
+  toggleMuteRef.current = toggleMute;
 
   // Another tab claimed the mic: release it here and warn.
   useEffect(() => {
@@ -56,16 +70,16 @@ export function useMic({ lang, active, onFinal, onInterim }: MicOptions) {
   }, []);
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (!cb.current.active || e.code !== "Space" || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!cb.current.active || (e.code !== "Space" && e.code !== "KeyM") || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(el.tagName))) return;
       e.preventDefault();
-      toggleRef.current();
+      if (e.code === "Space") toggleRef.current(); else toggleMuteRef.current();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, []);
   useEffect(() => { if (!active && speech.current) toggleRef.current(); }, [active]);
 
-  return { micOn, mic, toggle };
+  return { micOn, muted, mic, toggle, toggleMute };
 }

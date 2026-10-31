@@ -9,6 +9,7 @@ function Svg({ children, size = 20 }: { children: ReactNode; size?: number }) {
 }
 
 export const IconMic = () => <Svg><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></Svg>;
+export const IconMicOff = () => <Svg><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16" /></Svg>;
 export const IconStop = () => <Svg><rect x="6" y="6" width="12" height="12" rx="2" /></Svg>;
 export const IconImport = () => <Svg><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></Svg>;
 export const IconExport = () => <Svg><path d="M12 15V4M7 9l5-5 5 5M5 20h14" /></Svg>;

@@ -20,6 +20,10 @@ export const es = {
   "toolbar.mic.stopTitle": "Detener (barra espaciadora)",
   "toolbar.mic.talk": "Hablar",
   "toolbar.mic.talkTitle": "Hablar (barra espaciadora)",
+  "toolbar.mic.mute": "Silenciar",
+  "toolbar.mic.muteTitle": "Silenciar: seguir hablando sin dibujar (M)",
+  "toolbar.mic.unmute": "Reactivar",
+  "toolbar.mic.unmuteTitle": "Reactivar: volver a dibujar (M)",
   "toolbar.import": "Importar",
   "toolbar.importTitle": "Importar sesión",
   "toolbar.liveMode": "Modo Claude en vivo",
@@ -73,6 +77,7 @@ export const es = {
   "mic.error": "Error de voz",
   "mic.reconnecting": "Reconectando el micrófono…",
   "mic.listening": "Escuchando",
+  "mic.muted": "Silenciado",
   "corner.saved": "guardado {time}",
 
   "stats.title": "ESTADÍSTICAS",
