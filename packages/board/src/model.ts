@@ -1,5 +1,5 @@
 // Pure board model. No React, no coordinates.
-import { AWS_CATALOG_ID, AWS_SERVICES } from "@grafito/icons";
+import { qualifyService } from "@grafito/icons";
 import type { ComponentType, EmphasisStyle, MarkTone, Op, ZoneKind } from "@grafito/contract";
 
 export interface Zone {
@@ -107,8 +107,7 @@ function str(v: unknown): v is string {
 /** Known service id (`lambda` or `aws:lambda`) -> stored value (`aws:lambda`); null if unknown. */
 export function parseService(v: unknown): string | null {
   if (typeof v !== "string") return null;
-  const id = v.trim().replace(new RegExp(`^${AWS_CATALOG_ID}:`), "");
-  return AWS_SERVICES.some((s) => s.id === id) ? `${AWS_CATALOG_ID}:${id}` : null;
+  return qualifyService(v.trim());
 }
 
 /**

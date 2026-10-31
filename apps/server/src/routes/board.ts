@@ -1,17 +1,16 @@
 import type { Request, Response } from "express";
-import { CATALOG_IDS, ZONE_KINDS, normalizeCatalogs } from "@grafito/contract";
+import { DEFAULT_MODEL, ZONE_KINDS, isModelId, normalizeCatalogs } from "@grafito/contract";
+import { isCatalogId } from "@grafito/icons";
 import type { ClaudeClient } from "../claude/client";
 import { systemPromptFor } from "../prompt/system";
 import { buildUserText } from "../prompt/user-text";
 import type { BoardMode } from "../prompt/user-text";
 
-export const MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5"] as const;
-
 /** `catalogs` from the body: an array of known catalog ids (absent = off). Returns the error message or null. */
 function validateCatalogs(raw: unknown): string | null {
   if (raw === undefined) return null;
   if (!Array.isArray(raw)) return `Invalid catalogs: ${JSON.stringify(raw)}`;
-  const bad = raw.find((c) => typeof c !== "string" || !(CATALOG_IDS as readonly string[]).includes(c));
+  const bad = raw.find((c) => !isCatalogId(c));
   return bad === undefined ? null : `Invalid catalog: ${JSON.stringify(bad)}`;
 }
 
@@ -54,7 +53,7 @@ export function createBoardHandler(client: ClaudeClient | null) {
     }
     const catalogs = normalizeCatalogs(rawCatalogs ?? []);
     const mode: BoardMode = rawMode === "instruction" ? "instruction" : "content";
-    const useModel = (MODELS as readonly string[]).includes(model) ? model : MODELS[0];
+    const useModel = isModelId(model) ? model : DEFAULT_MODEL;
 
     const t0 = Date.now();
     let firstOp: number | null = null;

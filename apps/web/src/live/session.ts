@@ -3,7 +3,8 @@
 import type { Board } from "@grafito/board";
 import { serializeBoard } from "@grafito/board";
 import type { Op, RecordRequest, SessionRecord, Usage } from "@grafito/contract";
-import { addUsage, CATALOG_IDS, costUsd, parseOp, parseRecord, PROMPT_VERSION, zeroUsage } from "@grafito/contract";
+import { addUsage, costUsd, parseOp, parseRecord, PROMPT_VERSION, zeroUsage } from "@grafito/contract";
+import { CATALOG_IDS } from "@grafito/icons";
 import { createScheduler } from "./scheduler";
 import type { RequestMode } from "./scheduler";
 import { splitInstruction } from "./instruction";
@@ -42,7 +43,7 @@ export interface Settings {
   model: string;
   /** Shape preference: "auto" or a zone kind. */
   shape: string;
-  /** Enabled icon catalogs, e.g. ["aws"]. */
+  /** Enabled icon catalogs. */
   catalogs: string[];
   /** BCP 47 tag of the language setting. */
   speechLang: string;

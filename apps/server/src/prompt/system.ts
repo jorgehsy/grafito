@@ -1,4 +1,5 @@
-import { AWS_CATALOG_ID, AWS_SERVICES } from "@grafito/icons";
+import { CATALOGS } from "@grafito/icons";
+import type { IconCatalog } from "@grafito/icons";
 
 // Spanish on purpose: prompt text, translated with the English prompt ticket.
 export const BOARD_SYSTEM_PROMPT = `Eres un dibujante silencioso en vivo. Una persona da una charla sobre procesos/flujos y arquitectura técnica; el texto llega por fragmentos (con muletillas y repeticiones). Dibujas en un tablero de pizarra mediante llamadas a herramientas. Nunca escribes texto fuera de las herramientas. No das coordenadas: el tablero se coloca solo.
@@ -36,11 +37,11 @@ TABLERO ACTUAL: (tablero vacío)
 FRAGMENTO: "El cliente hace el pedido en la web y la API lo guarda en la base de datos."
 Llamadas: create_zone{id:"app",kind:"system",title:"Pedidos"}; add_component{zone:"app",id:"cliente",label:"Cliente",type:"actor"}; add_component{zone:"app",id:"web",label:"Web",type:"client"}; add_component{zone:"app",id:"api",label:"API",type:"service"}; add_component{zone:"app",id:"db",label:"Base de datos",type:"database"}; connect{id:"c1",from:"cliente",to:"web"}; connect{id:"c2",from:"web",to:"api"}; connect{id:"c3",from:"api",to:"db",label:"guarda pedido"}; update_summary{text:"El cliente pide por la web; la API guarda el pedido en la base de datos."}`;
 
-// Extra prompt block when the AWS catalog is on. The service list comes from services.ts.
+// Extra prompt block per enabled catalog. The service list comes from the catalog registry.
 // Spanish on purpose: prompt text, translated with the English prompt ticket.
-function awsPromptBlock(): string {
-  const serviceList = AWS_SERVICES.map((s) => (s.synonyms?.length ? `${s.id} (también: ${s.synonyms.join(", ")})` : s.id)).join("; ");
-  return `Iconos de servicio de AWS: add_step, add_decision y add_component admiten service, y set_service lo pone o cambia (o lo quita con service vacío) en cualquier elemento ya dibujado, p. ej. "esa API en realidad es API Gateway" o "a la caja API ponle icono de API Gateway". Ids válidos: ${serviceList}.
+function catalogPromptBlock(catalog: IconCatalog): string {
+  const serviceList = catalog.services.map((s) => (s.synonyms?.length ? `${s.id} (también: ${s.synonyms.join(", ")})` : s.id)).join("; ");
+  return `Iconos de servicio de ${catalog.label}: add_step, add_decision y add_component admiten service, y set_service lo pone o cambia (o lo quita con service vacío) en cualquier elemento ya dibujado, p. ej. "esa API en realidad es API Gateway" o "a la caja API ponle icono de API Gateway". Ids válidos: ${serviceList}.
 - Marca service SOLO si el hablante nombra el servicio ("Lambda", "un bucket de S3") o no hay duda. Si solo lo deduces ("una función serverless"), no marques.
 - Las palabras genéricas ("una base de datos", "una cola", "un servidor") no llevan icono. Solo hay icono de servicio, nunca de recurso.
 - Un elemento con service no necesita icon.`;
@@ -48,5 +49,6 @@ function awsPromptBlock(): string {
 
 /** System prompt: base block plus the catalog block when a catalog is on. Off = BOARD_SYSTEM_PROMPT unchanged. */
 export function systemPromptFor(catalogs: readonly string[]): string {
-  return catalogs.includes(AWS_CATALOG_ID) ? `${BOARD_SYSTEM_PROMPT}\n\n${awsPromptBlock()}` : BOARD_SYSTEM_PROMPT;
+  const blocks = CATALOGS.filter((c) => catalogs.includes(c.id)).map(catalogPromptBlock);
+  return blocks.length ? `${BOARD_SYSTEM_PROMPT}\n\n${blocks.join("\n\n")}` : BOARD_SYSTEM_PROMPT;
 }

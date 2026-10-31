@@ -1,13 +1,10 @@
 // The two borders of an op: what Claude is shown (toolDefs) and what is accepted back (parseOp).
 // Both come from the same schemas in ops.ts, one cached set per catalog combination.
 import { z } from "zod";
-import { AWS_CATALOG_ID, AWS_SERVICES } from "@grafito/icons";
+import { catalogServiceIds } from "@grafito/icons";
 import { inputSchemas, type Op, type OpName } from "./ops";
 
-/** Icon catalogs the server knows about (only AWS for now). */
-export const CATALOG_IDS = [AWS_CATALOG_ID] as const;
-
-/** Sorted and deduplicated, so ["aws"] and ["aws","aws"] share a cache entry. */
+/** Sorted and deduplicated, so ["a"] and ["a","a"] share a cache entry. */
 export function normalizeCatalogs(catalogs: readonly string[]): string[] {
   return [...new Set(catalogs)].sort();
 }
@@ -32,7 +29,7 @@ function setFor(catalogs: readonly string[]): CatalogSet {
   const key = normalizeCatalogs(catalogs).join(",");
   let set = sets.get(key);
   if (!set) {
-    const serviceIds = catalogs.includes(AWS_CATALOG_ID) ? AWS_SERVICES.map((s) => s.id) : [];
+    const serviceIds = catalogServiceIds(catalogs);
     const defs = inputSchemas(serviceIds);
     set = {
       tools: defs.map((d) => ({

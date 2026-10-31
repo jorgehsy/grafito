@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { T } from "./ShapeGallery";
 import { AWS_ICONS } from "../../icons/aws";
-import { AWS_SERVICES } from "@grafito/icons";
+import { CATALOGS } from "@grafito/icons";
+import { MODELS } from "@grafito/contract";
+import type { ModelInfo } from "@grafito/contract";
 import { LANGS, useT } from "../../i18n";
+import type { MessageKey } from "../../i18n";
 
 interface Tile { value: string; label: string; sub?: string; thumb: ReactNode }
 
@@ -11,16 +14,13 @@ const Code = ({ children }: { children: string }) => (
   <T><text x="24" y="23" textAnchor="middle" fontSize="18" fontWeight="600" fill="currentColor" stroke="none" fontFamily="inherit">{children}</text></T>
 );
 
-const modelTiles = (t: ReturnType<typeof useT>): Tile[] => [
-  {
-    value: "claude-sonnet-5-5", label: "Sonnet 5.5", sub: t("options.model.best"),
-    thumb: <T><path d="M24 3l3.2 9L36 15l-8.8 3L24 27l-3.2-9L12 15l8.8-3z" /><path d="M39 20l1.2 3.3 3.3 1.2-3.3 1.2L39 29l-1.2-3.3-3.3-1.2 3.3-1.2zM9 19l.9 2.4 2.4.9-2.4.9L9 26l-.9-2.4-2.4-.9 2.4-.9z" /></T>,
-  },
-  {
-    value: "claude-haiku-5-5", label: "Haiku 5.5", sub: t("options.model.faster"),
-    thumb: <T><path d="M27 3L14 18h9l-3 11 14-16h-9z" /><path d="M6 10h5M4 17h6M7 24h4" /></T>,
-  },
-];
+const MODEL_THUMBS: Record<ModelInfo["tier"], ReactNode> = {
+  best: <T><path d="M24 3l3.2 9L36 15l-8.8 3L24 27l-3.2-9L12 15l8.8-3z" /><path d="M39 20l1.2 3.3 3.3 1.2-3.3 1.2L39 29l-1.2-3.3-3.3-1.2 3.3-1.2zM9 19l.9 2.4 2.4.9-2.4.9L9 26l-.9-2.4-2.4-.9 2.4-.9z" /></T>,
+  faster: <T><path d="M27 3L14 18h9l-3 11 14-16h-9z" /><path d="M6 10h5M4 17h6M7 24h4" /></T>,
+};
+
+const modelTiles = (t: ReturnType<typeof useT>): Tile[] =>
+  MODELS.map((m) => ({ value: m.id, label: m.label, sub: t(m.tier === "best" ? "options.model.best" : "options.model.faster"), thumb: MODEL_THUMBS[m.tier] }));
 
 const LANG_TILES: Tile[] = LANGS.map((l) => ({ value: l.code, label: l.short, thumb: <Code>{l.code.split("-")[1]}</Code> }));
 
@@ -118,12 +118,15 @@ export function ViewTiles({ follow, onFollow, showTranscript, onShowTranscript }
   );
 }
 
-interface Catalog { id: string; label: string; title: string; samples: string[] }
-
-/** One icon catalog per card; more catalogs means more entries here. */
-const catalogs = (t: ReturnType<typeof useT>): Catalog[] => [
-  { id: "aws", label: "AWS", title: t("options.catalog.aws", { count: AWS_SERVICES.length }), samples: ["lambda", "s3", "dynamodb"] },
-];
+/** One card per catalog in the registry. */
+const catalogs = (t: ReturnType<typeof useT>) =>
+  CATALOGS.map((c) => ({
+    id: c.id,
+    label: c.label,
+    // One `options.catalog.<id>` message per registered catalog.
+    title: t(`options.catalog.${c.id}` as MessageKey, { count: c.services.length }),
+    samples: c.samples,
+  }));
 
 /** Independent cards (several can be on); value = ids of the enabled catalogs. */
 export function CatalogTiles({ value, onChange }: { value: string[]; onChange(v: string[]): void }) {

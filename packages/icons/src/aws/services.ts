@@ -2,7 +2,6 @@
 // Pure data, no Vite APIs: read by the script (Node), the server and the browser.
 
 export const AWS_PACKAGE_VERSION = "07312026";
-export const AWS_CATALOG_ID = "aws";
 // Every path in the zip starts with this folder.
 export const AWS_PACKAGE_ROOT = `Architecture-Service-Icons_${AWS_PACKAGE_VERSION}/`;
 

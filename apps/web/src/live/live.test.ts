@@ -4,7 +4,7 @@ import { op } from "@grafito/contract";
 import type { Op } from "@grafito/contract";
 import { serializeBoard } from "@grafito/board";
 import { createSseParser, streamBoard } from "./sse";
-import { costUsd, PRICING, fmtUsd, zeroUsage } from "@grafito/contract";
+import { costUsd, fmtUsd, priceOf, zeroUsage } from "@grafito/contract";
 
 const ev = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 const mockFetch = (chunks: string[]): typeof fetch =>
@@ -98,7 +98,7 @@ describe("cost", () => {
     expect(costUsd("claude-haiku-5-5", u)).toBeCloseTo(0.1 + 0.125 + 0.01 + 0.5, 10);
     expect(costUsd("claude-sonnet-5-5", u)).toBeCloseTo(2 + 2.5 + 0.2 + 10, 10);
     expect(costUsd("claude-haiku-5-5", { ...zeroUsage(), input_tokens: 2000, output_tokens: 1000 })).toBeCloseTo(0.0007, 10);
-    expect(PRICING["claude-sonnet-5-5"].output).toBe(10);
+    expect(priceOf("claude-sonnet-5-5").output).toBe(10);
     expect(fmtUsd(0.00123456)).toBe("$0.0012");
   });
 });

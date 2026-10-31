@@ -3,7 +3,7 @@
 import type { Geom, RenderItem } from "@grafito/board";
 import type { Visual } from "./visuals";
 import { AWS_ICONS } from "../icons/aws";
-import { AWS_CATALOG_ID } from "@grafito/icons";
+import { serviceIdOf } from "@grafito/icons";
 
 const NS = "http://www.w3.org/2000/svg";
 export const STAMP_PX = 30;
@@ -35,9 +35,6 @@ export function phaseStarts(plan: { phase: Phase; dur?: number }[], durations: P
 export function stampScale(p: number): number {
   return p < 0.7 ? (p / 0.7) * 1.18 : 1.18 - ((p - 0.7) / 0.3) * 0.18;
 }
-
-/** `aws:lambda` -> `lambda`. */
-export const serviceIdOf = (service: string) => service.replace(new RegExp(`^${AWS_CATALOG_ID}:`), "");
 
 /** Stamp center in the element's local coordinates. Diamond: on its top-left side; everything else: the corner. */
 export function stampCenter(variant: string, w: number, h: number): { x: number; y: number } {

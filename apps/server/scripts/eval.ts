@@ -5,7 +5,8 @@ import { emptyBoard, applyOps } from "@grafito/board";
 import type { Board } from "@grafito/board";
 import type { Op } from "@grafito/contract";
 import { serializeBoard } from "@grafito/board";
-import { CATALOG_IDS, costUsd, parseOp, parseRecord } from "@grafito/contract";
+import { EVAL_MODEL, costUsd, parseOp, parseRecord } from "@grafito/contract";
+import { CATALOG_IDS } from "@grafito/icons";
 import { buildUserText } from "../src/prompt/user-text";
 
 const USAGE = `Usage: pnpm eval <command> [options]
@@ -31,7 +32,7 @@ if (!file || !instruction) {
 }
 
 const URL = "http://localhost:8787/api/board";
-const MODEL = "claude-sonnet-5-5";
+const MODEL = EVAL_MODEL;
 
 const parsed = parseRecord(JSON.parse(readFileSync(file, "utf8")));
 if (!parsed.ok) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { IconBars, IconDoc, IconExport, IconGear, IconImport, IconMic, IconStop, IconTrash, IconUndo, IconWave } from "../../ui/icons";
 import type { BoardController, Subtitle } from "@grafito/board";
-import { fmtUsd, parseRecord } from "@grafito/contract";
+import { fmtUsd, isModelId, MODELS, parseRecord } from "@grafito/contract";
 import type { Settings } from "../session";
 import { useLiveSession } from "./useLiveSession";
 import { useMic } from "./useMic";
@@ -13,7 +13,6 @@ import { loadCatalogs, saveCatalogs } from "../catalogs";
 import { isLang, LANGS, setLang, useLang, useT } from "../../i18n";
 import { readFlag, writeFlag } from "../../storage";
 
-const MODEL_OPTIONS = ["claude-sonnet-5-5", "claude-haiku-5-5"];
 const STATS_KEY = "grafito.stats";
 
 interface Props {
@@ -41,7 +40,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
   const [optsOpen, setOptsOpen] = useState(false);
   const gearRef = useRef<HTMLButtonElement>(null);
   const fileIn = useRef<HTMLInputElement>(null);
-  const [model, setModel] = useState(MODEL_OPTIONS[0]);
+  const [model, setModel] = useState(MODELS[0].id);
   const [shape, setShape] = useState("auto");
   const [catalogs, setCatalogs] = useState<string[]>(loadCatalogs);
   const [importWarn, setImportWarn] = useState("");
@@ -52,7 +51,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
     { get: () => getCtrl()!.board, submit: (ops) => getCtrl()!.submit(ops), clear: onClear },
     settings,
     (s) => {
-      if (MODEL_OPTIONS.includes(s.model)) setModel(s.model);
+      if (isModelId(s.model)) setModel(s.model);
       if (SHAPE_OPTIONS.some((o) => o.value === s.shape)) setShape(s.shape);
       if (isLang(s.speechLang)) setLang(s.speechLang);
     },
