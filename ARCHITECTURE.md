@@ -2,7 +2,7 @@
 
 Grafito listens to a talk and draws it live. Claude never draws anything itself: it emits **ops** (small, coordinate-free changes to the board), and the browser lays out and animates the result. Terms in bold are defined in [`GLOSSARY.md`](GLOSSARY.md); decisions are in [`docs/adr/`](docs/adr/).
 
-Some file and identifier names are still Spanish (for example `scripts/arquitectura.ts` for a demo). They are being renamed to the glossary terms.
+Some file and identifier names are still Spanish (for example `demos/architecture.ts` for a demo). They are being renamed to the glossary terms.
 
 ## Package map
 
@@ -23,9 +23,9 @@ Dependencies point one way: `apps/*` → `packages/*`. `board` depends on `contr
 | --- | --- |
 | `packages/contract` | `ops.ts` (op types and tool definitions), `validate.ts` (op validation and tool sets per catalog), `pricing.ts` (prices, usage, cost) |
 | `packages/board` | `model.ts` (board, `applyOp`), `layout.ts`, `route.ts` (routing across zones), `tree.ts` (render tree), `animator.ts` (diff, animation queue), `controller.ts`, `camera.ts`, `player.ts` (demo player), `serialize.ts` (board text), `palette.ts` |
-| `packages/icons` | `src/aws/services.ts` (curated list), `src/aws/*.svg`, `src/aws/NOTICE.md`, `scripts/aws-icons.ts` |
-| `apps/web` | `BoardApp.tsx`, `live/*` (session, scheduler, SSE client, speech, session record, UI), `render/*` (engine, visuals, service stamp), `scripts/*` (demos) |
-| `apps/server` | `src/index.ts` (routes), `src/board.ts` (prompt, Claude call, SSE), `src/sessions.ts`, `scripts/eval-instruccion.ts` |
+| `packages/icons` | `src/aws/services.ts` (curated list), `src/aws/*.svg`, `src/aws/NOTICE.md`, `scripts/fetch-aws-icons.ts` |
+| `apps/web` | `BoardApp.tsx`, `live/*` (session, scheduler, SSE client, speech, session record, UI), `render/*` (engine, visuals, service stamp), `demos/*` |
+| `apps/server` | `src/index.ts` (routes), `src/board.ts` (prompt, Claude call, SSE), `src/sessions.ts`, `scripts/eval.ts` |
 
 ## Pipeline
 
@@ -44,6 +44,6 @@ speech → fragment → `POST /api/board` → Claude tool calls → ops → boar
 ### Side paths
 
 - **Session records.** `live/record.ts` builds a session record from the session's requests and posts it to `POST /api/sessions`; `apps/server/src/sessions.ts` writes it under `apps/server/sessions/`. Records can also be exported, imported and restored in the browser.
-- **Demos.** In demo mode, `Player` (`packages/board/src/player.ts`) plays a demo from `apps/web/src/scripts/*` through the same `BoardController`, without the server.
+- **Demos.** In demo mode, `Player` (`packages/board/src/player.ts`) plays a demo from `apps/web/src/demos/*` through the same `BoardController`, without the server.
 - **Icons.** `packages/icons` holds the AWS SVGs; `apps/web/src/icons/aws/index.ts` loads them with Vite's `import.meta.glob` through the `@aws-svg` alias. `pnpm --filter @grafito/icons icons:aws <zip>` refreshes them from AWS's official icon package.
-- **Eval.** `apps/server/scripts/eval-instruccion.ts` replays a saved session record and runs an instruction against it, to compare prompt changes.
+- **Eval.** `apps/server/scripts/eval.ts` replays a saved session record and runs an instruction against it, to compare prompt changes.

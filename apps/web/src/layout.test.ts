@@ -4,14 +4,14 @@ import { op } from "@grafito/contract";
 import { bezierAt, clearLayoutCache, computeLayout, labelLines, labelRect, overlaps } from "@grafito/board";
 import type { ConnectionGeom, Pt } from "@grafito/board";
 import type { Rect } from "@grafito/board";
-import { SCRIPTS } from "./scripts";
+import { DEMOS } from "./demos";
 import { buildTree } from "@grafito/board";
 import { diffTrees } from "@grafito/board";
 
 const finalBoard = (ops: Parameters<typeof applyOps>[1]) => applyOps(emptyBoard(), ops).board;
 
-describe.each(SCRIPTS)("layout of demo $id", ({ script }) => {
-  const board = finalBoard(script.flatMap((c) => c.ops));
+describe.each(DEMOS)("layout of demo $id", ({ demo }) => {
+  const board = finalBoard(demo.flatMap((c) => c.ops));
 
   it("zones do not overlap", async () => {
     const lay = await computeLayout(board);
@@ -92,7 +92,7 @@ describe.each(SCRIPTS)("layout of demo $id", ({ script }) => {
 
 describe("stability", () => {
   it("adding a step at the end of a flow barely moves the existing ones", async () => {
-    const chunks = SCRIPTS[1].script;
+    const chunks = DEMOS[1].demo;
     const ops = chunks.slice(0, 2).flatMap((c) => c.ops);
     const b0 = finalBoard(ops);
     const before = await computeLayout(b0);

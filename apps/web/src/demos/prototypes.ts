@@ -2,7 +2,7 @@ import { op } from "@grafito/contract";
 import { timeline } from "@grafito/board";
 
 /** Dictado F: tipos de prototipo y lo que entrega cada uno (zona tree, de izquierda a derecha). */
-export const prototipos = timeline([
+export const prototypes = timeline([
   {
     text: "quiero explicar los tipos de prototipo que podemos hacer, porque no todos son iguales.",
     ops: [

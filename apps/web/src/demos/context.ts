@@ -2,7 +2,7 @@ import { op } from "@grafito/contract";
 import { timeline } from "@grafito/board";
 
 /** Dictado C: la ventana de contexto como una barra con umbrales (zona scale). */
-export const contexto = timeline([
+export const context = timeline([
   {
     text: "quiero explicar cómo funciona la ventana de contexto en Claude Code.",
     ops: [

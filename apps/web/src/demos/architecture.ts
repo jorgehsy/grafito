@@ -2,7 +2,7 @@ import { op } from "@grafito/contract";
 import { timeline } from "@grafito/board";
 
 /** Dictado B: arquitectura de una aplicación web con cola, worker y pagos externos. */
-export const arquitectura = timeline([
+export const architecture = timeline([
   {
     text: "Vamos a repasar la arquitectura de la aplicación de pedidos, de punta a punta.",
     ops: [

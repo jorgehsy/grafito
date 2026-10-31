@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { cleanSvg, installIcons } from "../../scripts/aws-icons";
+import { cleanSvg, installIcons } from "../../scripts/fetch-aws-icons";
 import { AWS_PACKAGE_ROOT, AWS_SERVICES } from "./services";
 
 describe("services", () => {

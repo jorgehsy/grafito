@@ -2,7 +2,7 @@ import { op } from "@grafito/contract";
 import { timeline } from "@grafito/board";
 
 /** Dictado G: la ventana de contexto en cuatro cuadros (zonas scale en fila): se llena, se compacta y sigue con el resumen. */
-export const compactar = timeline([
+export const compact = timeline([
   {
     text: "te voy a mostrar la ventana de contexto en cuatro cuadros, uno al lado del otro, cada uno con su barra.",
     ops: [

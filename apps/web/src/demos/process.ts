@@ -2,7 +2,7 @@ import { op } from "@grafito/contract";
 import { timeline } from "@grafito/board";
 
 /** Dictado A: cómo se procesa un pedido, de la compra a la entrega. */
-export const proceso = timeline([
+export const process = timeline([
   {
     text: "Bueno, voy a explicar cómo procesamos un pedido en la tienda, desde que el cliente compra hasta que le llega el paquete.",
     ops: [

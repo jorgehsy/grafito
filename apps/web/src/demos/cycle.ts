@@ -2,7 +2,7 @@ import { op } from "@grafito/contract";
 import { timeline } from "@grafito/board";
 
 /** Dictado D: la ventana de contexto como un ciclo que se repite (zona cycle). */
-export const ciclo = timeline([
+export const cycle = timeline([
   {
     text: "voy a contar qué pasa con la ventana de contexto mientras trabajas con Claude Code, porque es un ciclo que se repite.",
     ops: [

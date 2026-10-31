@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardController } from "@grafito/board";
 import { Player } from "@grafito/board";
 import type { Subtitle } from "@grafito/board";
-import { SCRIPTS } from "./scripts";
+import { DEMOS } from "./demos";
 import { Engine } from "./render/engine";
 import { LivePanel } from "./live/LivePanel";
 import { useT } from "./i18n";
@@ -24,7 +24,7 @@ export function BoardApp() {
   const speedRef = useRef(1);
   const subRef = useRef<HTMLDivElement>(null);
 
-  const [demoId, setDemoId] = useState(() => new URLSearchParams(location.search).get("demo") ?? SCRIPTS[0].id);
+  const [demoId, setDemoId] = useState(() => new URLSearchParams(location.search).get("demo") ?? DEMOS[0].id);
   const [st, setSt] = useState<Status>("idle");
   const [speed, setSpeed] = useState(() => Number(new URLSearchParams(location.search).get("speed")) || 1);
   const [follow, setFollow] = useState(true);
@@ -93,8 +93,8 @@ export function BoardApp() {
     if (status.current === "playing") return;
     resetAll();
     const id = new URLSearchParams(location.search).get("auto") ?? demoRef.current;
-    const info = SCRIPTS.find((s) => s.id === id) ?? SCRIPTS[0];
-    player.current = new Player(info.script, {
+    const info = DEMOS.find((s) => s.id === id) ?? DEMOS[0];
+    player.current = new Player(info.demo, {
       onSubtitle: setSub,
       onOps: (ops) => { void ctrl.current?.submit(ops); },
       onEnd: () => setStatus("done"),
@@ -129,9 +129,9 @@ export function BoardApp() {
         <span className="word">grafito</span>
         {mode === "live" && <span className="board">{t("app.liveBadge")}</span>}
         {mode === "demo" && (
-          <div className="scriptbar" role="group" aria-label={t("app.demoBar")}>
+          <div className="demobar" role="group" aria-label={t("app.demoBar")}>
             <select aria-label={t("app.demoBar")} value={demoId} disabled={locked} onChange={(e) => setDemoId(e.target.value)}>
-              {SCRIPTS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {DEMOS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             {st === "playing" ? (
               <button className="tb sm" aria-label={t("app.pause")} title={t("app.pause")} onClick={pause}><IconPause /></button>

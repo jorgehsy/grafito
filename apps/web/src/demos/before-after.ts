@@ -2,7 +2,7 @@ import { op } from "@grafito/contract";
 import { timeline } from "@grafito/board";
 
 /** Dictado E: cómo cambió hacer software, antes y ahora (zona timeline con tramos). */
-export const antesAhora = timeline([
+export const beforeAfter = timeline([
   {
     text: "quiero mostrar cómo ha cambiado hacer software, comparando cómo era antes con cómo es ahora.",
     ops: [

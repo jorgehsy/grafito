@@ -97,8 +97,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .notch:hover { color: var(--grafito); }
 
 /* guion: controles en la cabecera, junto a la marca */
-.scriptbar { display: flex; align-items: center; gap: 6px; margin-left: 6px; padding: 3px 8px 3px 4px; background: #fff; border: 1px solid var(--hueso); border-radius: 14px; box-shadow: var(--sombra); font-size: 13px; pointer-events: auto; }
-.scriptbar select { font-size: 13px; border: 1px solid var(--hueso); border-radius: 12px; padding: 6px 10px; background: #fff; color: var(--grafito); max-width: 180px; }
+.demobar { display: flex; align-items: center; gap: 6px; margin-left: 6px; padding: 3px 8px 3px 4px; background: #fff; border: 1px solid var(--hueso); border-radius: 14px; box-shadow: var(--sombra); font-size: 13px; pointer-events: auto; }
+.demobar select { font-size: 13px; border: 1px solid var(--hueso); border-radius: 12px; padding: 6px 10px; background: #fff; color: var(--grafito); max-width: 180px; }
 .spd { display: flex; align-items: center; gap: 6px; color: var(--humo); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 .spd input { width: 80px; }
 
