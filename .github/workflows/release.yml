@@ -15,25 +15,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run typecheck test build
       - name: Comprobar que la etiqueta coincide con package.json
         run: |
           pkg="v$(node -p "require('./package.json').version")"
           if [ "$pkg" != "$GITHUB_REF_NAME" ]; then
             echo "La etiqueta $GITHUB_REF_NAME no coincide con package.json ($pkg)"; exit 1
           fi
-      - run: npm run build
       - name: Empaquetar
         run: |
           name="grafito-${GITHUB_REF_NAME}"
           git archive --format=tar.gz --prefix="$name/" -o "$name-source.tar.gz" "$GITHUB_REF_NAME"
-          tar -czf "$name-web-dist.tar.gz" dist
+          tar -czf "$name-web-dist.tar.gz" apps/web/dist
       - name: Crear release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,0 +1,13 @@
+{
+  "extends": "@grafito/config/tsconfig.web.json",
+  "compilerOptions": {
+    "types": [
+      "node",
+      "vite/client"
+    ]
+  },
+  "include": [
+    "src",
+    "vite.config.ts"
+  ]
+}

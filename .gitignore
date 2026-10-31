@@ -2,9 +2,10 @@
 node_modules
 dist
 .idea
-pruebas/
+apps/server/sessions/
 .remember/
 .DS_Store
 
 .scratch/
 .claude/worktrees/
+.turbo

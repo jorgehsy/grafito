@@ -1,0 +1,9 @@
+{
+  "extends": "@grafito/config/tsconfig.package.json",
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ]
+}

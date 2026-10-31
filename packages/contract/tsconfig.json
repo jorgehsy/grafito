@@ -1,0 +1,6 @@
+{
+  "extends": "@grafito/config/tsconfig.package.json",
+  "include": [
+    "src"
+  ]
+}

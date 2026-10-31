@@ -1,0 +1,22 @@
+{
+  "name": "@grafito/icons",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./aws/*": "./src/aws/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "icons:aws": "tsx scripts/iconos-aws.ts"
+  },
+  "devDependencies": {
+    "@grafito/config": "workspace:*",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15"
+  }
+}

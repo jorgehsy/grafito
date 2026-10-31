@@ -87,6 +87,7 @@ La clave solo la lee el servidor local. Nunca llega al navegador.
 ### Sesiones guardadas
 
 - Cada sesión se guarda en `pruebas/` (en tu disco, no se sube a git).
+- Nota (monorepo): ahora se guardan en `apps/server/sessions/` y la clave va en `apps/server/.env`.
 - Al recargar, puedes **Restaurar** la última sesión.
 - **Exportar** baja un `.json` y el tablero como `.svg`. **Importar** carga un `.json`.
 - **Limpiar** empieza una sesión nueva.

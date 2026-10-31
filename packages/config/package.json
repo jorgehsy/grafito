@@ -1,0 +1,12 @@
+{
+  "name": "@grafito/config",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsconfig.web.json": "./tsconfig.web.json",
+    "./tsconfig.node.json": "./tsconfig.node.json",
+    "./tsconfig.package.json": "./tsconfig.package.json"
+  }
+}
