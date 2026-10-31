@@ -2,7 +2,8 @@
 import type { Board } from "./model";
 import { derivedConnections, findElement } from "./model";
 import type { BoardLayout, Pt, Rect } from "./layout";
-import { bezierAt, elementLines, emphasisRect, markNoteLines, wrapText } from "./layout";
+import { bezierAt } from "./layout/edges";
+import { elementLines, emphasisRect, markNoteLines, wrapText } from "./layout/geometry";
 
 export type RenderItemKind = "zone" | "element" | "connection" | "emphasis" | "question" | "callout";
 export interface Geom { x: number; y: number; w: number; h: number; pts?: Pt[]; curve?: boolean; lab?: Pt }
