@@ -39,11 +39,11 @@ speech → fragment → `POST /api/board` → Claude tool calls → ops → boar
 6. **Board model.** `live/sse.ts` parses the stream and the session submits each op to `BoardController` (`packages/board/src/controller.ts`), which applies ops one at a time with `applyOp` (`model.ts`). The board holds no coordinates.
 7. **Layout.** `computeLayout` (`layout.ts`) positions everything per zone kind: ELK for flow and system, d3-hierarchy for mindmap, stacked rows for list and compare, custom code for scale, cycle, timeline and tree. `route.ts` routes connections between zones around obstacles.
 8. **Render tree.** `buildTree` (`tree.ts`) turns board + layout into a flat list of **render items** with stable keys. `diffTrees` (`animator.ts`) compares it with the previous tree, and the **animation queue** plays the result: draw, update and remove in order, moves in parallel, faster when work piles up.
-9. **Animated SVG.** `apps/web/src/render/engine.ts` implements the queue's `Sink`: it builds each **visual** with rough.js (`render/visuals.ts`), animates strokes, fills and text, adds the **service stamp** (`render/sello.ts`) and moves the camera (`packages/board/src/camera.ts`).
+9. **Animated SVG.** `apps/web/src/render/engine.ts` implements the queue's `Sink`: it builds each **visual** with rough.js (`render/visuals.ts`), animates strokes, fills and text, adds the **service stamp** (`render/stamp.ts`) and moves the camera (`packages/board/src/camera.ts`).
 
 ### Side paths
 
 - **Session records.** `live/record.ts` builds a session record from the session's requests and posts it to `POST /api/sessions`; `apps/server/src/sessions.ts` writes it under `apps/server/sessions/`. Records can also be exported, imported and restored in the browser.
 - **Demos.** In demo mode, `Player` (`packages/board/src/player.ts`) plays a demo from `apps/web/src/scripts/*` through the same `BoardController`, without the server.
-- **Icons.** `packages/icons` holds the AWS SVGs; `apps/web/src/iconos/aws/index.ts` loads them with Vite's `import.meta.glob` through the `@aws-svg` alias. `pnpm --filter @grafito/icons icons:aws <zip>` refreshes them from AWS's official icon package.
+- **Icons.** `packages/icons` holds the AWS SVGs; `apps/web/src/icons/aws/index.ts` loads them with Vite's `import.meta.glob` through the `@aws-svg` alias. `pnpm --filter @grafito/icons icons:aws <zip>` refreshes them from AWS's official icon package.
 - **Eval.** `apps/server/scripts/eval-instruccion.ts` replays a saved session record and runs an instruction against it, to compare prompt changes.

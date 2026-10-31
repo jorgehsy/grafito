@@ -8,7 +8,7 @@ import type { Cam, View } from "@grafito/board";
 import { geomEqual } from "@grafito/board";
 import type { Geom, RenderItem, RenderTree } from "@grafito/board";
 import { emptyTree } from "@grafito/board";
-import { addServiceIcon, enterSello, hideSello, planEntrada, removeSello } from "./sello";
+import { addServiceIcon, enterSello, hideSello, planEntrada, removeSello } from "./stamp";
 import { RED } from "@grafito/board";
 import { buildVisual, hideForDraw, hideText, measure, showAll } from "./visuals";
 import type { Visual } from "./visuals";

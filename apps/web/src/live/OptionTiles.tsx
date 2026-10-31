@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { T } from "./ShapeGallery";
-import { ICONOS_AWS } from "../iconos/aws";
+import { ICONOS_AWS } from "../icons/aws";
 import { AWS_SERVICES } from "@grafito/icons";
 
 interface Tile { value: string; label: string; sub?: string; thumb: ReactNode }

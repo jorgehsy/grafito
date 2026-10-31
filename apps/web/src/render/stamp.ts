@@ -2,7 +2,7 @@
 // Lo puro (orden, tiempos y el SVG en texto) se prueba sin DOM; lo demás arma nodos y los anima.
 import type { Geom, RenderItem } from "@grafito/board";
 import type { Visual } from "./visuals";
-import { ICONOS_AWS } from "../iconos/aws";
+import { ICONOS_AWS } from "../icons/aws";
 import { AWS_CATALOG_ID } from "@grafito/icons";
 
 const NS = "http://www.w3.org/2000/svg";

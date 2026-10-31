@@ -5,7 +5,7 @@ import type { Drawable } from "roughjs/bin/core";
 import type { Geom, RenderItem } from "@grafito/board";
 import { LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "@grafito/board";
 import { BLUE, EDGES, FILLS, FONT_FAMILY, INK, PAPER, RED, TONES } from "@grafito/board";
-import { addServiceIcon } from "./sello";
+import { addServiceIcon } from "./stamp";
 
 const NS = "http://www.w3.org/2000/svg";
 const gen = rough.generator();

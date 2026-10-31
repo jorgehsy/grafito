@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { centroSello, cuerpoIconoPrefijado, escalaSello, iniciosDeFases, planEntrada, selloMarkup, SELLO_MS } from "./sello";
+import { centroSello, cuerpoIconoPrefijado, escalaSello, iniciosDeFases, planEntrada, selloMarkup, SELLO_MS } from "./stamp";
 import { AWS_SERVICES } from "@grafito/icons";
 
 describe("planEntrada", () => {

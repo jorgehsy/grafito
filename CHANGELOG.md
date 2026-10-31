@@ -5,7 +5,7 @@ Las notas completas de cada versión están en [Releases](https://github.com/jor
 ## v0.2.0-alpha.4 · 2026-10-27
 
 - Iconos de AWS: actívalos en Opciones → Iconos, y Claude pone el icono oficial (Lambda, S3, Cognito… 40 servicios) junto a las cajas que son servicios de AWS.
-- Los iconos son de AWS y no están bajo la licencia MIT (ver `src/iconos/aws/AVISO.md`).
+- Los iconos son de AWS y no están bajo la licencia MIT (ver `packages/icons/src/aws/NOTICE.md`).
 - Panel de opciones en tarjetas: Modelo, Idioma y Vista.
 
 ## v0.2.0-alpha.3 · 2026-10-26
