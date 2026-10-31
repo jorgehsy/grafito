@@ -9,7 +9,7 @@ import { compact } from "./compact";
 
 export interface DemoInfo { id: string; name: string; demo: Demo }
 export const DEMOS: DemoInfo[] = [
-  { id: "architecture", name: "Arquitectura de una app web", demo: architecture },
+  { id: "architecture", name: "Architecture of a web app", demo: architecture },
   { id: "process", name: "Proceso de un pedido", demo: process },
   { id: "context", name: "Ventana de contexto", demo: context },
   { id: "cycle", name: "Ciclo de la ventana", demo: cycle },

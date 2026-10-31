@@ -2,7 +2,7 @@
 
 Grafito listens to a talk and draws it live. Claude never draws anything itself: it emits **ops** (small, coordinate-free changes to the board), and the browser lays out and animates the result. Terms in bold are defined in [`GLOSSARY.md`](GLOSSARY.md); decisions are in [`docs/adr/`](docs/adr/).
 
-Some file and identifier names are still Spanish (for example `demos/architecture.ts` for a demo). They are being renamed to the glossary terms.
+Some file and identifier names are still Spanish. They are being renamed to the glossary terms.
 
 ## Package map
 
@@ -46,4 +46,4 @@ speech → fragment → `POST /api/board` → Claude tool calls → ops → boar
 - **Session records.** `live/record.ts` builds a session record from the session's requests and posts it to `POST /api/sessions`; `apps/server/src/sessions.ts` writes it under `apps/server/sessions/`. Records can also be exported, imported and restored in the browser.
 - **Demos.** In demo mode, `Player` (`packages/board/src/player.ts`) plays a demo from `apps/web/src/demos/*` through the same `BoardController`, without the server.
 - **Icons.** `packages/icons` holds the AWS SVGs; `apps/web/src/icons/aws/index.ts` loads them with Vite's `import.meta.glob` through the `@aws-svg` alias. `pnpm --filter @grafito/icons icons:aws <zip>` refreshes them from AWS's official icon package.
-- **Eval.** `apps/server/scripts/eval.ts` replays a saved session record and runs an instruction against it, to compare prompt changes.
+- **Eval.** `pnpm --filter @grafito/server eval instruction <record.json> "<instruction>"` (`apps/server/scripts/eval.ts`) replays a saved session record and runs an instruction against it, to compare prompt changes.

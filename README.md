@@ -81,7 +81,7 @@ La clave solo la lee el servidor local. Nunca llega al navegador.
 - **Darle órdenes:** di o escribe *"Grafito"* y luego la orden. Lo anterior se dibuja; lo posterior se toma como instrucción. Si no te gusta el resultado, usa **Deshacer instrucción**.
 - **Elegir la forma:** en **Opciones** eliges la forma del dibujo, el modelo (Sonnet por defecto, Haiku más barato) y el idioma (es-CL, es-AR, es-MX, es-ES, en-US).
 - **Ver costos:** pulsa **F3** o el botón de estadísticas.
-- **Demo sin gastar:** abre **http://localhost:5173/** y elige un guion. Atajo: `/?auto=arquitectura&speed=2`.
+- **Demo sin gastar:** abre **http://localhost:5173/** y elige un guion. Atajo: `/?auto=architecture&speed=2`.
 - **Moverte:** rueda del mouse = zoom, arrastrar = mover.
 
 ### Sesiones guardadas
@@ -125,7 +125,7 @@ npm run iconos:aws <zip>  # reinstala los iconos de AWS desde el paquete oficial
 | `src/board/model.ts`, `layout.ts` | Estado del tablero y cómo se acomoda en pantalla. |
 | `src/board/animator.ts`, `render/` | Animación de trazos, cámara y estilo a mano. |
 | `src/board/live/` | Panel en vivo, streaming, voz (`speech/`) y precios. |
-| `src/board/scripts/` | Guiones de demo. |
+| `apps/web/src/demos/` | Guiones de demo. |
 
 La primera versión (con Excalidraw) sigue en `/v1.html` como referencia. Ya no se mantiene.
 

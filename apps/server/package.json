@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "eval": "tsx scripts/eval.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint ."

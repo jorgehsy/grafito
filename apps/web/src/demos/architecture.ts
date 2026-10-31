@@ -1,133 +1,133 @@
 import { op } from "@grafito/contract";
 import { timeline } from "@grafito/board";
 
-/** Dictado B: arquitectura de una aplicación web con cola, worker y pagos externos. */
+/** Dictation B: architecture of a web application with a queue, a worker and external payments. */
 export const architecture = timeline([
   {
-    text: "Vamos a repasar la arquitectura de la aplicación de pedidos, de punta a punta.",
+    text: "Let's go over the architecture of the order application, end to end.",
     ops: [
-      op.create_zone({ id: "app", kind: "system", title: "Arquitectura de la aplicación" }),
-      op.update_summary({ text: "Arquitectura de la app de pedidos: web, API, cola, worker, base de datos y pagos externos." }),
+      op.create_zone({ id: "app", kind: "system", title: "Application architecture" }),
+      op.update_summary({ text: "Order app architecture: web, API, queue, worker, database and external payments." }),
     ],
   },
   {
-    text: "Arriba del todo está el usuario, que entra desde su navegador, desde el ordenador o desde el móvil.",
+    text: "At the very top is the user, who comes in from a browser, on a computer or on a phone.",
     ops: [
-      op.add_component({ zone: "app", id: "usuario", label: "Usuario", type: "actor" }),
-      op.add_component({ zone: "app", id: "web", label: "Navegador", type: "client" }),
-      op.connect({ id: "c1", from: "usuario", to: "web" }),
+      op.add_component({ zone: "app", id: "user", label: "User", type: "actor" }),
+      op.add_component({ zone: "app", id: "web", label: "Browser", type: "client" }),
+      op.connect({ id: "c1", from: "user", to: "web" }),
     ],
   },
   {
-    text: "El navegador habla con nuestra API por HTTPS, que es un servicio en Node.",
+    text: "The browser talks to our API over HTTPS, which is a Node service.",
     ops: [
       op.add_component({ zone: "app", id: "api", label: "API", type: "service" }),
       op.connect({ id: "c2", from: "web", to: "api", label: "HTTPS" }),
     ],
   },
   {
-    text: "La API guarda el pedido directamente en la base de datos, que es MySQL.",
+    text: "The API saves the order straight to the database, which is MySQL.",
     ops: [
-      op.add_component({ zone: "app", id: "bd", label: "MySQL", type: "database" }),
-      op.connect({ id: "c_api_bd", from: "api", to: "bd" }),
+      op.add_component({ zone: "app", id: "db", label: "MySQL", type: "database" }),
+      op.connect({ id: "c_api_db", from: "api", to: "db" }),
     ],
   },
   {
-    text: "No, perdón, en realidad la base de datos es Postgres, no MySQL.",
-    ops: [op.update_label({ id: "bd", label: "PostgreSQL" })],
+    text: "No, sorry, the database is actually Postgres, not MySQL.",
+    ops: [op.update_label({ id: "db", label: "PostgreSQL" })],
   },
   {
-    text: "Y tampoco, la API no guarda nada directamente. Lo único que hace es dejar el pedido en una cola.",
+    text: "And no, the API doesn't save anything directly either. All it does is leave the order on a queue.",
     ops: [
-      op.delete({ id: "c_api_bd" }),
-      op.add_component({ zone: "app", id: "cola", label: "Cola de pedidos", type: "queue" }),
-      op.connect({ id: "c3", from: "api", to: "cola", label: "encola" }),
+      op.delete({ id: "c_api_db" }),
+      op.add_component({ zone: "app", id: "queue", label: "Order queue", type: "queue" }),
+      op.connect({ id: "c3", from: "api", to: "queue", label: "enqueues" }),
     ],
   },
   {
-    text: "Del otro lado de la cola hay un worker que va leyendo los pedidos de uno en uno.",
+    text: "On the other side of the queue there's a worker that reads the orders one at a time.",
     ops: [
       op.add_component({ zone: "app", id: "worker", label: "Worker", type: "service" }),
-      op.connect({ id: "c4", from: "cola", to: "worker" }),
+      op.connect({ id: "c4", from: "queue", to: "worker" }),
     ],
   },
   {
-    text: "Es el worker el que guarda en la base de datos y el que se encarga de todo lo lento.",
-    ops: [op.connect({ id: "c5", from: "worker", to: "bd", label: "guarda" })],
+    text: "The worker is the one that saves to the database and handles everything slow.",
+    ops: [op.connect({ id: "c5", from: "worker", to: "db", label: "saves" })],
   },
   {
-    text: "Para cobrar usamos un proveedor de pagos externo, que no controlamos nosotros.",
+    text: "To charge customers we use an external payment provider, which we don't control.",
     ops: [
-      op.add_component({ zone: "app", id: "pagos", label: "Proveedor de pagos", type: "external", icon: "💳" }),
-      op.connect({ id: "c6", from: "worker", to: "pagos", label: "cobra" }),
+      op.add_component({ zone: "app", id: "payments", label: "Payment provider", type: "external", icon: "💳" }),
+      op.connect({ id: "c6", from: "worker", to: "payments", label: "charges" }),
     ],
   },
   {
-    text: "Cuando termina, nos avisa de forma asíncrona con un webhook que llega a la API.",
-    ops: [op.connect({ id: "c7", from: "pagos", to: "api", label: "webhook", style: "dashed" })],
+    text: "When it finishes, it notifies us asynchronously with a webhook that reaches the API.",
+    ops: [op.connect({ id: "c7", from: "payments", to: "api", label: "webhook", style: "dashed" })],
   },
   {
-    text: "Las facturas en PDF las generamos en el worker y las dejamos en un bucket de almacenamiento.",
+    text: "We generate the PDF invoices in the worker and leave them in a storage bucket.",
     ops: [
-      op.add_component({ zone: "app", id: "facturas", label: "Bucket de facturas", type: "storage" }),
-      op.connect({ id: "c8", from: "worker", to: "facturas", label: "PDF" }),
+      op.add_component({ zone: "app", id: "invoices", label: "Invoice bucket", type: "storage" }),
+      op.connect({ id: "c8", from: "worker", to: "invoices", label: "PDF" }),
     ],
   },
   {
-    text: "La cola es la pieza clave: absorbe los picos de pedidos, por ejemplo en rebajas.",
+    text: "The queue is the key piece: it absorbs order spikes, for example during sales.",
     ops: [
-      op.emphasize({ target: "cola", style: "circle" }),
-      op.add_callout({ id: "nota_cola", target: "cola", text: "absorbe los picos de ventas" }),
+      op.emphasize({ target: "queue", style: "circle" }),
+      op.add_callout({ id: "queue_note", target: "queue", text: "absorbs sales spikes" }),
     ],
   },
   {
-    text: "Ahora veamos cómo se procesa un pago, paso a paso.",
-    ops: [op.create_zone({ id: "pago", kind: "flow", title: "Cómo se procesa un pago", place: { relation: "below", of: "app" } })],
+    text: "Now let's see how a payment is processed, step by step.",
+    ops: [op.create_zone({ id: "payment", kind: "flow", title: "How a payment is processed", place: { relation: "below", of: "app" } })],
   },
   {
-    text: "El usuario confirma el pedido y la API crea un pago pendiente.",
+    text: "The user confirms the order and the API creates a pending payment.",
     ops: [
-      op.add_step({ zone: "pago", id: "s1", label: "El usuario confirma" }),
-      op.add_step({ zone: "pago", id: "s2", label: "La API crea un pago pendiente", after: "s1" }),
+      op.add_step({ zone: "payment", id: "s1", label: "The user confirms" }),
+      op.add_step({ zone: "payment", id: "s2", label: "The API creates a pending payment", after: "s1" }),
       op.connect({ id: "x1", from: "s2", to: "api", style: "dashed" }),
     ],
   },
   {
-    text: "El pedido pasa por la cola y el worker llama al proveedor de pagos.",
+    text: "The order goes through the queue and the worker calls the payment provider.",
     ops: [
-      op.add_step({ zone: "pago", id: "s3", label: "El worker llama al proveedor", after: "s2" }),
-      op.connect({ id: "x2", from: "s3", to: "pagos" }),
+      op.add_step({ zone: "payment", id: "s3", label: "The worker calls the provider", after: "s2" }),
+      op.connect({ id: "x2", from: "s3", to: "payments" }),
     ],
   },
   {
-    text: "Si el pago se aprueba, guardamos el pedido como pagado. Si no, reintentamos un par de veces.",
+    text: "If the payment is approved, we save the order as paid. If not, we retry a couple of times.",
     ops: [
-      op.add_decision({ zone: "pago", id: "d1", question: "¿Pago aprobado?", after: "s3" }),
-      op.add_step({ zone: "pago", id: "s4", label: "Guardar pedido pagado" }),
-      op.add_step({ zone: "pago", id: "s5", label: "Reintentar", icon: "🔁" }),
-      op.connect({ id: "y1", from: "d1", to: "s4", label: "sí" }),
+      op.add_decision({ zone: "payment", id: "d1", question: "Payment approved?", after: "s3" }),
+      op.add_step({ zone: "payment", id: "s4", label: "Save paid order" }),
+      op.add_step({ zone: "payment", id: "s5", label: "Retry", icon: "🔁" }),
+      op.connect({ id: "y1", from: "d1", to: "s4", label: "yes" }),
       op.connect({ id: "y2", from: "d1", to: "s5", label: "no" }),
-      op.connect({ id: "x3", from: "s4", to: "bd" }),
+      op.connect({ id: "x3", from: "s4", to: "db" }),
     ],
   },
   {
-    text: "Y no tengo claro qué pasa si el proveedor tarda demasiado en responder, eso hay que revisarlo.",
-    ops: [op.mark_question({ target: "pagos", text: "¿y los timeouts?" })],
+    text: "And I'm not sure what happens if the provider takes too long to respond, that needs checking.",
+    ops: [op.mark_question({ target: "payments", text: "what about timeouts?" })],
   },
   {
-    text: "Por último, al guardar el pedido mandamos un correo de confirmación y se genera la factura.",
+    text: "Finally, when the order is saved we send a confirmation email and the invoice is generated.",
     ops: [
-      op.add_step({ zone: "pago", id: "s6", label: "Correo y factura", icon: "✉️", after: "s4" }),
-      op.connect({ id: "x4", from: "s6", to: "facturas", style: "dashed" }),
+      op.add_step({ zone: "payment", id: "s6", label: "Email and invoice", icon: "✉️", after: "s4" }),
+      op.connect({ id: "x4", from: "s6", to: "invoices", style: "dashed" }),
       op.emphasize({ target: "s4", style: "star" }),
     ],
   },
   {
-    text: "Lo bueno de este diseño es que si el worker se cae, los pedidos se quedan esperando en la cola y no se pierde ninguno, simplemente se procesan más tarde.",
-    ops: [op.add_callout({ id: "nota_worker", target: "worker", text: "si se cae, nada se pierde" })],
+    text: "The good thing about this design is that if the worker goes down, the orders wait in the queue and none are lost, they're just processed later.",
+    ops: [op.add_callout({ id: "worker_note", target: "worker", text: "if it goes down, nothing is lost" })],
   },
   {
-    text: "Eso sería todo: una API fina, una cola que amortigua y un worker que hace el trabajo pesado.",
-    ops: [op.update_summary({ text: "API fina que encola, worker que guarda y cobra con un proveedor externo; webhook asíncrono de vuelta." })],
+    text: "That's all: a thin API, a queue that buffers and a worker that does the heavy lifting.",
+    ops: [op.update_summary({ text: "Thin API that enqueues, worker that saves and charges through an external provider; async webhook back." })],
   },
 ]);
