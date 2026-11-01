@@ -117,3 +117,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 @media (max-width: 1100px) {
   .typebar { width: min(760px, calc(100% - 140px)); left: calc(50% + 40px); bottom: 72px; }
 }
+
+/* architect mode: the speech bubble, from the top-right corner until it can point at its target */
+.bubble { position: fixed; top: 16px; right: 20px; max-width: 340px; padding: 12px 16px; background: #fff; border: 2px solid var(--grafito); border-radius: 18px; box-shadow: var(--sombra); font-family: 'Kalam', cursive; font-size: 18px; line-height: 1.35; color: var(--grafito); z-index: 9; }
+.bubble.wait { color: var(--humo); border-color: var(--goma); }

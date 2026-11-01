@@ -167,7 +167,7 @@ Which change an op makes (`create_zone`, `add_step`, `connect`, `update_summary`
 _Avoid_: tool name (in board code), op type
 
 **Tool definition**:
-The name, description and input schema of one op as offered to Claude; the set offered depends on the enabled icon catalogs.
+The name, description and input schema of one op as offered to Claude; the set offered depends on the app mode (live mode and architect mode each have their own op set) and on the enabled icon catalogs.
 _Avoid_: herramienta, schema (alone), tool spec
 
 **Invalid op**:

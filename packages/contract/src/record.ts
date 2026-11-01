@@ -5,6 +5,9 @@ import { z } from "zod";
 /** Bump when the system prompt or the tools Claude sees change; each request records it. */
 export const PROMPT_VERSION = 2;
 
+/** Architect mode's own counter: bump it when the architect prompt or the tools it offers change. */
+export const ARCHITECT_PROMPT_VERSION = 1;
+
 export const OUTDATED_RECORD = "This session was saved by an older grafito and cannot be restored.";
 
 const ms = z.number().nullable();

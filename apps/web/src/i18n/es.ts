@@ -70,6 +70,7 @@ export const es = {
   "architect.input.label": "Cuéntale a Claude qué construir",
   "architect.input.placeholder": "Describe lo que quieres construir en AWS y pulsa Enter…",
 
+  "architect.thinking": "Pensando…",
   "restore.banner.one": "Hay una prueba sin cerrar ({count} petición, {cost})",
   "restore.banner.other": "Hay una prueba sin cerrar ({count} peticiones, {cost})",
   "restore.restore": "Restaurar",

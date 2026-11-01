@@ -11,7 +11,7 @@ export function hasApiKey(key = process.env.ANTHROPIC_API_KEY): key is string {
   return !!key && key.trim() !== "" && !key.includes(PLACEHOLDER);
 }
 
-/** The production adapter: streams a board request from the Anthropic Messages API. */
+/** The production adapter: streams a request from the Anthropic Messages API. */
 export function anthropicClient(apiKey: string): ClaudeClient {
   const client = new Anthropic({ apiKey });
   return {
@@ -24,14 +24,14 @@ export function anthropicClient(apiKey: string): ClaudeClient {
           text: b.text,
           ...(b.cache ? { cache_control: { type: "ephemeral" as const } } : {}),
         })),
-        tools: toolDefs(p.catalogs),
+        tools: toolDefs(p.catalogs, p.opSet),
         tool_choice: { type: "auto" as const },
         output_config: { effort: p.effort },
         messages: [{ role: "user" as const, content: p.userText }],
       };
       const open = async (s: AbortSignal) =>
         (await client.messages.create({ ...params, stream: true }, { signal: s })) as unknown as AsyncIterable<RawEvent>;
-      return modelEvents(open, p.catalogs, signal);
+      return modelEvents(open, p, signal);
     },
   };
 }

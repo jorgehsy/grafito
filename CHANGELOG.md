@@ -5,6 +5,7 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 ## Unreleased
 
 - Architect mode (hidden, `?mode=architect`): a blank board with one system zone and a text box at the bottom. Live and architect mode keep separate autosave slots, so one never overwrites the other.
+- Architect mode (hidden): type what you want to build and Claude draws it in the system zone and answers in a speech bubble in the corner (Sonnet 5.5 by default; `POST /api/architect`).
 
 ## v0.2.0-alpha.6 · 2026-10-31
 

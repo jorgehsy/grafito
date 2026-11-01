@@ -3,6 +3,7 @@ import type { Options, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { MODELS, toolDefs } from "@grafito/contract";
+import type { ToolDef } from "@grafito/contract";
 import type { ClaudeClient, ClaudeParams, SystemBlock, Usage } from "./client";
 import { modelEvents } from "./stream";
 import type { RawEvent } from "./stream";
@@ -38,7 +39,7 @@ export function subscriptionEnv(source: NodeJS.ProcessEnv, maxTokens: number): R
   return env;
 }
 
-/** The adapter for the owner's Claude subscription: runs the board request through the Agent SDK (local `claude` login). */
+/** The adapter for the owner's Claude subscription: runs the request through the Agent SDK (local `claude` login). */
 export function subscriptionClient(opts: SubscriptionOptions = {}): ClaudeClient {
   const query = opts.query ?? (sdkQuery as QueryFn);
   const source = opts.env ?? process.env;
@@ -49,13 +50,13 @@ export function subscriptionClient(opts: SubscriptionOptions = {}): ClaudeClient
         const messages = query({ prompt: p.userText, options: { ...options(p, subscriptionEnv(source, p.maxTokens)), abortController } });
         return rawEvents(messages, abortController, s);
       };
-      return modelEvents(open, p.catalogs, signal);
+      return modelEvents(open, p, signal);
     },
   };
 }
 
 function options(p: ClaudeParams, env: Record<string, string | undefined>): Options {
-  const tools = toolDefs(p.catalogs);
+  const tools = toolDefs(p.catalogs, p.opSet);
   return {
     model: MODELS.find((m) => m.id === p.model)?.apiModel ?? p.model,
     systemPrompt: systemPrompt(p.system),
@@ -64,13 +65,14 @@ function options(p: ClaudeParams, env: Record<string, string | undefined>): Opti
     settingSources: [],
     strictMcpConfig: true,
     persistSession: false,
-    mcpServers: { [SERVER]: { type: "sdk", name: SERVER, instance: opServer(p.catalogs) } },
+    mcpServers: { [SERVER]: { type: "sdk", name: SERVER, instance: opServer(tools) } },
     allowedTools: tools.map((t) => PREFIX + t.name),
     permissionMode: "dontAsk",
     maxTurns: MAX_TURNS,
     includePartialMessages: true,
     effort: p.effort,
-    thinking: { type: "disabled" },
+    // Architect turns keep the adaptive default: Sonnet 5.5 answers them with a 400 when thinking is disabled.
+    ...(p.adaptiveThinking ? {} : { thinking: { type: "disabled" as const } }),
     env,
   };
 }
@@ -88,10 +90,10 @@ function systemPrompt(blocks: readonly SystemBlock[]): string[] {
  * through the SDK's `tool()` (which wants Zod shapes and would rebuild the schemas and validate a second
  * time): the model sees the same schemas as with the API and `parseOp` stays the only check. Every call answers "ok".
  */
-function opServer(catalogs: readonly string[]): McpServer {
+function opServer(tools: readonly ToolDef[]): McpServer {
   const server = new McpServer({ name: SERVER, version: "1.0.0" }, { capabilities: { tools: {} } });
   server.server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: toolDefs(catalogs).map((t) => ({
+    tools: tools.map((t) => ({
       name: t.name,
       description: t.description,
       inputSchema: t.input_schema,

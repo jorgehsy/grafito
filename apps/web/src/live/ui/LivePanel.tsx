@@ -10,7 +10,8 @@ import { SHAPE_OPTIONS } from "./ShapeGallery";
 import { OptionsPopover } from "./OptionsPopover";
 import { hhmm, StatsPanel } from "./StatsPanel";
 import { loadCatalogs, saveCatalogs } from "../catalogs";
-import { totalCost, usableModel } from "../models";
+import { fetchAvailableModels, totalCost, usableModel } from "../models";
+import type { ModelControl } from "../models";
 import { isLang, LANGS, setLang, useLang, useT } from "../../i18n";
 import { readFlag, writeFlag } from "../../storage";
 
@@ -34,9 +35,11 @@ interface Props {
   onShowTranscript(v: boolean): void;
   /** The mute control while the mic is on, null while it is off; shown next to the subtitles. */
   onMuteControl(c: { muted: boolean; toggle(): void } | null): void;
+  /** Another mode's model choice (architect mode has its own); the options popover shows it instead of live mode's. */
+  modelControl: ModelControl | null;
 }
 
-export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript, onMuteControl }: Props) {
+export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript, onMuteControl, modelControl }: Props) {
   const t = useT();
   const lang = useLang();
   const active = mode === "live";
@@ -68,10 +71,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/health")
-      .then((r) => r.json())
-      .then((h) => (Array.isArray(h?.models) ? (h.models as unknown[]).filter((x): x is string => typeof x === "string") : null), () => null)
-      .then((ids) => { if (alive) setAvailable(ids); });
+    void fetchAvailableModels().then((ids) => { if (alive) setAvailable(ids); });
     return () => { alive = false; };
   }, []);
   // A choice the server does not offer falls back to the default.
@@ -157,7 +157,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
 
       <OptionsPopover
         open={optsOpen} anchor={gearRef} onClose={() => setOptsOpen(false)}
-        model={model} availableModels={available} onModel={setModel} shape={shape} onShape={setShape}
+        model={modelControl?.model ?? model} availableModels={modelControl ? modelControl.available : available} onModel={modelControl?.onModel ?? setModel} shape={shape} onShape={setShape}
         catalogs={catalogs} onCatalogs={(v) => { setCatalogs(v); saveCatalogs(v); }}
         langLocked={micOn} follow={follow} onFollow={onFollow} showTranscript={showTranscript} onShowTranscript={onShowTranscript}
       />

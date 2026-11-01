@@ -1,11 +1,11 @@
 export { ZONE_KINDS, op } from "./ops";
-export type { ComponentType, EmphasisStyle, MarkTone, Op, OpInputs, OpName, TextField, ZoneKind } from "./ops";
+export type { ComponentType, EmphasisStyle, MarkTone, Op, OpInputs, OpName, OpSet, TextField, ZoneKind } from "./ops";
 export { normalizeCatalogs, parseOp, toolDefs } from "./parse";
 export type { ParsedOp, ToolDef } from "./parse";
-export { DEFAULT_MODEL, EVAL_MODEL, MODELS, isModelId, priceOf } from "./models";
+export { ARCHITECT_DEFAULT_MODEL, DEFAULT_MODEL, EVAL_MODEL, MODELS, isModelId, priceOf } from "./models";
 export type { ModelInfo, Price, Provider } from "./models";
 export * from "./pricing";
 export { DEFAULT_LANG, LANGS, isLang, languageName } from "./lang";
 export type { Lang } from "./lang";
-export { OUTDATED_RECORD, PROMPT_VERSION, parseRecord } from "./record";
+export { ARCHITECT_PROMPT_VERSION, OUTDATED_RECORD, PROMPT_VERSION, parseRecord } from "./record";
 export type { ParsedRecord, RecordRequest, SessionRecord } from "./record";

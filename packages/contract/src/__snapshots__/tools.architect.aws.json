@@ -1,0 +1,293 @@
+[
+  {
+    "name": "add_component",
+    "description": "Adds a component to a system zone. type: actor = person (stick figure); client = browser or phone; service = service box; database = cylinder; queue = queue or pipe; storage = bucket or folder; external = dotted cloud of a third party.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "zone": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of a system zone."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier."
+        },
+        "label": {
+          "type": "string",
+          "description": "Short name."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "actor",
+            "client",
+            "service",
+            "database",
+            "queue",
+            "storage",
+            "external"
+          ]
+        },
+        "icon": {
+          "type": "string",
+          "description": "Optional emoji."
+        },
+        "service": {
+          "type": "string",
+          "enum": [
+            "lambda",
+            "ec2",
+            "ecs",
+            "eks",
+            "fargate",
+            "s3",
+            "efs",
+            "dynamodb",
+            "rds",
+            "aurora",
+            "elasticache",
+            "api-gateway",
+            "cloudfront",
+            "route-53",
+            "vpc",
+            "elb",
+            "sqs",
+            "sns",
+            "eventbridge",
+            "step-functions",
+            "appsync",
+            "cognito",
+            "iam",
+            "kms",
+            "secrets-manager",
+            "waf",
+            "cloudwatch",
+            "cloudformation",
+            "cloudtrail",
+            "kinesis",
+            "athena",
+            "glue",
+            "redshift",
+            "opensearch",
+            "bedrock",
+            "sagemaker",
+            "codepipeline",
+            "codebuild",
+            "amplify",
+            "ses"
+          ],
+          "description": "AWS service (icon). Only if the speaker names it or there is no doubt."
+        }
+      },
+      "required": [
+        "zone",
+        "id",
+        "label",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "connect",
+    "description": "Draws an arrow between two elements, inside one zone or across zones (e.g. from a step of a flow to a component of an architecture).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier of the connection."
+        },
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the source element."
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the target element."
+        },
+        "label": {
+          "type": "string",
+          "description": "Short text over the arrow."
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "solid",
+            "dashed"
+          ],
+          "description": "dashed = optional, asynchronous or weak relation."
+        },
+        "both_ways": {
+          "type": "boolean",
+          "description": "Arrow with a head at both ends."
+        }
+      },
+      "required": [
+        "id",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "update_label",
+    "description": "Changes the text of an element, zone, connection or callout (when the speaker corrects themselves).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id to change."
+        },
+        "label": {
+          "type": "string",
+          "description": "New text."
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "delete",
+    "description": "Deletes an element, connection, callout or zone. Deleting a zone deletes all its content; deleting an element removes its connections.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id to delete."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "say",
+    "description": "Speaks to the user in a speech bubble over the board. Exactly one per turn, even when nothing is drawn; if you send more than one, only the last is shown.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "What you tell the user: about 25 words, concrete, at most one question."
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the element the bubble is about (optional; without it the bubble comes from a corner)."
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "set_service",
+    "description": "Puts on or changes the AWS service icon of an element already drawn (any type). An empty service removes it.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the element."
+        },
+        "service": {
+          "type": "string",
+          "enum": [
+            "lambda",
+            "ec2",
+            "ecs",
+            "eks",
+            "fargate",
+            "s3",
+            "efs",
+            "dynamodb",
+            "rds",
+            "aurora",
+            "elasticache",
+            "api-gateway",
+            "cloudfront",
+            "route-53",
+            "vpc",
+            "elb",
+            "sqs",
+            "sns",
+            "eventbridge",
+            "step-functions",
+            "appsync",
+            "cognito",
+            "iam",
+            "kms",
+            "secrets-manager",
+            "waf",
+            "cloudwatch",
+            "cloudformation",
+            "cloudtrail",
+            "kinesis",
+            "athena",
+            "glue",
+            "redshift",
+            "opensearch",
+            "bedrock",
+            "sagemaker",
+            "codepipeline",
+            "codebuild",
+            "amplify",
+            "ses",
+            ""
+          ],
+          "description": "Service id; empty to remove it."
+        }
+      },
+      "required": [
+        "id",
+        "service"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "update_summary",
+    "description": "Updates the one or two sentence summary of everything said so far.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Summary."
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  }
+]

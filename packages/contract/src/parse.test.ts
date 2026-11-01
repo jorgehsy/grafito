@@ -52,6 +52,28 @@ describe("toolDefs: what Claude sees", () => {
   });
 });
 
+describe("toolDefs: the architect op set", () => {
+  it("architect, catalogs off", async () => {
+    await expect(JSON.stringify(toolDefs([], "architect"), null, 2) + "\n").toMatchFileSnapshot("./__snapshots__/tools.architect.off.json");
+  });
+  it("architect, AWS catalog on", async () => {
+    await expect(JSON.stringify(toolDefs(["aws"], "architect"), null, 2) + "\n").toMatchFileSnapshot("./__snapshots__/tools.architect.aws.json");
+  });
+  it("keeps the component, connection, label, delete and summary ops, adds say, and drops every zone op", () => {
+    expect(toolDefs([], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", "say", "update_summary"]);
+    expect(toolDefs(["aws"], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", "say", "set_service", "update_summary"]);
+  });
+  it("kept ops are the same tool definitions as in the board set", () => {
+    const board = new Map(toolDefs(["aws"]).map((t) => [t.name, t]));
+    for (const t of toolDefs(["aws"], "architect")) if (t.name !== "say") expect(t).toEqual(board.get(t.name));
+  });
+  it("the board set never shows architect ops and stays the default", () => {
+    expect(toolDefs([]).map((t) => t.name)).not.toContain("say");
+    expect(toolDefs([], "board")).toBe(toolDefs([]));
+    expect(toolDefs([], "architect")).toBe(toolDefs([], "architect"));
+  });
+});
+
 describe("parseOp: the shape of an op", () => {
   it("returns the typed op", () => {
     expect(parseOp({ name: "delete", input: { id: "a" } }, [])).toEqual({ ok: true, op: { name: "delete", input: { id: "a" } } });
@@ -144,5 +166,31 @@ describe("parseOp: catalogs", () => {
     expect(ok("set_service", { id: "a", service: "s3" }, on)).toBe(true);
     expect(ok("set_service", { id: "a", service: "" }, on)).toBe(true);
     expect(ok("set_service", { id: "a", service: "made-up" }, on)).toBe(false);
+  });
+});
+
+describe("parseOp: op sets", () => {
+  const arch = (name: string, input: unknown, catalogs: readonly string[] = []) => parseOp({ name, input }, catalogs, "architect");
+  it("say: text required, target optional, nothing else", () => {
+    expect(arch("say", { text: "How do users sign in?" })).toEqual({ ok: true, op: { name: "say", input: { text: "How do users sign in?" } } });
+    expect(arch("say", { text: "Done.", target: "bucket" }).ok).toBe(true);
+    expect(arch("say", { text: " " }).ok).toBe(false);
+    expect(arch("say", {}).ok).toBe(false);
+    expect(arch("say", { text: "x", target: "" }).ok).toBe(false);
+    expect(arch("say", { text: "x", tone: "loud" }).ok).toBe(false);
+  });
+  it("say is unknown in live mode; zone ops are unknown in architect mode", () => {
+    expect(error("say", { text: "hi" })).toBe('say: unknown tool "say"');
+    for (const name of ["create_zone", "add_step", "move_to_zone", "add_callout", "mark_question"]) {
+      const r = arch(name, {});
+      expect(r.ok ? null : r.error).toBe(`${name}: unknown tool "${name}"`);
+    }
+  });
+  it("kept ops validate as in live mode; set_service only with a catalog on", () => {
+    expect(arch("add_component", { zone: "system", id: "b", label: "Bucket", type: "storage", service: "s3" }, ["aws"]).ok).toBe(true);
+    expect(arch("add_component", { zone: "system", id: "b", label: "Bucket", type: "storage", service: "s3" }).ok).toBe(false);
+    expect(arch("set_service", { id: "b", service: "s3" }, ["aws"]).ok).toBe(true);
+    expect(arch("set_service", { id: "b", service: "s3" }).ok).toBe(false);
+    expect(arch("update_summary", { text: "An S3 bucket." }).ok).toBe(true);
   });
 });

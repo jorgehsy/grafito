@@ -6,6 +6,7 @@ import { DEMOS } from "./demos";
 import { Engine } from "./render/engine";
 import { LivePanel } from "./live/ui/LivePanel";
 import { ArchitectPanel } from "./architect/ui/ArchitectPanel";
+import type { ModelControl } from "./live/models";
 import { useT } from "./i18n";
 import { readFlag, writeFlag } from "./storage";
 import { IconChevron, IconMicOff, IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
@@ -40,6 +41,7 @@ export function BoardApp() {
   // The architect panel starts its session on mount, which needs the controller made by the effect below.
   const [ready, setReady] = useState(false);
   const [mute, setMute] = useState<{ muted: boolean; toggle(): void } | null>(null);
+  const [architectModel, setArchitectModel] = useState<ModelControl | null>(null);
   const [showTranscript, setShowTranscript] = useState(() => readFlag(TRANSCRIPT_KEY, true));
 
   const setStatus = (s: Status) => { status.current = s; setSt(s); };
@@ -170,10 +172,11 @@ export function BoardApp() {
         showTranscript={showTranscript}
         onShowTranscript={setShowTranscript}
         onMuteControl={setMute}
+        modelControl={architectModel}
       />
 
       {mode === "architect" && ready && (
-        <ArchitectPanel board={{ submit: (ops) => ctrl.current!.submit(ops), clear: resetAll }} />
+        <ArchitectPanel board={{ get: () => ctrl.current!.board, submit: (ops) => ctrl.current!.submit(ops), clear: resetAll }} onModelControl={setArchitectModel} />
       )}
 
       {mode !== "architect" && <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} title={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} onClick={() => setShowTranscript((v) => !v)}>

@@ -25,6 +25,8 @@ const HAIKU_PLAN: ModelInfo = { id: "claude-haiku-5-5@subscription", apiModel: "
 export const MODELS: readonly ModelInfo[] = [SONNET, HAIKU, SONNET_PLAN, HAIKU_PLAN];
 /** Used when a request names no known model, and to price unknown ids. */
 export const DEFAULT_MODEL = HAIKU.id;
+/** Architect mode's default model: its turns need judgment more than speed. */
+export const ARCHITECT_DEFAULT_MODEL = SONNET.id;
 /** The model the eval runs against. */
 export const EVAL_MODEL = SONNET.id;
 

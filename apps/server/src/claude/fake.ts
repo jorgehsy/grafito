@@ -29,7 +29,7 @@ export function fakeClaude(script: readonly FakeAttempt[]): FakeClaude {
     attempts: 0,
     stream(params, signal) {
       fake.calls.push({ params, signal });
-      return modelEvents(open, params.catalogs, signal);
+      return modelEvents(open, params, signal);
     },
   };
   const open = async (signal: AbortSignal): Promise<AsyncIterable<RawEvent>> => {

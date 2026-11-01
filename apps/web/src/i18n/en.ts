@@ -73,6 +73,7 @@ export const en = {
   "architect.input.label": "Tell Claude what to build",
   "architect.input.placeholder": "Describe what you want to build on AWS and press Enter…",
 
+  "architect.thinking": "Thinking…",
   "restore.banner.one": "There is an unclosed session ({count} request, {cost})",
   "restore.banner.other": "There is an unclosed session ({count} requests, {cost})",
   "restore.restore": "Restore",

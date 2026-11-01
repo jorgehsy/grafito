@@ -177,6 +177,27 @@ const DESCRIPTIONS: Record<keyof typeof INPUTS, string> = {
   update_summary: "Updates the one or two sentence summary of everything said so far.",
 };
 
+// ---- Architect mode ----
+// Architect mode offers its own op set: some board ops, then ops of its own that the board set never shows.
+
+/** Which tools Claude is offered: `board` in live mode, `architect` in architect mode. */
+export type OpSet = "board" | "architect";
+
+/** Board ops architect mode keeps, in tool order. No zone ops: the app makes the one system zone. */
+const ARCHITECT_KEPT = ["add_component", "connect", "update_label", "delete"] as const;
+
+/** Input schema per architect-only op, in the order Claude sees the tools. */
+const ARCHITECT_INPUTS = {
+  say: z.strictObject({
+    text: text("What you tell the user: about 25 words, concrete, at most one question."),
+    target: id("Id of the element the bubble is about (optional; without it the bubble comes from a corner).").optional(),
+  }),
+};
+
+const ARCHITECT_DESCRIPTIONS: Record<keyof typeof ARCHITECT_INPUTS, string> = {
+  say: "Speaks to the user in a speech bubble over the board. Exactly one per turn, even when nothing is drawn; if you send more than one, only the last is shown.",
+};
+
 // ---- Icon catalogs (optional) ----
 // When on, the elements that can carry a service icon get `service`, and set_service appears
 // (just before update_summary, which stays last). When off, Claude sees nothing of the catalog.
@@ -186,8 +207,22 @@ const SERVICE_OPS = ["add_step", "add_decision", "add_component"] as const;
 const SET_SERVICE_DESCRIPTION =
   "Puts on or changes the AWS service icon of an element already drawn (any type). An empty service removes it.";
 
-/** Input schemas for one catalog set: `serviceIds` empty = catalogs off. */
-export function inputSchemas(serviceIds: readonly string[]): { name: OpName; description: string; schema: z.ZodType }[] {
+type InputSchema = { name: OpName; description: string; schema: z.ZodType };
+
+/** Input schemas for one op set and catalog set: `serviceIds` empty = catalogs off. */
+export function inputSchemas(serviceIds: readonly string[], set: OpSet = "board"): InputSchema[] {
+  const board = boardSchemas(serviceIds);
+  if (set === "board") return board;
+  const named = (name: OpName) => board.filter((t) => t.name === name);
+  const own = (Object.keys(ARCHITECT_INPUTS) as (keyof typeof ARCHITECT_INPUTS)[]).map((name) => ({
+    name: name as OpName,
+    description: ARCHITECT_DESCRIPTIONS[name],
+    schema: ARCHITECT_INPUTS[name] as z.ZodType,
+  }));
+  return [...ARCHITECT_KEPT.flatMap(named), ...own, ...named("set_service"), ...named("update_summary")];
+}
+
+function boardSchemas(serviceIds: readonly string[]): InputSchema[] {
   const base = (Object.keys(INPUTS) as (keyof typeof INPUTS)[]).map((name) => ({
     name: name as OpName,
     description: DESCRIPTIONS[name],
@@ -223,6 +258,8 @@ export type OpInputs = Omit<BaseInputs, (typeof SERVICE_OPS)[number]> & {
   add_component: WithService<BaseInputs["add_component"]>;
   /** Service icon for any element; an empty `service` removes it. Only with a catalog on. */
   set_service: { id: string; service: string };
+  /** Architect mode only: the turn's speech bubble. */
+  say: z.output<typeof ARCHITECT_INPUTS.say>;
 };
 export type OpName = keyof OpInputs;
 export type Op = { [K in OpName]: { name: K; input: OpInputs[K] } }[OpName];
