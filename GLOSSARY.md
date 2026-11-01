@@ -324,6 +324,10 @@ _Avoid_: transcripción, subtitles, log
 One run of architect mode, from start to reset: a sequence of turns and the approvals or rejections clicked between them.
 _Avoid_: sesión de arquitecto, design session, conversation
 
+**Architect scenario**:
+A scripted architect session used to eval prompt changes: a list of steps, each a user message or a click named by meaning (accept all, reject the newest, choose alternative N), some with expectations about the turn that follows.
+_Avoid_: test conversation, script, fixture
+
 **Session record**:
 The saved file of a live session or an architect session, tagged with its app mode; it always reopens in that mode. A live record holds the Claude model, shape preference, language (`speechLang`), requests (each with its batch, ops, warnings and prompt version), transcript and summary. An architect record holds its turns and clicks in the order they happened, and the summary. It can be exported, imported and restored by replaying it. Version 3; version 2 records open as live records, version 1 records (0.2.0-alpha.4 and earlier) are rejected.
 _Avoid_: registro, registro de sesión, prueba, log, save file
