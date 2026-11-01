@@ -264,6 +264,10 @@ _Avoid_: propuesta, draft, suggestion, pending element
 The normal look of an approved part of the board, as opposed to the pencil look of a proposal.
 _Avoid_: tinta, final, committed
 
+**Well-Architected digest**:
+The short summary of the AWS Well-Architected Framework that Claude works from in architect mode: the pillars, design principles, and every question and best-practice title with its ID. Claude follows it; it never quotes AWS text.
+_Avoid_: WA summary, guidance, rulebook, lens
+
 **Demo**:
 A recorded sequence of timed chunks (spoken text plus its ops) that plays on the board without Claude.
 _Avoid_: script, guion, recording
