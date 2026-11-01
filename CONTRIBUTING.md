@@ -19,7 +19,7 @@ Everything runs through Turborepo from the repo root:
 | Command | What it runs |
 | --- | --- |
 | `pnpm dev` | `turbo run dev`: Vite for `apps/web` and `tsx watch` for `apps/server` |
-| `pnpm typecheck` | `tsc --noEmit` in every package (plus `tsconfig.test.json` in `board` and `icons`) |
+| `pnpm typecheck` | `tsc --noEmit` in every package (plus `tsconfig.test.json` in `board`, `icons` and `wellarchitected`) |
 | `pnpm lint` | ESLint in every package |
 | `pnpm test` | Vitest in every package that has tests |
 | `pnpm build` | the production build of `apps/web` |

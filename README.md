@@ -148,6 +148,7 @@ pnpm --filter @grafito/icons icons:aws <zip>     # reinstall the AWS icons from 
 | `packages/contract` | The browser/server contract. Ops and their tool definitions, op validation, pricing. |
 | `packages/board` | The board engine, no DOM. Model (`applyOps`), layout, routing, render tree, animation queue, controller, board text for the prompt. |
 | `packages/icons` | Icon catalogs. AWS curated list, SVGs, NOTICE, fetch script. |
+| `packages/wellarchitected` | The Well-Architected digest for architect mode. Pillar, question and best-practice titles, NOTICE, fetch script. |
 | `packages/config` | Shared tsconfig bases and the ESLint flat config. |
 
 Demo scripts live in `apps/web/src/demos/`.
@@ -179,7 +180,7 @@ Welcome! Open an *issue* with what you found or what you would like. If you send
 
 ## License
 
-[MIT](LICENSE) © 2026 Jorge Simoes, except the icons in `packages/icons/src/aws/` (see [NOTICE.md](packages/icons/src/aws/NOTICE.md)).
+[MIT](LICENSE) © 2026 Jorge Simoes, except the icons in `packages/icons/src/aws/` (see [NOTICE.md](packages/icons/src/aws/NOTICE.md)) and the Well-Architected digest in `packages/wellarchitected/`, adapted from AWS documentation under CC BY-SA 4.0 (see [NOTICE.md](packages/wellarchitected/NOTICE.md)).
 
 Amazon Web Services, AWS and the related service icons are trademarks of Amazon.com, Inc. or its affiliates. Grafito is not affiliated with or endorsed by AWS.
 

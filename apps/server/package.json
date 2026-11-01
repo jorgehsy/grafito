@@ -16,6 +16,7 @@
     "@grafito/board": "workspace:*",
     "@grafito/contract": "workspace:*",
     "@grafito/icons": "workspace:*",
+    "@grafito/wellarchitected": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "dotenv": "^18.0.8",
     "express": "^5.3.0"
