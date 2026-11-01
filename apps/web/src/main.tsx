@@ -4,4 +4,11 @@ import "@fontsource/kalam/700.css";
 import "./board.css";
 import { BoardApp } from "./BoardApp";
 
-createRoot(document.getElementById("root")!).render(<BoardApp />);
+const root = createRoot(document.getElementById("root")!);
+
+if (import.meta.env.DEV && new URLSearchParams(location.search).get("prototype") === "architect") {
+  // Throwaway prototype (#36), dev only.
+  void import("./prototype-architect").then((m) => root.render(<m.ArchitectPrototype />));
+} else {
+  root.render(<BoardApp />);
+}
