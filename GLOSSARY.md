@@ -10,7 +10,7 @@ _Avoid_: tablero, canvas, whiteboard, pizarra, board model
 
 **Zone**:
 A titled box on the board that holds one topic, drawn in one zone kind.
-_Avoid_: zona, section, frame, group, panel
+_Avoid_: zona, section, frame, panel; a group is something else (see Group)
 
 **Zone kind**:
 The shape a zone draws its topic in: one of flow, system, list, compare, mindmap, scale, cycle, timeline or tree. It decides which element types the zone accepts and how it is laid out.
@@ -75,6 +75,10 @@ _Avoid_: componente, box, service box
 **Component type**:
 How a component is drawn: actor, client, service, database, queue, storage or external.
 _Avoid_: comp, component kind
+
+**Group**:
+An AWS boundary box inside a system zone that holds components and other groups: AWS Cloud, Region, VPC, Availability Zone or subnet. Groups nest; each component and each group has at most one parent group.
+_Avoid_: container (an ECS or Docker container is a component), box, boundary, zone
 
 **Node**:
 An idea in a mindmap zone, hanging from a parent node.
@@ -235,6 +239,30 @@ _Avoid_: modo Claude, claude mode, en vivo
 **Demo mode**:
 The app mode that plays a demo, with no Claude calls.
 _Avoid_: script mode, modo guion
+
+**Architect mode**:
+The app mode where the user and Claude design an AWS architecture together, following the AWS Well-Architected Framework: Claude asks, suggests and pushes back in speech bubbles while it draws on the board. Separate from live mode.
+_Avoid_: design mode, chat mode, modo arquitecto, conversation mode
+
+**Speech bubble**:
+A short comic-style balloon drawn over the board that carries what Claude says to the user in architect mode. Short, concrete and blunt; never a full explanation.
+_Avoid_: burbuja, chat message, reply, tooltip, callout (a callout is an annotation)
+
+**Bubble marker**:
+The small minimized mark a speech bubble leaves where it appeared once the next turn starts; one toggle shows or hides every past bubble.
+_Avoid_: pin, dot, badge, comment marker
+
+**Turn**:
+One user message in architect mode and Claude's answer to it: at most one speech bubble with at most one question, plus the ops it draws.
+_Avoid_: turno, message, exchange, round
+
+**Proposal**:
+Something Claude draws in pencil in architect mode on its own initiative (what the user explicitly asks for goes straight to ink), waiting for the user to approve it (it turns to ink) or reject it (it is erased). Alternatives are proposals drawn side by side; choosing one erases the others.
+_Avoid_: propuesta, draft, suggestion, pending element
+
+**Ink**:
+The normal look of an approved part of the board, as opposed to the pencil look of a proposal.
+_Avoid_: tinta, final, committed
 
 **Demo**:
 A recorded sequence of timed chunks (spoken text plus its ops) that plays on the board without Claude.
