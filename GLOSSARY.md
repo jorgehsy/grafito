@@ -253,7 +253,7 @@ The small minimized mark a speech bubble leaves where it appeared once the next 
 _Avoid_: pin, dot, badge, comment marker
 
 **Turn**:
-One user message in architect mode and Claude's answer to it: at most one speech bubble with at most one question, plus the ops it draws.
+One user message in architect mode (with any approvals or rejections clicked since the last one) and Claude's answer to it: one speech bubble with at most one question, plus the ops it draws.
 _Avoid_: turno, message, exchange, round
 
 **Proposal**:
