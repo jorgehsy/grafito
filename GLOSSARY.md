@@ -320,8 +320,12 @@ _Avoid_: serialización, serialized board, snapshot
 Every finished speech result of a live session, in order, with its time.
 _Avoid_: transcripción, subtitles, log
 
+**Architect session**:
+One run of architect mode, from start to reset: a sequence of turns and the approvals or rejections clicked between them.
+_Avoid_: sesión de arquitecto, design session, conversation
+
 **Session record**:
-The saved file of a live session: Claude model, shape preference, language (`speechLang`), requests (each with its batch, ops, warnings and prompt version), transcript and summary. It can be exported, imported and restored. Version 2; version 1 records (0.2.0-alpha.4 and earlier) are rejected.
+The saved file of a live session or an architect session, tagged with its app mode; it always reopens in that mode. A live record holds the Claude model, shape preference, language (`speechLang`), requests (each with its batch, ops, warnings and prompt version), transcript and summary. An architect record holds its turns and clicks in the order they happened, and the summary. It can be exported, imported and restored by replaying it. Version 3; version 2 records open as live records, version 1 records (0.2.0-alpha.4 and earlier) are rejected.
 _Avoid_: registro, registro de sesión, prueba, log, save file
 
 **Claude model**:
