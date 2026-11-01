@@ -22,8 +22,8 @@ interface Props {
   exportSvg(): string | null;
   onSubtitle(s: Subtitle): void;
   onClear(): void;
-  /** Live mode: the voice, import, export and options controls only work here. */
-  active: boolean;
+  /** The app mode; null until it is known. The voice, import and clear controls only work in live mode. */
+  mode: "demo" | "live" | "architect" | null;
   onMode(m: "demo" | "live"): void;
   modeLocked: boolean;
   follow: boolean;
@@ -36,9 +36,10 @@ interface Props {
   onMuteControl(c: { muted: boolean; toggle(): void } | null): void;
 }
 
-export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript, onMuteControl }: Props) {
+export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript, onMuteControl }: Props) {
   const t = useT();
   const lang = useLang();
+  const active = mode === "live";
   const [statsOpen, setStatsOpen] = useState(() => readFlag(STATS_KEY, true));
   const [optsOpen, setOptsOpen] = useState(false);
   const gearRef = useRef<HTMLButtonElement>(null);
@@ -144,7 +145,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
         <input ref={fileIn} type="file" accept="application/json,.json" hidden onChange={(e) => void importFile(e.target.files?.[0])} />
         <hr />
         <button className={"tb mode" + (active ? " sel" : "")} aria-pressed={active} aria-label={t("toolbar.liveMode")} title={t("toolbar.liveModeTitle")} disabled={modeLocked} onClick={() => onMode("live")}><IconWave /></button>
-        <button className={"tb mode" + (!active ? " sel" : "")} aria-pressed={!active} aria-label={t("toolbar.demoMode")} title={t("toolbar.demoModeTitle")} disabled={modeLocked} onClick={() => onMode("demo")}><IconDoc /></button>
+        <button className={"tb mode" + (mode === "demo" ? " sel" : "")} aria-pressed={mode === "demo"} aria-label={t("toolbar.demoMode")} title={t("toolbar.demoModeTitle")} disabled={modeLocked} onClick={() => onMode("demo")}><IconDoc /></button>
         <hr />
         <button className="tb" data-testid="undo" aria-label={t("toolbar.undo")} title={t("toolbar.undo")} disabled={!live.canUndo} onClick={() => session.undoLastInstruction()}><IconUndo /></button>
         <button className="tb" data-testid="export" aria-label={t("toolbar.export")} title={t("toolbar.exportTitle")} disabled={!live.entries.length} onClick={exportAll}><IconExport /></button>
@@ -181,7 +182,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, active, onM
         {mic.state === "restarting" && <div className="toast" role="status">{t("mic.reconnecting")}{mic.detail ? ` (${mic.detail})` : ""}</div>}
       </div>
 
-      {statsOpen && <StatsPanel session={live} model={model} summary={summary} warnings={warnings} onClose={() => setStatsOpen(false)} />}
+      {statsOpen && mode !== "architect" && <StatsPanel session={live} model={model} summary={summary} warnings={warnings} onClose={() => setStatsOpen(false)} />}
 
       <div className="corner">{listening && <span className="dot" />}{listening ? t(muted ? "mic.muted" : "mic.listening") + " · " : ""}{langLabel}{live.savedAt ? ` · ${t("corner.saved", { time: hhmm(live.savedAt) })}` : ""}</div>
     </div>

@@ -11,6 +11,7 @@ import { splitInstruction } from "./instruction";
 import { createGrouper } from "./speech/grouper";
 import { streamBoard } from "./sse";
 import type { UsageInfo } from "./sse";
+import { RECORD_KEYS } from "../storage";
 import type { Store } from "../storage";
 import { t } from "../i18n";
 
@@ -90,7 +91,7 @@ export interface LiveSession {
   subscribe(fn: (s: LiveSessionState) => void): () => void;
 }
 
-export const RECORD_KEY = "grafito.sessionRecord";
+export const RECORD_KEY = RECORD_KEYS.live;
 export const AUTOSAVE_MS = 10_000;
 const SAVE_AFTER_REQUEST_MS = 300;
 

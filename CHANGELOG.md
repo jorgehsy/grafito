@@ -4,6 +4,8 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 
 ## Unreleased
 
+- Architect mode (hidden, `?mode=architect`): a blank board with one system zone and a text box at the bottom. Live and architect mode keep separate autosave slots, so one never overwrites the other.
+
 ## v0.2.0-alpha.6 · 2026-10-31
 
 - Mute button: while the mic is on, a button next to the subtitles (or the M key) lets you keep talking without Grafito drawing. Muting first closes the turn, so what you said before still gets drawn.

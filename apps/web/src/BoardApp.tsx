@@ -5,15 +5,16 @@ import type { Subtitle } from "@grafito/board";
 import { DEMOS } from "./demos";
 import { Engine } from "./render/engine";
 import { LivePanel } from "./live/ui/LivePanel";
+import { ArchitectPanel } from "./architect/ui/ArchitectPanel";
 import { useT } from "./i18n";
 import { readFlag, writeFlag } from "./storage";
 import { IconChevron, IconMicOff, IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
 
 type Status = "idle" | "playing" | "paused" | "done";
-type Mode = "demo" | "live";
+type Mode = "demo" | "live" | "architect";
 const TRANSCRIPT_KEY = "grafito.transcript";
 
-const urlMode = (): Mode | null => { const m = new URLSearchParams(location.search).get("mode"); return m === "live" || m === "demo" ? m : null; };
+const urlMode = (): Mode | null => { const m = new URLSearchParams(location.search).get("mode"); return m === "live" || m === "demo" || m === "architect" ? m : null; };
 
 export function BoardApp() {
   const t = useT();
@@ -34,7 +35,10 @@ export function BoardApp() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [summary, setSummary] = useState("");
   // Without ?mode= in the URL the default depends on whether the server has an API key: live if so, demo if not.
+  // Architect mode is only reached through ?mode=architect, so it never waits on that probe.
   const [mode, setMode] = useState<Mode | null>(urlMode);
+  // The architect panel starts its session on mount, which needs the controller made by the effect below.
+  const [ready, setReady] = useState(false);
   const [mute, setMute] = useState<{ muted: boolean; toggle(): void } | null>(null);
   const [showTranscript, setShowTranscript] = useState(() => readFlag(TRANSCRIPT_KEY, true));
 
@@ -49,6 +53,7 @@ export function BoardApp() {
     c.onWarnings = (w) => setWarnings((p) => [...p, ...w].slice(-6));
     c.onBoard = (b) => setSummary(b.summary);
     ctrl.current = c;
+    setReady(true);
     (window as any).__grafito = { engine: e, controller: c };
     let last = performance.now();
     let raf = 0;
@@ -130,6 +135,7 @@ export function BoardApp() {
         <Logo />
         <span className="word">grafito</span>
         {mode === "live" && <span className="board">{t("app.liveBadge")}</span>}
+        {mode === "architect" && <span className="board">{t("app.architectBadge")}</span>}
         {mode === "demo" && (
           <div className="demobar" role="group" aria-label={t("app.demoBar")}>
             <select aria-label={t("app.demoBar")} value={demoId} disabled={locked} onChange={(e) => setDemoId(e.target.value)}>
@@ -154,7 +160,7 @@ export function BoardApp() {
         exportSvg={() => engine.current?.exportSvg() ?? null}
         onSubtitle={setSub}
         onClear={() => { resetAll(); }}
-        active={mode === "live"}
+        mode={mode}
         onMode={changeMode}
         modeLocked={locked}
         follow={follow}
@@ -166,11 +172,15 @@ export function BoardApp() {
         onMuteControl={setMute}
       />
 
-      <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} title={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} onClick={() => setShowTranscript((v) => !v)}>
-        <IconChevron up={!showTranscript} />
-      </button>
+      {mode === "architect" && ready && (
+        <ArchitectPanel board={{ submit: (ops) => ctrl.current!.submit(ops), clear: resetAll }} />
+      )}
 
-      <div className="subtitles" data-testid="subtitles" role="status" ref={subRef} hidden={!showTranscript}>
+      {mode !== "architect" && <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} title={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} onClick={() => setShowTranscript((v) => !v)}>
+        <IconChevron up={!showTranscript} />
+      </button>}
+
+      <div className="subtitles" data-testid="subtitles" role="status" ref={subRef} hidden={!showTranscript || mode === "architect"}>
         <span className="wv"><IconWave /></span>
         <div className="txt">
           {!sub.spoken.length && !sub.current ? (

@@ -6,6 +6,7 @@
 export const en = {
   "app.demoHint": "Pick a demo and press Play to watch the board draw itself as it is \"dictated\".",
   "app.liveBadge": "Claude live",
+  "app.architectBadge": "Architect",
   "app.demoBar": "Demo",
   "app.pause": "Pause",
   "app.resume": "Resume",
@@ -67,6 +68,10 @@ export const en = {
   "typebar.label": "Type to Claude",
   "typebar.placeholder": "No microphone? Type here and press Enter…",
   "typebar.send": "Send",
+
+  "architect.zoneTitle": "Architecture",
+  "architect.input.label": "Tell Claude what to build",
+  "architect.input.placeholder": "Describe what you want to build on AWS and press Enter…",
 
   "restore.banner.one": "There is an unclosed session ({count} request, {cost})",
   "restore.banner.other": "There is an unclosed session ({count} requests, {cost})",

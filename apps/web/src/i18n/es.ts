@@ -3,6 +3,7 @@ import type { en } from "./en";
 export const es = {
   "app.demoHint": "Elige un guion y pulsa Play para ver el tablero dibujarse mientras se \"dicta\".",
   "app.liveBadge": "Claude en vivo",
+  "app.architectBadge": "Arquitecto",
   "app.demoBar": "Guion",
   "app.pause": "Pausa",
   "app.resume": "Seguir",
@@ -64,6 +65,10 @@ export const es = {
   "typebar.label": "Escribir a Claude",
   "typebar.placeholder": "¿Sin micrófono? Escribe aquí y pulsa Enter…",
   "typebar.send": "Enviar",
+
+  "architect.zoneTitle": "Arquitectura",
+  "architect.input.label": "Cuéntale a Claude qué construir",
+  "architect.input.placeholder": "Describe lo que quieres construir en AWS y pulsa Enter…",
 
   "restore.banner.one": "Hay una prueba sin cerrar ({count} petición, {cost})",
   "restore.banner.other": "Hay una prueba sin cerrar ({count} peticiones, {cost})",

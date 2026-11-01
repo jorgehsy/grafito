@@ -5,7 +5,7 @@ import { costUsd, OUTDATED_RECORD, parseRecord, PROMPT_VERSION, zeroUsage } from
 import type { SessionRecord } from "@grafito/contract";
 import { createLiveSession, RECORD_KEY } from "./session";
 import type { LiveSession, LiveSessionState, Settings } from "./session";
-import { memoryStore } from "../storage";
+import { memoryStore, RECORD_KEYS } from "../storage";
 import type { Store } from "../storage";
 import { setLang, t } from "../i18n";
 import fixture from "./fixtures/session-v2.json";
@@ -234,6 +234,19 @@ describe("autosave", () => {
     expect(storage.get(RECORD_KEY)).toBeNull();
     expect(h.state()).toMatchObject({ entries: [], transcript: [], unclosed: null, totals: { requests: 0, usage: zeroUsage(), costUsd: 0 } });
     expect(h.session.snapshot().id).not.toBe(fixture.id);
+  });
+
+  it("uses only the live slot: an architect session in its own slot is never offered nor removed", async () => {
+    const architect = JSON.stringify({ ...fixture, id: "architect1" });
+    const storage = memoryStore({ [RECORD_KEYS.architect]: architect });
+    const h = harness({ storage });
+    expect(h.state().unclosed).toBeNull();
+    h.say("one."); await settled(h, 1);
+    await until(() => h.saves.length === 1);
+    expect(storage.get(RECORD_KEY)).not.toBeNull();
+    h.session.reset();
+    expect(storage.get(RECORD_KEY)).toBeNull();
+    expect(storage.get(RECORD_KEYS.architect)).toBe(architect);
   });
 
   it("drops a stored version 1 session with the outdated message", () => {
