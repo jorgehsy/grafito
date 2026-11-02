@@ -136,6 +136,7 @@ pnpm dev                                         # web on :5173, server on :8787
 pnpm turbo run typecheck lint test build         # what CI runs
 pnpm --filter @grafito/server eval instruction <record.json> "<instruction>" [--dry]  # replay a saved session against an instruction
 pnpm --filter @grafito/server eval baseline <dir> [--dry]  # the prompt regression eval: 2 instructions per record
+pnpm --filter @grafito/server eval architect scripts/architect/scenarios [--dry] [--runs N]  # architect mode's scripted sessions, checked turn by turn
 pnpm --filter @grafito/icons icons:aws <zip>     # reinstall the AWS icons from the official package
 ```
 

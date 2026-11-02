@@ -1,0 +1,6 @@
+{
+  "lang": "es-CL",
+  "steps": [
+    { "say": "Quiero construir una aplicación web con una base de datos.", "expect": ["pencil"] }
+  ]
+}

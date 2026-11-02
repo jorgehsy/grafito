@@ -12,6 +12,7 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 - Architect mode (hidden): click a pencil sketch for a small ✓/✗ toolbar that keeps or erases it at once; click one of two alternatives to choose it. Claude hears about your clicks with your next message.
 - Architect mode (hidden): Claude's speech bubble points at what it talks about (a component, group or pencil proposal), or sits in the corner for a general remark. Past bubbles shrink to dots on a timeline rail above the text box: hover one to read it, click it to reopen the bubble, click the rail to show or hide them all.
 - Architect mode (hidden): the session autosaves like live mode, in its own slot and to `sessions/`. Coming back offers to restore it, with pending pencil proposals and the bubble rail as they were; export, import and clear work in architect mode too, and a file reopens in the mode it was saved in. Session records are now version 3 and name their mode; version 2 files still open (as live sessions) and are written back as version 3.
+- Architect mode (hidden): `pnpm --filter @grafito/server eval architect <scenarios>` runs scripted architect sessions (6 English scenarios and a Spanish one) through Claude and checks each turn by rule: one bubble, one question at most, two alternatives at most, real Well-Architected ids, and ink, pencil, bubble-only or "keep these?" where the scenario expects it. Each run is saved as a session record you can import.
 
 ## v0.2.0-alpha.6 · 2026-10-31
 
