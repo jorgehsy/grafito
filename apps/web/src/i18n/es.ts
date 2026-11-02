@@ -31,6 +31,8 @@ export const es = {
   "toolbar.liveModeTitle": "Claude en vivo",
   "toolbar.demoMode": "Modo Guion",
   "toolbar.demoModeTitle": "Guion (sin Claude)",
+  "toolbar.architectMode": "Modo Arquitecto",
+  "toolbar.architectModeTitle": "Arquitecto (diseña en AWS con Claude)",
   "toolbar.undo": "Deshacer instrucción",
   "toolbar.export": "Exportar",
   "toolbar.exportTitle": "Exportar JSON y SVG",

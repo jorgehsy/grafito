@@ -31,6 +31,7 @@
 - **Saves itself.** Each session is saved to `apps/server/sessions/`. You can restore, import and export (JSON and SVG).
 - **Visible cost.** Shows the tokens and the dollar cost of each request.
 - **AWS icons.** Turn on the catalog in Options → Icons and Claude puts the official icon (Lambda, S3, Cognito... 40 services) next to boxes that are AWS services.
+- **Architect mode.** Design an AWS architecture with Claude: you type, it draws, asks and pushes back, following the AWS Well-Architected Framework.
 - **Script mode.** Demos that need no Claude and cost nothing, to see how it works.
 
 ## Language
@@ -90,6 +91,19 @@ Only the local server reads the key. It never reaches the browser.
 - **See costs:** press **F3** or the stats button.
 - **Demo at no cost:** open **http://localhost:5173/?mode=demo** and pick a demo. To play one right away: `/?mode=demo&demo=architecture&auto=1&speed=2`.
 - **Move around:** mouse wheel = zoom, drag = pan.
+
+### Architect mode
+
+Design an AWS architecture together with Claude. It draws, asks and pushes back like a senior architect would, following the AWS Well-Architected Framework.
+
+- **Enter:** press the compass button in the toolbar (next to live and demo), or open **http://localhost:5173/?mode=architect**. You start on a blank board with one system zone.
+- **Talk by text:** there is one text box at the bottom. Say what you want to build and press Enter. What you ask for is drawn in ink.
+- **Pencil proposals:** what Claude adds on its own is drawn in pencil (grey and sketchy), with a question. Type *"yes"* or *"no"*, or click the sketch and press ✓ or ✗. When the choice depends on you, Claude draws two alternatives side by side: answer *"A"* or *"B"*, or click the one you want.
+- **Speech bubbles:** Claude answers in a short bubble that points at what it talks about. Past bubbles shrink to dots on the timeline rail above the text box: hover one to read it, click it to reopen it.
+- **Saves itself:** architect mode has its own autosave, apart from live mode, so one never overwrites the other. Switching modes wipes the board without asking; come back and press **Restore** to get the design back, pending pencil included. Export and import work too, and a file reopens in the mode it was saved in.
+- **Review:** when nothing big is left open, Claude offers a Well-Architected review, one gap at a time. Its advice uses a digest of the framework in `packages/wellarchitected/`, adapted from AWS documentation under CC BY-SA 4.0 (see [NOTICE.md](packages/wellarchitected/NOTICE.md)).
+
+Architect turns use Sonnet by default and follow the same key rules as live mode. If you change the architect prompt, run the scripted sessions first: `pnpm --filter @grafito/server eval architect scripts/architect/scenarios` (add `--dry` to see what would be sent without calling Claude).
 
 ### Use your Claude subscription (local only)
 

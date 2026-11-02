@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconBars, IconDoc, IconExport, IconGear, IconImport, IconMic, IconStop, IconTrash, IconUndo, IconWave } from "../../ui/icons";
+import { IconBars, IconCompass, IconDoc, IconExport, IconGear, IconImport, IconMic, IconStop, IconTrash, IconUndo, IconWave } from "../../ui/icons";
 import type { BoardController, Subtitle } from "@grafito/board";
 import { isModelId, MODELS, parseRecord } from "@grafito/contract";
 import type { ArchitectRecord } from "@grafito/contract";
@@ -30,7 +30,7 @@ interface Props {
    * live and architect mode; undo in live mode only.
    */
   mode: "demo" | "live" | "architect" | null;
-  onMode(m: "demo" | "live"): void;
+  onMode(m: "demo" | "live" | "architect"): void;
   modeLocked: boolean;
   follow: boolean;
   onFollow(v: boolean): void;
@@ -163,6 +163,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
         <hr />
         <button className={"tb mode" + (active ? " sel" : "")} aria-pressed={active} aria-label={t("toolbar.liveMode")} title={t("toolbar.liveModeTitle")} disabled={modeLocked} onClick={() => onMode("live")}><IconWave /></button>
         <button className={"tb mode" + (mode === "demo" ? " sel" : "")} aria-pressed={mode === "demo"} aria-label={t("toolbar.demoMode")} title={t("toolbar.demoModeTitle")} disabled={modeLocked} onClick={() => onMode("demo")}><IconDoc /></button>
+        <button className={"tb mode" + (mode === "architect" ? " sel" : "")} aria-pressed={mode === "architect"} aria-label={t("toolbar.architectMode")} title={t("toolbar.architectModeTitle")} disabled={modeLocked} onClick={() => onMode("architect")}><IconCompass /></button>
         <hr />
         <button className="tb" data-testid="undo" aria-label={t("toolbar.undo")} title={t("toolbar.undo")} disabled={!active || !live.canUndo} onClick={() => session.undoLastInstruction()}><IconUndo /></button>
         <button className="tb" data-testid="export" aria-label={t("toolbar.export")} title={t("toolbar.exportTitle")} disabled={arch ? !arch.canExport : !live.entries.length} onClick={exportAll}><IconExport /></button>

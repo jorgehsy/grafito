@@ -34,6 +34,8 @@ export const en = {
   "toolbar.liveModeTitle": "Claude live",
   "toolbar.demoMode": "Demo mode",
   "toolbar.demoModeTitle": "Demo (no Claude)",
+  "toolbar.architectMode": "Architect mode",
+  "toolbar.architectModeTitle": "Architect (design on AWS with Claude)",
   "toolbar.undo": "Undo instruction",
   "toolbar.export": "Export",
   "toolbar.exportTitle": "Export JSON and SVG",

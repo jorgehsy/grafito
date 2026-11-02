@@ -14,6 +14,7 @@ export const IconStop = () => <Svg><rect x="6" y="6" width="12" height="12" rx="
 export const IconImport = () => <Svg><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></Svg>;
 export const IconExport = () => <Svg><path d="M12 15V4M7 9l5-5 5 5M5 20h14" /></Svg>;
 export const IconWave = () => <Svg><path d="M3 12h2M7 7v10M11 4v16M15 8v8M19 10v4M21 12h0" /></Svg>;
+export const IconCompass = () => <Svg><circle cx="12" cy="5" r="2" /><path d="M11 7L5 21M13 7l6 14M7.5 15h9" /></Svg>;
 export const IconDoc = () => <Svg><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></Svg>;
 export const IconUndo = () => <Svg><path d="M9 14L4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-3" /></Svg>;
 export const IconGear = () => <Svg><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></Svg>;

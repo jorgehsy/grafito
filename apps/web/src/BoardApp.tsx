@@ -38,7 +38,7 @@ export function BoardApp() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [summary, setSummary] = useState("");
   // Without ?mode= in the URL the default depends on whether the server has an API key: live if so, demo if not.
-  // Architect mode is only reached through ?mode=architect, so it never waits on that probe.
+  // ?mode=architect opens architect mode straight away, without waiting on that probe.
   const [mode, setMode] = useState<Mode | null>(urlMode);
   // The architect panel starts its session on mount, which needs the controller made by the effect below.
   const [ready, setReady] = useState(false);
