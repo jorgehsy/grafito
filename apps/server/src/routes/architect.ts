@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { ARCHITECT_DEFAULT_MODEL, DEFAULT_LANG, isLang, normalizeCatalogs, parseActions } from "@grafito/contract";
+import { ARCHITECT_DEFAULT_MODEL, DEFAULT_LANG, isLang, normalizeCatalogs, parseClicks } from "@grafito/contract";
 import { architectSystemPrompt, buildArchitectUserText } from "../prompt/architect";
 import type { RecentTurn } from "../prompt/architect";
 import { openSse, pickModel, sseFail, streamTurn, validateCatalogs } from "./turn";
@@ -37,7 +37,7 @@ export function createArchitectHandler(clients: Clients) {
     if (typeof text !== "string" || !text.trim()) return sseFail(res, "The text is empty");
     const recent = parseRecent(rawRecent);
     if (!recent) return sseFail(res, "Invalid recent: expected a list of {text, bubble}");
-    const actions = parseActions(rawActions);
+    const actions = parseClicks(rawActions);
     if (!actions) return sseFail(res, "Invalid actions: expected a list of {type: accept | reject, proposal}");
     const badCatalogs = validateCatalogs(rawCatalogs);
     if (badCatalogs) return sseFail(res, badCatalogs);

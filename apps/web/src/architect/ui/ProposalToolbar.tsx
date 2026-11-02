@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ArchitectAction } from "@grafito/contract";
+import type { ProposalClick } from "@grafito/contract";
 import { useT } from "../../i18n";
 
 /** Space the toolbar takes, to keep it on screen. */
@@ -10,7 +10,7 @@ interface Props {
   proposal: string;
   /** Where the clicked item is on screen right now; null once it is gone or the proposal is closed. */
   anchor(): DOMRect | null;
-  onDecide(type: ArchitectAction["type"]): void;
+  onDecide(type: ProposalClick["type"]): void;
   /** A turn is in flight: the buttons wait for it (a click then could not be replayed in its place). */
   busy: boolean;
   /** The anchor is gone. */

@@ -3,7 +3,7 @@ import { ARCHITECT_ZONE_ID, applyOps, architectZoneOp, emptyBoard, lastSay } fro
 import { op } from "@grafito/contract";
 import type { Op } from "@grafito/contract";
 import {
-  bubbleMarkers, initialBubbleView, isOpen, openBubbles, placeBubble, resolveTarget, tailShape, tailTip, toggleDot,
+  bubbleMarkers, initialBubbleView, isOpen, openBubbles, placeBubble, resolveTarget, tailShape, tailTip, toggleMarker,
   toggleRail, unionRect, withCurrent,
 } from "./bubbles";
 import type { Rect } from "./bubbles";
@@ -55,7 +55,7 @@ describe("bubble markers", () => {
     expect(lastSay([comp("x")])).toBeNull();
   });
 
-  it("one dot per turn, from the say ops; a turn with no say is a muted dot", () => {
+  it("one marker per turn, from the say ops; a turn with no say is a muted marker", () => {
     const markers = bubbleMarkers([
       turn(1, [comp("api"), say("An API.", "api")]),
       turn(2, [say("Which database?", "P1"), op.propose({ id: "P1", label: "DB" })]),
@@ -70,7 +70,7 @@ describe("bubble markers", () => {
     ]);
   });
 
-  it("a turn in flight gets its dot once its bubble arrives", () => {
+  it("a turn in flight gets its marker once its bubble arrives", () => {
     expect(bubbleMarkers([turn(1, [say("a")]), turn(2, [], { done: false })])).toHaveLength(1);
     expect(bubbleMarkers([turn(1, [say("a")]), turn(2, [say("b")], { done: false })])).toHaveLength(2);
   });
@@ -84,29 +84,29 @@ describe("open bubbles", () => {
     expect(openBubbles(markers, v).map((m) => m.turn)).toEqual([3]);
   });
 
-  it("a dot reopens its bubble and closes it again; the current dot closes the current bubble", () => {
-    let v = toggleDot(withCurrent(initialBubbleView(), 3), 1);
+  it("a marker reopens its bubble and closes it again; the current marker closes the current bubble", () => {
+    let v = toggleMarker(withCurrent(initialBubbleView(), 3), 1);
     expect(openBubbles(markers, v).map((m) => m.turn)).toEqual([3, 1]);
-    v = toggleDot(toggleDot(v, 1), 3);
+    v = toggleMarker(toggleMarker(v, 1), 3);
     expect(openBubbles(markers, v)).toEqual([]);
   });
 
   it("the rail shows and hides every past bubble", () => {
     let v = toggleRail(withCurrent(initialBubbleView(), 3));
     expect(openBubbles(markers, v).map((m) => m.turn)).toEqual([3, 2, 1]);
-    v = toggleDot(v, 2);
+    v = toggleMarker(v, 2);
     expect(isOpen(v, 2)).toBe(false);
     v = toggleRail(v);
     expect(openBubbles(markers, v).map((m) => m.turn)).toEqual([3]);
   });
 
   it("a new turn shrinks reopened bubbles back to markers", () => {
-    const v = withCurrent(toggleDot(withCurrent(initialBubbleView(), 2), 1), 3);
+    const v = withCurrent(toggleMarker(withCurrent(initialBubbleView(), 2), 1), 3);
     expect(v.toggled).toEqual([]);
     expect(openBubbles(markers, v).map((m) => m.turn)).toEqual([3]);
   });
 
-  it("a muted dot opens nothing", () => {
+  it("a muted marker opens nothing", () => {
     const m = bubbleMarkers([{ n: 1, ops: [], done: true }, { n: 2, ops: [say("b")], done: true }]);
     expect(openBubbles(m, toggleRail(withCurrent(initialBubbleView(), 2))).map((x) => x.turn)).toEqual([2]);
   });

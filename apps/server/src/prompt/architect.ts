@@ -1,7 +1,7 @@
 import { ARCHITECT_ZONE_ID } from "@grafito/board";
 import { CATALOGS } from "@grafito/icons";
 import type { IconCatalog } from "@grafito/icons";
-import type { ArchitectAction, Lang } from "@grafito/contract";
+import type { Lang, ProposalClick } from "@grafito/contract";
 import { renderWellArchitectedDigest } from "@grafito/wellarchitected";
 import type { SystemBlock } from "../claude/client";
 import { languageLine, serviceList } from "./system";
@@ -84,7 +84,7 @@ export interface RecentTurn {
 export const RECENT_TURNS = 3;
 
 /** User text of one architect turn. The headers are named in the system prompt; the clicks section only when there are clicks. */
-export function buildArchitectUserText(a: { board?: unknown; summary?: unknown; recent?: readonly RecentTurn[]; actions?: readonly ArchitectAction[]; text: string }): string {
+export function buildArchitectUserText(a: { board?: unknown; summary?: unknown; recent?: readonly RecentTurn[]; actions?: readonly ProposalClick[]; text: string }): string {
   const boardText = typeof a.board === "string" && a.board.trim() ? a.board : "(empty board)";
   const summary = typeof a.summary === "string" && a.summary.trim() ? a.summary : "(empty)";
   const recent = (a.recent ?? []).slice(-RECENT_TURNS);

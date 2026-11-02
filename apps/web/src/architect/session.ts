@@ -5,7 +5,7 @@
 // The session is saved as a timeline of turns and clicks (session record version 3) and restored by replaying it.
 import { alternativesOf, architectZoneOp, findProposal, lastSay, proposalOf, replayArchitect, serializeBoard } from "@grafito/board";
 import type { Board, ReplayedTurn } from "@grafito/board";
-import type { ArchitectAction, ArchitectRecord, Op, TimelineEntry, Usage } from "@grafito/contract";
+import type { ArchitectRecord, Op, ProposalClick, TimelineEntry, Usage } from "@grafito/contract";
 import { ARCHITECT_PROMPT_VERSION, costUsd, parseRecord, RECORD_VERSION, zeroUsage } from "@grafito/contract";
 import { streamOps } from "../live/sse";
 import type { UsageInfo } from "../live/sse";
@@ -44,7 +44,7 @@ export interface ArchitectTurn {
 }
 
 /** One click on a proposal, with its time. Choosing an alternative is an accept: the other one is erased. */
-export interface ArchitectClick extends ArchitectAction {
+export interface ArchitectClick extends ProposalClick {
   at: number;
 }
 
@@ -96,7 +96,7 @@ export interface ArchitectSession {
    * the next turn. Returns false, doing nothing, if a turn is in flight, the proposal is not open or a click already
    * settled it.
    */
-  decide(type: ArchitectAction["type"], proposal: string): boolean;
+  decide(type: ProposalClick["type"], proposal: string): boolean;
   /** Cancels the turn in flight; the session stays usable. */
   stop(): void;
   /** Stops, and saves now if anything changed since the last save. For leaving architect mode. */
@@ -126,7 +126,7 @@ export function pickProposal(board: Board, key: string | null): { do: "none" } |
 }
 
 /** The clicks as the request's `actions`: type and proposal, in order. */
-export const clickActions = (clicks: readonly ArchitectClick[]): ArchitectAction[] => clicks.map(({ type, proposal }) => ({ type, proposal }));
+export const requestClicks = (clicks: readonly ArchitectClick[]): ProposalClick[] => clicks.map(({ type, proposal }) => ({ type, proposal }));
 
 export const RECORD_KEY = RECORD_KEYS.architect;
 
@@ -236,7 +236,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     const myEpoch = epoch;
     const { model, catalogs, lang } = d.settings.get();
     const recent = recentTurns(turns);
-    const actions = clickActions(clicks);
+    const actions = requestClicks(clicks);
     clicks = [];
     const turn: ArchitectTurn = {
       n: (turns.at(-1)?.n ?? 0) + 1, text, model, promptVersion: ARCHITECT_PROMPT_VERSION, startedAt: Date.now(), totalMs: null,

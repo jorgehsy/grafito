@@ -13,7 +13,7 @@ import { browserStore } from "../../storage";
 import { ProposalToolbar } from "./ProposalToolbar";
 import { SpeechBubbles } from "./SpeechBubbles";
 import { TimelineRail } from "./TimelineRail";
-import { bubbleMarkers, initialBubbleView, openBubbles, toggleDot, toggleRail, withCurrent } from "../bubbles";
+import { bubbleMarkers, initialBubbleView, openBubbles, toggleMarker, toggleRail, withCurrent } from "../bubbles";
 
 /** What the panel needs from the drawn board: clicks on it, the selection outline, and where an item is on screen. */
 export interface BoardCanvas {
@@ -171,7 +171,7 @@ export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl,
       <TimelineRail
         markers={markers}
         view={view}
-        onDot={(turn) => setView((v) => toggleDot(withCurrent(v, current), turn))}
+        onMarker={(turn) => setView((v) => toggleMarker(withCurrent(v, current), turn))}
         onRail={() => setView((v) => toggleRail(withCurrent(v, current)))}
       />
       <form className="typebar" data-testid="architect-typebar" onSubmit={(e) => { e.preventDefault(); send(); }}>

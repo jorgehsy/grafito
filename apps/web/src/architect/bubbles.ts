@@ -1,4 +1,4 @@
-// Speech bubbles and bubble markers, as pure functions: what a bubble points at, which turns get a dot on the
+// Speech bubbles and bubble markers, as pure functions: what a bubble points at, which turns get a marker on the
 // timeline rail, which bubbles are open, and where an open bubble and its tail go on screen.
 import { findElement, findGroup, findProposal, lastSay, proposalItems } from "@grafito/board";
 import type { Board } from "@grafito/board";
@@ -27,17 +27,17 @@ export function resolveTarget(board: Board, target: string | undefined): BubbleT
   return null;
 }
 
-/** One dot on the timeline rail. */
+/** One marker on the timeline rail. */
 export interface BubbleMarker {
   turn: number;
-  /** null: the turn said nothing (a muted dot that opens nothing). */
+  /** null: the turn said nothing (a muted marker that opens nothing). */
   bubble: Bubble | null;
   error?: string;
 }
 
 /**
- * One dot per turn, in order, built from each turn's `say` ops only (so a restored session gets the same rail).
- * A turn still in flight gets its dot once its bubble arrives or it ends.
+ * One marker per turn, in order, built from each turn's `say` ops only (so a restored session gets the same rail).
+ * A turn still in flight gets its marker once its bubble arrives or it ends.
  */
 export function bubbleMarkers(turns: readonly { n: number; ops: readonly Op[]; done: boolean; error?: string }[]): BubbleMarker[] {
   return turns
@@ -48,24 +48,24 @@ export function bubbleMarkers(turns: readonly { n: number; ops: readonly Op[]; d
 
 /** Which bubbles are open. Not saved: a restored session starts with past bubbles shrunk to markers. */
 export interface BubbleView {
-  /** The latest turn: its bubble is open unless its dot was clicked. */
+  /** The latest turn: its bubble is open unless its marker was clicked. */
   current: number;
   /** The rail was clicked: every past bubble is open. */
   showPast: boolean;
-  /** Turns whose dot was clicked since: each flips its bubble from the default above. */
+  /** Turns whose marker was clicked since: each flips its bubble from the default above. */
   toggled: readonly number[];
 }
 
 export const initialBubbleView = (): BubbleView => ({ current: 0, showPast: false, toggled: [] });
 
-/** A new turn shrinks the bubbles reopened by dot back to markers; the rail's show-all stays. */
+/** A new turn shrinks the bubbles reopened from their markers again; the rail's show-all stays. */
 export const withCurrent = (v: BubbleView, current: number): BubbleView => (v.current === current ? v : { ...v, current, toggled: [] });
 
 /** Clicking the rail itself: show or hide every past bubble. */
 export const toggleRail = (v: BubbleView): BubbleView => ({ ...v, showPast: !v.showPast, toggled: [] });
 
-/** Clicking a dot: reopen that bubble, or close it again. */
-export const toggleDot = (v: BubbleView, turn: number): BubbleView =>
+/** Clicking a marker: reopen that bubble, or close it again. */
+export const toggleMarker = (v: BubbleView, turn: number): BubbleView =>
   ({ ...v, toggled: v.toggled.includes(turn) ? v.toggled.filter((x) => x !== turn) : [...v.toggled, turn] });
 
 export const isOpen = (v: BubbleView, turn: number): boolean => (turn === v.current || v.showPast) !== v.toggled.includes(turn);

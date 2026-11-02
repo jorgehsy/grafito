@@ -1,7 +1,7 @@
 // Pure board model. No React, no coordinates.
 import { qualifyService } from "@grafito/icons";
 import type { ComponentType, EmphasisStyle, GroupKind, MarkTone, Op, ZoneKind } from "@grafito/contract";
-import { ARCHITECT_ZONE_ID } from "./architect";
+import { ARCHITECT_ZONE_ID } from "./architect-zone";
 
 export interface Zone {
   id: string;

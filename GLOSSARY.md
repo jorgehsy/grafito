@@ -249,8 +249,8 @@ A short comic-style balloon drawn over the board that carries what Claude says t
 _Avoid_: burbuja, chat message, reply, tooltip, callout (a callout is an annotation)
 
 **Bubble marker**:
-What a speech bubble shrinks to once the next turn starts: a small dot on the **timeline rail**, the slim strip just above the text box with one marker per turn (muted for a turn that said nothing). Hovering or focusing a marker shows its text, clicking it reopens the bubble, and clicking the rail itself shows or hides every past bubble.
-_Avoid_: pin, badge, comment marker
+What a speech bubble shrinks to once the next turn starts: a small round marker on the **timeline rail**, the slim strip just above the text box with one marker per turn (muted for a turn that said nothing). Hovering or focusing a marker shows its text, clicking it reopens the bubble, and clicking the rail itself shows or hides every past bubble.
+_Avoid_: pin, dot, badge, comment marker
 
 **Turn**:
 One user message in architect mode (with any approvals or rejections clicked since the last one) and Claude's answer to it: one speech bubble with at most one question, plus the ops it draws.

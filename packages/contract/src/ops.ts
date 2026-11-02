@@ -184,7 +184,6 @@ const DESCRIPTIONS: Record<keyof typeof INPUTS, string> = {
   update_summary: "Updates the one or two sentence summary of everything said so far.",
 };
 
-// ---- Architect mode ----
 // Architect mode offers its own op set: some board ops, then ops of its own that the board set never shows.
 
 /** Which tools Claude is offered: `board` in live mode, `architect` in architect mode. */

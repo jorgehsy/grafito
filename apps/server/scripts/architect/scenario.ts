@@ -5,7 +5,7 @@ import { z } from "zod";
 import { openProposals } from "@grafito/board";
 import type { Board } from "@grafito/board";
 import { DEFAULT_LANG, isLang } from "@grafito/contract";
-import type { ArchitectAction, Lang } from "@grafito/contract";
+import type { Lang, ProposalClick } from "@grafito/contract";
 import { isCatalogId } from "@grafito/icons";
 
 export const EXPECTS = ["ink", "pencil", "bubbleOnly", "asksKeep", "review"] as const;
@@ -95,7 +95,7 @@ export function stepText(s: Step): string {
  * alternative (choosing between two is `choose`), or rejects every open one; "newest" is the last one opened;
  * `choose N` accepts alternative N of the newest open pair.
  */
-export function resolveClick(board: Board, step: ClickStep): { ok: true; actions: ArchitectAction[] } | { ok: false; error: string } {
+export function resolveClick(board: Board, step: ClickStep): { ok: true; actions: ProposalClick[] } | { ok: false; error: string } {
   const open = openProposals(board);
   if (!open.length) return { ok: false, error: "no open proposal" };
   if ("choose" in step) {

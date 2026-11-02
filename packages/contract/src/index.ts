@@ -1,7 +1,7 @@
 export { GROUP_KINDS, ZONE_KINDS, op } from "./ops";
 export type { ComponentType, EmphasisStyle, GroupKind, MarkTone, Op, OpInputs, OpName, OpSet, TextField, ZoneKind } from "./ops";
-export { ArchitectActionSchema, MAX_ACTIONS, parseActions } from "./actions";
-export type { ArchitectAction } from "./actions";
+export { MAX_CLICKS, ProposalClickSchema, parseClicks } from "./clicks";
+export type { ProposalClick } from "./clicks";
 export { normalizeCatalogs, parseOp, toolDefs } from "./parse";
 export type { ParsedOp, ToolDef } from "./parse";
 export { ARCHITECT_DEFAULT_MODEL, DEFAULT_MODEL, EVAL_MODEL, MODELS, fallbackModel, isModelId, priceOf } from "./models";

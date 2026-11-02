@@ -84,7 +84,7 @@ export const en = {
   "architect.rail.label": "Past bubbles",
   "architect.rail.showAll": "Show all past bubbles",
   "architect.rail.hideAll": "Hide all past bubbles",
-  "architect.rail.dot": "Turn {n}: {text}",
+  "architect.rail.marker": "Turn {n}: {text}",
   "architect.rail.silent": "Turn {n}: no bubble",
   "architect.rail.failed": "Turn {n} failed: {error}",
   "restore.banner.one": "There is an unclosed live session ({count} request, {cost})",

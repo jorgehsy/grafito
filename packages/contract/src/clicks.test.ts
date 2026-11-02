@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { MAX_ACTIONS, parseActions } from "./actions";
+import { MAX_CLICKS, parseClicks } from "./clicks";
 
-describe("parseActions", () => {
+describe("parseClicks", () => {
   it("takes a list of accept/reject clicks in order; absent is none", () => {
     const list = [{ type: "accept", proposal: "P3" }, { type: "reject", proposal: "P4" }];
-    expect(parseActions(list)).toEqual(list);
-    expect(parseActions([])).toEqual([]);
-    expect(parseActions(undefined)).toEqual([]);
+    expect(parseClicks(list)).toEqual(list);
+    expect(parseClicks([])).toEqual([]);
+    expect(parseClicks(undefined)).toEqual([]);
   });
 
   it("rejects anything else", () => {
@@ -20,8 +20,8 @@ describe("parseActions", () => {
       [{ type: "accept", proposal: "  " }],
       [{ type: "accept", proposal: 3 }],
       [{ type: "accept", proposal: "P3", at: 1 }],
-      Array.from({ length: MAX_ACTIONS + 1 }, () => ({ type: "reject", proposal: "P1" })),
+      Array.from({ length: MAX_CLICKS + 1 }, () => ({ type: "reject", proposal: "P1" })),
     ])
-      expect(parseActions(bad)).toBeNull();
+      expect(parseClicks(bad)).toBeNull();
   });
 });

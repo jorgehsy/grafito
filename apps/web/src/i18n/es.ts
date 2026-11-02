@@ -81,7 +81,7 @@ export const es = {
   "architect.rail.label": "Globos anteriores",
   "architect.rail.showAll": "Mostrar todos los globos anteriores",
   "architect.rail.hideAll": "Ocultar todos los globos anteriores",
-  "architect.rail.dot": "Turno {n}: {text}",
+  "architect.rail.marker": "Turno {n}: {text}",
   "architect.rail.silent": "Turno {n}: sin globo",
   "architect.rail.failed": "El turno {n} falló: {error}",
   "restore.banner.one": "Hay una sesión en vivo sin cerrar ({count} petición, {cost})",
