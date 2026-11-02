@@ -81,8 +81,10 @@ export const es = {
   "architect.rail.dot": "Turno {n}: {text}",
   "architect.rail.silent": "Turno {n}: sin globo",
   "architect.rail.failed": "El turno {n} falló: {error}",
-  "restore.banner.one": "Hay una prueba sin cerrar ({count} petición, {cost})",
-  "restore.banner.other": "Hay una prueba sin cerrar ({count} peticiones, {cost})",
+  "restore.banner.one": "Hay una sesión en vivo sin cerrar ({count} petición, {cost})",
+  "restore.banner.other": "Hay una sesión en vivo sin cerrar ({count} peticiones, {cost})",
+  "restore.architect.one": "Hay una sesión de arquitecto sin cerrar ({count} turno, {cost})",
+  "restore.architect.other": "Hay una sesión de arquitecto sin cerrar ({count} turnos, {cost})",
   "restore.restore": "Restaurar",
   "restore.discard": "Descartar",
 

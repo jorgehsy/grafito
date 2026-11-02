@@ -84,8 +84,10 @@ export const en = {
   "architect.rail.dot": "Turn {n}: {text}",
   "architect.rail.silent": "Turn {n}: no bubble",
   "architect.rail.failed": "Turn {n} failed: {error}",
-  "restore.banner.one": "There is an unclosed session ({count} request, {cost})",
-  "restore.banner.other": "There is an unclosed session ({count} requests, {cost})",
+  "restore.banner.one": "There is an unclosed live session ({count} request, {cost})",
+  "restore.banner.other": "There is an unclosed live session ({count} requests, {cost})",
+  "restore.architect.one": "There is an unclosed architect session ({count} turn, {cost})",
+  "restore.architect.other": "There is an unclosed architect session ({count} turns, {cost})",
   "restore.restore": "Restore",
   "restore.discard": "Discard",
 

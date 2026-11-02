@@ -1,6 +1,6 @@
 // Speech bubbles and bubble markers, as pure functions: what a bubble points at, which turns get a dot on the
 // timeline rail, which bubbles are open, and where an open bubble and its tail go on screen.
-import { findElement, findGroup, findProposal, proposalItems } from "@grafito/board";
+import { findElement, findGroup, findProposal, lastSay, proposalItems } from "@grafito/board";
 import type { Board } from "@grafito/board";
 import type { Op } from "@grafito/contract";
 import type { Bubble } from "./session";
@@ -23,15 +23,6 @@ export function resolveTarget(board: Board, target: string | undefined): BubbleT
   if (findProposal(board, target)) {
     const keys = proposalItems(board, target);
     return keys.length ? { kind: "proposal", keys } : null;
-  }
-  return null;
-}
-
-/** The bubble a turn's ops end with: the last `say` wins; null if there is none. */
-export function lastSay(ops: readonly Op[]): Bubble | null {
-  for (let i = ops.length - 1; i >= 0; i--) {
-    const o = ops[i];
-    if (o.name === "say") return { text: o.input.text, ...(o.input.target ? { target: o.input.target } : {}) };
   }
   return null;
 }

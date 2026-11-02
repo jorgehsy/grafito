@@ -13,8 +13,17 @@ describe("architect system prompt", () => {
     expect(sha(ARCHITECT_SYSTEM_PROMPT)).toBe("19b1a7d4368c572df63a100bd3d170afdc4568bcac7011845f00a092fff561ed");
     expect(sha(WELL_ARCHITECTED_DIGEST)).toBe("832d66dfb0b386561a47bbc433cfe764bb9e1a64e86d3c34a133c2e1a4a363be");
     expect(sha(JSON.stringify(toolDefs([], "architect")))).toBe("b0b629ca41e4000ceb22e616e74a3ef6d982b1fe3a3b12e6f351d6f15c7115c1");
-    // Architect turns stamp ARCHITECT_PROMPT_VERSION: from the session record slice on, bump it whenever these hashes change.
-    expect(ARCHITECT_PROMPT_VERSION).toBe(1);
+  });
+
+  it("every change to the architect prompt, digest, tools or user text bumps ARCHITECT_PROMPT_VERSION", () => {
+    // Saved architect turns stamp ARCHITECT_PROMPT_VERSION, so a version must always mean the same prompt. On any
+    // change: bump ARCHITECT_PROMPT_VERSION and add its hash here; never edit a hash already listed.
+    const PINNED: Record<number, string> = {
+      1: "2f330fb826cb88a9a072e9155337218230fd700465bdcb378e7ddf7329e8120d",
+    };
+    const userText = buildArchitectUserText({ board: "B", summary: "s", recent: [{ text: "t", bubble: "b" }], actions: [{ type: "accept", proposal: "P1" }], text: "next" });
+    const all = [ARCHITECT_SYSTEM_PROMPT, WELL_ARCHITECTED_DIGEST, JSON.stringify(toolDefs([], "architect")), JSON.stringify(toolDefs(["aws"], "architect")), userText];
+    expect({ version: ARCHITECT_PROMPT_VERSION, hash: sha(all.join("\n\u0000\n")) }).toEqual({ version: ARCHITECT_PROMPT_VERSION, hash: PINNED[ARCHITECT_PROMPT_VERSION] });
   });
 
   it("is the architect prompt and the digest, cached, then the same language line as live mode, not cached", () => {

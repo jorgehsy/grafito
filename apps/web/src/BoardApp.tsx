@@ -6,6 +6,8 @@ import { DEMOS } from "./demos";
 import { Engine } from "./render/engine";
 import { LivePanel } from "./live/ui/LivePanel";
 import { ArchitectPanel } from "./architect/ui/ArchitectPanel";
+import type { ArchitectRecordControl } from "./architect/ui/ArchitectPanel";
+import type { ArchitectRecord } from "@grafito/contract";
 import type { ModelControl } from "./live/models";
 import { useT } from "./i18n";
 import { readFlag, writeFlag } from "./storage";
@@ -42,6 +44,9 @@ export function BoardApp() {
   const [ready, setReady] = useState(false);
   const [mute, setMute] = useState<{ muted: boolean; toggle(): void } | null>(null);
   const [architectModel, setArchitectModel] = useState<ModelControl | null>(null);
+  const [architectSession, setArchitectSession] = useState<ArchitectRecordControl | null>(null);
+  // An imported architect record waiting for the architect panel to mount and reopen it.
+  const [architectSeed, setArchitectSeed] = useState<ArchitectRecord | null>(null);
   const [showTranscript, setShowTranscript] = useState(() => readFlag(TRANSCRIPT_KEY, true));
 
   const setStatus = (s: Status) => { status.current = s; setSt(s); };
@@ -124,6 +129,13 @@ export function BoardApp() {
 
   const locked = st === "playing" || st === "paused";
   const changeMode = (m: Mode) => { if (m === mode) return; resetAll(); setStatus("idle"); setMode(m); };
+  const openArchitect = (rec: ArchitectRecord) => {
+    if (mode === "architect" && architectSession) return architectSession.restore(rec);
+    setArchitectSeed(rec);
+    changeMode("architect");
+  };
+  // The panel read the seed when it mounted (its effects run before this one).
+  useEffect(() => { if (mode === "architect" && architectSeed) setArchitectSeed(null); }, [mode, architectSeed]);
   const queued = backlog.pending;
 
   return (
@@ -173,6 +185,8 @@ export function BoardApp() {
         onShowTranscript={setShowTranscript}
         onMuteControl={setMute}
         modelControl={architectModel}
+        architect={architectSession}
+        onOpenArchitect={openArchitect}
       />
 
       {mode === "architect" && ready && (
@@ -184,6 +198,8 @@ export function BoardApp() {
             screenRect: (key) => engine.current?.screenRect(key) ?? null,
           }}
           onModelControl={setArchitectModel}
+          onRecordControl={setArchitectSession}
+          initialRecord={architectSeed}
         />
       )}
 

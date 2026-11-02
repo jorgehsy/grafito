@@ -8,7 +8,7 @@ import express from "express";
 import { applyOps, emptyBoard, serializeBoard } from "@grafito/board";
 import type { Board } from "@grafito/board";
 import { DEFAULT_LANG, EVAL_MODEL, MODELS, costUsd, isLang, isModelId, parseOp, parseRecord } from "@grafito/contract";
-import type { Lang, Op, SessionRecord } from "@grafito/contract";
+import type { Lang, LiveRecord, Op } from "@grafito/contract";
 import { CATALOG_IDS } from "@grafito/icons";
 import { buildClients } from "../src/claude/clients";
 import { createBoardHandler } from "../src/routes/board";
@@ -35,8 +35,9 @@ Commands:
       and no GRAFITO_SUBSCRIPTION needed, only a logged-in Claude Code.
       e.g. pnpm eval instruction rec.json "..." --model claude-sonnet-5-5@subscription
   convert-v1 <record.json | dir>... --out <dir>
-      Convert version 1 session records to version 2 (same file names) into <dir>.
+      Convert version 1 session records to the current version (same file names) into <dir>.
 
+Instruction and baseline take live session records (version 2 or 3); an architect record is refused.
 Instruction and baseline runs need ANTHROPIC_API_KEY (apps/server/.env) unless the model is a plan model.`;
 
 /** The instructions of the recorded baseline, verbatim: they are what the user said. */
@@ -91,14 +92,15 @@ async function boardUrl(): Promise<string> {
 const jsonFiles = (paths: string[]) =>
   paths.flatMap((p) => (statSync(p).isDirectory() ? readdirSync(p).filter((f) => f.endsWith(".json")).sort().map((f) => join(p, f)) : [p]));
 
-function loadRecord(file: string): SessionRecord {
+function loadRecord(file: string): LiveRecord {
   const parsed = parseRecord(JSON.parse(readFileSync(file, "utf8")));
   if (!parsed.ok) fail(`${file}: ${parsed.error}${parsed.outdated ? " Convert it first: pnpm eval convert-v1 <file> --out <dir>" : ""}`);
+  if (parsed.record.appMode !== "live") fail(`${file}: an architect session record; these commands replay live session records only.`);
   return parsed.record;
 }
 
 /** The board after the requests that did not fail, the first `upto` of them (failed ones count). */
-function replay(rec: SessionRecord, upto = Infinity): Board {
+function replay(rec: LiveRecord, upto = Infinity): Board {
   let board = emptyBoard();
   for (const r of rec.requests.slice(0, upto)) {
     if (r.error) continue;
@@ -132,7 +134,7 @@ interface RunResult {
 }
 
 /** One instruction against one record. Without `dry` this calls the Claude API through the server. */
-async function run(rec: SessionRecord, name: string, instruction: string, opts: { dry: boolean; upto?: number }): Promise<RunResult | null> {
+async function run(rec: LiveRecord, name: string, instruction: string, opts: { dry: boolean; upto?: number }): Promise<RunResult | null> {
   const board = replay(rec, opts.upto);
   const summary = board.summary || rec.summary || "";
   const original = serializeBoard(board);

@@ -1,14 +1,14 @@
-// Converts a version 1 session record (0.2.0-alpha.4 and earlier) to version 2, so old recordings,
+// Converts a version 1 session record (0.2.0-alpha.4 and earlier) to a current live record, so old recordings,
 // such as the eval baseline, can be replayed. The record is not trusted: the result goes through parseRecord.
 import { parseRecord } from "@grafito/contract";
-import type { SessionRecord } from "@grafito/contract";
+import type { LiveRecord } from "@grafito/contract";
 
 /** Every version 1 request was answered by the Spanish prompt, which is prompt version 1. */
 const V1_PROMPT_VERSION = 1;
 
 type V1Request = Record<string, unknown> & { text?: unknown; invalid?: unknown; mode?: unknown };
 
-export function convertV1(x: unknown): SessionRecord {
+export function convertV1(x: unknown): LiveRecord {
   if (!x || typeof x !== "object" || (x as { version?: unknown }).version !== 1) throw new Error("not a version 1 session record");
   const { lang, shape, requests, ...rest } = x as Record<string, unknown>;
   const converted = {
@@ -23,7 +23,9 @@ export function convertV1(x: unknown): SessionRecord {
         })
       : requests,
   };
+  // Written as version 2, which parseRecord reads as a version 3 live record.
   const parsed = parseRecord(converted);
   if (!parsed.ok) throw new Error(parsed.error);
+  if (parsed.record.appMode !== "live") throw new Error("not a live session record");
   return parsed.record;
 }

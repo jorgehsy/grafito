@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ARCHITECT_ZONE_ID, applyOps, emptyBoard } from "@grafito/board";
 import type { Board } from "@grafito/board";
-import { ARCHITECT_PROMPT_VERSION, op } from "@grafito/contract";
-import type { Op } from "@grafito/contract";
-import { createArchitectSession, pickProposal, recentTurns } from "./session";
+import { ARCHITECT_PROMPT_VERSION, op, parseRecord } from "@grafito/contract";
+import type { ArchitectRecord, Op } from "@grafito/contract";
+import { createArchitectSession, pickProposal, recentTurns, RECORD_KEY } from "./session";
 import type { ArchitectSession, ArchitectSessionState, ArchitectSettings } from "./session";
+import { memoryStore, RECORD_KEYS } from "../storage";
+import { t } from "../i18n";
+import type { Store } from "../storage";
 
 const ev = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 const sse = (chunks: string[]) => {
@@ -25,19 +28,29 @@ const say = (text: string, target?: string) => ev("op", { name: "say", input: ta
 const open: ArchitectSession[] = [];
 afterEach(() => { open.splice(0).forEach((s) => s.stop()); });
 
-function harness(respond: (i: number) => string[] = () => [done], settings: Partial<ArchitectSettings> = {}, lag?: Op[][]) {
+interface Extra {
+  storage?: Store;
+  saveStatus?: number;
+}
+
+function harness(respond: (i: number) => string[] = () => [done], settings: Partial<ArchitectSettings> = {}, lag?: Op[][], extra: Extra = {}) {
   let board: Board = emptyBoard();
   const requests: { url: string; body: Record<string, unknown> }[] = [];
+  const saves: ArchitectRecord[] = [];
+  const applied: { model: string; lang: string }[] = [];
+  const storage = extra.storage ?? memoryStore();
   const fetchImpl = (async (url: string, init: RequestInit) => {
     const body = JSON.parse(init.body as string);
+    if (url === "/api/sessions") { saves.push(body); return new Response("{}", { status: extra.saveStatus ?? 200 }); }
     requests.push({ url, body });
     return sse(respond(requests.length - 1));
   }) as unknown as typeof fetch;
   const session = createArchitectSession({
     // With `lag`, submitted ops wait there until the test applies them, like the controller's layout step.
     board: { get: () => board, submit: async (ops) => { if (lag) lag.push(ops); else board = applyOps(board, ops).board; }, clear: () => { board = emptyBoard(); } },
-    settings: { get: () => ({ model: "claude-sonnet-5-5", catalogs: ["aws"], lang: "es-CL", ...settings }) },
+    settings: { get: () => ({ model: "claude-sonnet-5-5", catalogs: ["aws"], lang: "es-CL", ...settings }), apply: (s) => applied.push(s) },
     zoneTitle: () => "Architecture",
+    storage,
     fetchImpl,
   });
   open.push(session);
@@ -45,7 +58,7 @@ function harness(respond: (i: number) => string[] = () => [done], settings: Part
   session.subscribe((s) => (state = s));
   session.start();
   const flush = () => { for (const ops of lag?.splice(0) ?? []) board = applyOps(board, ops).board; };
-  return { session, requests, board: () => board, state: () => state, flush };
+  return { session, requests, saves, storage, applied, board: () => board, state: () => state, flush };
 }
 const settled = (h: ReturnType<typeof harness>, n: number) => until(() => h.state().turns.length === n && !h.state().busy);
 
@@ -55,7 +68,7 @@ describe("architect session: start", () => {
     await tick();
     expect(h.board().zones).toEqual([expect.objectContaining({ id: ARCHITECT_ZONE_ID, kind: "system", title: "Architecture" })]);
     expect(h.board().elements).toEqual([]);
-    expect(h.state()).toEqual({ turns: [], busy: false, bubble: null, error: "", clicks: [] });
+    expect(h.state()).toEqual({ turns: [], busy: false, bubble: null, error: "", clicks: [], unclosed: null, savedAt: null, warning: "" });
   });
 });
 
@@ -322,5 +335,159 @@ describe("recent turns", () => {
   it("leaves out the turn in flight", () => {
     const turn = (text: string, isDone: boolean) => ({ text, done: isDone, bubble: { text: "b" } }) as Parameters<typeof recentTurns>[0][number];
     expect(recentTurns([turn("a", true), turn("b", false)])).toEqual([{ text: "a", bubble: "b" }]);
+  });
+});
+
+describe("architect session: save and restore", () => {
+  const opEv = (name: string, input: unknown) => ev("op", { name, input });
+  const comp = (id: string, proposal?: string) => opEv("add_component", { zone: ARCHITECT_ZONE_ID, id, label: id, type: "service", ...(proposal ? { proposal } : {}) });
+  const turns = [
+    [opEv("propose", { id: "P1", label: "CDN" }), comp("cdn", "P1"), opEv("propose", { id: "P2", label: "Queue" }), comp("queue", "P2"), say("CDN and a queue?", "P1"), opEv("update_summary", { text: "Two ideas." }), done],
+    [comp("api"), opEv("propose", { id: "P3", label: "Cache" }), comp("cache", "P3"), say("A cache too?", "P3"), done],
+  ];
+  /** Two turns, a click between them (accept P1) and one after the last (reject P2): P3 is left in pencil. */
+  async function session(extra: Extra = {}) {
+    const h = harness((i) => turns[i] ?? [say("Ok."), done], {}, undefined, extra);
+    await tick();
+    h.session.send("a web app");
+    await settled(h, 1);
+    h.session.decide("accept", "P1");
+    h.session.send("and an API");
+    await settled(h, 2);
+    h.session.decide("reject", "P2");
+    await tick();
+    return h;
+  }
+  const pencil = (b: Board) => b.elements.filter((e) => e.proposal).map((e) => [e.id, e.proposal]);
+
+  it("autosaves a version 3 architect record to its own slot and the server shortly after a turn", async () => {
+    const h = await session();
+    await until(() => h.saves.length >= 1);
+    const rec = JSON.parse(h.storage.get(RECORD_KEY)!);
+    expect(rec).toMatchObject({ version: 3, appMode: "architect", model: "claude-sonnet-5-5", speechLang: "es-CL", summary: "Two ideas." });
+    expect(h.storage.get(RECORD_KEYS.live)).toBeNull();
+    expect(h.saves.at(-1)?.id).toBe(rec.id);
+    expect(h.state().savedAt).not.toBeNull();
+  });
+
+  it("the record is the timeline: turns with their ops as received (say included) and clicks, in order; no transcript", async () => {
+    const h = await session();
+    const rec = h.session.snapshot();
+    expect(rec.timeline.map((e) => (e.kind === "turn" ? `turn ${e.n}` : `${e.type} ${e.proposal}`))).toEqual(["turn 1", "accept P1", "turn 2", "reject P2"]);
+    expect(rec.timeline[0]).toMatchObject({
+      kind: "turn", text: "a web app", model: "claude-sonnet-5-5", promptVersion: ARCHITECT_PROMPT_VERSION, totalMs: 20,
+      usage: { input: 1000, cacheRead: 500, cacheWrite: 100, output: 200 },
+    });
+    expect(rec.timeline[0].kind === "turn" && rec.timeline[0].ops.map((o) => o.name)).toEqual(["propose", "add_component", "propose", "add_component", "say", "update_summary"]);
+    expect(rec.totals).toEqual({ requests: 2, costUsd: expect.any(Number), medianVoiceFirstMs: null });
+    expect(rec).not.toHaveProperty("transcript");
+    expect(rec).not.toHaveProperty("shape");
+    expect(parseRecord(JSON.parse(JSON.stringify(rec))).ok).toBe(true);
+  });
+
+  it("round trip: snapshot → parseRecord → restore gives the same board, bubbles and record", async () => {
+    const h = await session();
+    const rec = h.session.snapshot();
+    const p = parseRecord(JSON.parse(JSON.stringify(rec)));
+    if (!p.ok || p.record.appMode !== "architect") throw new Error("not an architect record");
+    const g = harness();
+    await tick();
+    g.session.restore(p.record);
+    await tick();
+    expect(g.board()).toEqual(h.board());
+    expect(g.state().turns.map((x) => [x.n, x.text, x.bubble])).toEqual(h.state().turns.map((x) => [x.n, x.text, x.bubble]));
+    expect(g.state().bubble).toEqual({ text: "A cache too?", target: "P3" });
+    expect(g.applied).toEqual([{ model: "claude-sonnet-5-5", lang: "es-CL" }]);
+    const { updatedAt: _a, ...back } = g.session.snapshot();
+    const { updatedAt: _b, ...expected } = rec;
+    expect(back).toEqual(expected);
+  });
+
+  it("pending proposals return in pencil", async () => {
+    const h = await session();
+    const g = harness();
+    await tick();
+    g.session.restore(h.session.snapshot());
+    await tick();
+    expect(g.board().proposals.map((x) => x.id)).toEqual(["P3"]);
+    expect(pencil(g.board())).toEqual([["cache", "P3"]]);
+    expect(g.board().elements.map((e) => e.id)).toEqual(["cdn", "api", "cache"]);
+  });
+
+  it("clicks after the last turn become the next turn's actions; recent is rebuilt from the turns", async () => {
+    const h = await session();
+    const g = harness(() => [say("Noted."), done]);
+    await tick();
+    g.session.restore(h.session.snapshot());
+    expect(g.state().clicks.map(({ type, proposal }) => ({ type, proposal }))).toEqual([{ type: "reject", proposal: "P2" }]);
+    await tick();
+    g.session.send("next");
+    await settled(g, 3);
+    const body = g.requests[0].body;
+    expect(body.actions).toEqual([{ type: "reject", proposal: "P2" }]);
+    expect(body.recent).toEqual([{ text: "a web app", bubble: "CDN and a queue?" }, { text: "and an API", bubble: "A cache too?" }]);
+    expect(body.board).toContain("[pencil P3]");
+    expect(g.state().turns.at(-1)?.n).toBe(3);
+    expect(g.session.snapshot().id).toBe(h.session.snapshot().id);
+  });
+
+  it("a broken turn is saved with the ops that arrived and its error, and replayed as is", async () => {
+    const h = harness(() => [opEv("propose", { id: "P1", label: "CDN" }), comp("cdn", "P1"), ev("error", { message: "overloaded" })]);
+    await tick();
+    h.session.send("a web app");
+    await settled(h, 1);
+    const rec = h.session.snapshot();
+    expect(rec.timeline[0]).toMatchObject({ kind: "turn", error: expect.stringContaining("overloaded"), ops: [{ name: "propose" }, { name: "add_component" }] });
+    const g = harness();
+    await tick();
+    g.session.restore(rec);
+    await tick();
+    expect(pencil(g.board())).toEqual([["cdn", "P1"]]);
+    expect(g.state().error).toContain("overloaded");
+    // leftover pencil can be rejected by click
+    expect(g.session.decide("reject", "P1")).toBe(true);
+  });
+
+  it("offers the stored session until the first turn; reset forgets it", async () => {
+    const h = await session();
+    await until(() => h.storage.get(RECORD_KEY) !== null);
+    const g = harness(undefined, {}, undefined, { storage: h.storage });
+    expect(g.state().unclosed?.id).toBe(h.session.snapshot().id);
+    await tick();
+    g.session.send("fresh start");
+    await settled(g, 1);
+    expect(g.state().unclosed).toBeNull();
+    g.session.reset();
+    expect(h.storage.get(RECORD_KEY)).toBeNull();
+    expect(g.state()).toMatchObject({ turns: [], clicks: [], unclosed: null });
+    expect(g.board().zones.map((z) => z.id)).toEqual([ARCHITECT_ZONE_ID]);
+  });
+
+  it("uses only its own slot: a live session is never offered nor removed; a version 1 record is dropped", async () => {
+    const live = JSON.stringify({ version: 3, appMode: "live", id: "live1" });
+    const storage = memoryStore({ [RECORD_KEYS.live]: live, [RECORD_KEY]: JSON.stringify({ version: 1, id: "old" }) });
+    const h = harness(undefined, {}, undefined, { storage });
+    expect(h.state().unclosed).toBeNull();
+    expect(h.state().warning).toBe(t("record.outdated"));
+    expect(storage.get(RECORD_KEY)).toBeNull();
+    h.session.reset();
+    expect(storage.get(RECORD_KEYS.live)).toBe(live);
+  });
+
+  it("close saves at once what changed since the last save", async () => {
+    const h = await session();
+    await until(() => h.saves.length >= 1);
+    const n = h.saves.length;
+    h.session.decide("accept", "P3");
+    h.session.close();
+    await until(() => h.saves.length === n + 1);
+    expect(h.saves.at(-1)?.timeline.at(-1)).toMatchObject({ kind: "click", type: "accept", proposal: "P3" });
+  });
+
+  it("warns when the server does not save; a copy stays in the browser", async () => {
+    const h = await session({ saveStatus: 500 });
+    await until(() => h.state().warning !== "");
+    expect(h.state().warning).toBe(t("save.failed", { error: "HTTP 500" }));
+    expect(h.storage.get(RECORD_KEY)).not.toBeNull();
   });
 });

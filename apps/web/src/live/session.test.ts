@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { applyOps, emptyBoard } from "@grafito/board";
 import type { Board } from "@grafito/board";
 import { costUsd, OUTDATED_RECORD, parseRecord, PROMPT_VERSION, zeroUsage } from "@grafito/contract";
-import type { SessionRecord } from "@grafito/contract";
+import type { LiveRecord } from "@grafito/contract";
 import { createLiveSession, RECORD_KEY } from "./session";
 import type { LiveSession, LiveSessionState, Settings } from "./session";
 import { memoryStore, RECORD_KEYS } from "../storage";
@@ -38,7 +38,7 @@ function harness(o: Options = {}) {
   let board = o.board ?? emptyBoard();
   let settings: Settings = { model: "claude-haiku-5-5", shape: "auto", catalogs: [], speechLang: "en-US", ...o.settings };
   const requests: any[] = [];
-  const saves: SessionRecord[] = [];
+  const saves: LiveRecord[] = [];
   const storage = o.storage ?? memoryStore();
   const fetchImpl = (async (url: string, init: RequestInit) => {
     const body = JSON.parse(init.body as string);
@@ -120,7 +120,7 @@ describe("snapshot", () => {
     h.say(long); await settled(h, 1);
     h.say("second"); await settled(h, 2);
     const rec = h.session.snapshot();
-    expect(rec).toMatchObject({ version: 2, shape: "flow", speechLang: "es-CL", model: "claude-haiku-5-5", summary: "r" });
+    expect(rec).toMatchObject({ version: 3, appMode: "live", shape: "flow", speechLang: "es-CL", model: "claude-haiku-5-5", summary: "r" });
     expect(rec.requests[0]).toMatchObject({
       n: 1, promptVersion: PROMPT_VERSION, batch: long, mode: "content", firstOpMs: 7,
       ops: [{ name: "update_summary", input: { text: "r" } }], warnings: ["zz: bad"],
@@ -135,14 +135,15 @@ describe("snapshot", () => {
 });
 
 describe("restore", () => {
-  it("round trip: parseRecord → restore → snapshot gives the fixture back", () => {
+  it("round trip: a version 2 file restores and is written back as version 3, otherwise the same", () => {
     const p = parseRecord(fixture);
-    if (!p.ok) throw new Error(p.error);
+    if (!p.ok || p.record.appMode !== "live") throw new Error("not a live record");
     const h = harness();
     h.session.restore(p.record);
     const { updatedAt: _a, ...back } = h.session.snapshot();
     const { updatedAt: _b, ...expected } = fixture;
-    expect(back).toEqual(expected);
+    expect(fixture.version).toBe(2);
+    expect(back).toEqual({ ...expected, version: 3, appMode: "live" });
     // The undone instruction is not replayed; catalog ops are, with every catalog on.
     expect(h.board().zones.map((z) => z.id)).toEqual(["orders"]);
     expect(h.board().elements.find((e) => e.id === "ship")?.service).toBe("aws:lambda");
@@ -153,7 +154,7 @@ describe("restore", () => {
   it("continues the numbering and the totals after the record", async () => {
     const h = harness();
     const p = parseRecord(fixture);
-    if (!p.ok) throw new Error(p.error);
+    if (!p.ok || p.record.appMode !== "live") throw new Error("not a live record");
     h.session.restore(p.record);
     h.say("more"); await settled(h, 5);
     const rec = h.session.snapshot();
@@ -163,7 +164,7 @@ describe("restore", () => {
   });
 
   it("parses the recorded ops: invalid ones are dropped and join the warnings", () => {
-    const rec = structuredClone(fixture) as SessionRecord;
+    const rec = { ...structuredClone(fixture), version: 3, appMode: "live" } as LiveRecord;
     rec.requests = [{
       ...rec.requests[0],
       warnings: ["zz: bad"],
@@ -234,6 +235,17 @@ describe("autosave", () => {
     expect(storage.get(RECORD_KEY)).toBeNull();
     expect(h.state()).toMatchObject({ entries: [], transcript: [], unclosed: null, totals: { requests: 0, usage: zeroUsage(), costUsd: 0 } });
     expect(h.session.snapshot().id).not.toBe(fixture.id);
+  });
+
+  it("a stored version 2 session is restored and saved back as version 3", async () => {
+    const storage = memoryStore({ [RECORD_KEY]: JSON.stringify(fixture) });
+    const h = harness({ storage });
+    const unclosed = h.state().unclosed;
+    if (!unclosed) throw new Error("not offered");
+    h.session.restore(unclosed);
+    await until(() => h.saves.length === 1);
+    expect(h.saves[0]).toMatchObject({ version: 3, appMode: "live", id: fixture.id });
+    expect(JSON.parse(storage.get(RECORD_KEY)!)).toMatchObject({ version: 3, appMode: "live", id: fixture.id });
   });
 
   it("uses only the live slot: an architect session in its own slot is never offered nor removed", async () => {

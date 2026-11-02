@@ -1,9 +1,11 @@
 // Saved sessions: POST/GET /api/sessions, stored as sessions/<YYYY-MM-DD_HH-mm-ss>_<id>.json (never outside that folder).
+// Live and architect sessions share the folder; a record is written as the current version (3), whatever it came in as.
 import type { Request, Response } from "express";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseRecord } from "@grafito/contract";
+import type { AppMode } from "@grafito/contract";
 
 export const DEFAULT_DIR = resolve(fileURLToPath(new URL("..", import.meta.url)), "sessions");
 const FILE_RE = /^[A-Za-z0-9_-]+\.json$/;
@@ -47,11 +49,14 @@ export function createSessionsHandlers(dir: string = DEFAULT_DIR) {
   async function list(_req: Request, res: Response) {
     let files: string[] = [];
     try { files = (await readdir(root)).filter((f) => FILE_RE.test(f)); } catch { /* directory does not exist yet */ }
-    const out: { file: string; startedAt: number; requests: number; costUsd: number }[] = [];
+    const out: { file: string; appMode: AppMode; startedAt: number; requests: number; costUsd: number }[] = [];
     for (const file of files) {
       try {
         const r = JSON.parse(await readFile(join(root, file), "utf8"));
-        out.push({ file, startedAt: r.startedAt, requests: r.requests?.length ?? 0, costUsd: r.totals?.costUsd ?? 0 });
+        // A version 2 file has no appMode: it is a live session. An architect session counts its turns.
+        const appMode: AppMode = r.appMode === "architect" ? "architect" : "live";
+        const requests = appMode === "architect" ? (r.timeline?.filter((e: { kind?: unknown }) => e?.kind === "turn").length ?? 0) : (r.requests?.length ?? 0);
+        out.push({ file, appMode, startedAt: r.startedAt, requests, costUsd: r.totals?.costUsd ?? 0 });
       } catch { /* foreign or corrupt file: skip it */ }
     }
     out.sort((a, b) => b.startedAt - a.startedAt);

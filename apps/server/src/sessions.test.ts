@@ -21,6 +21,15 @@ const rec = (id: string, extra: object = {}) => ({
   requests: [request(1)], transcript: [], summary: "", totals: { requests: 1, costUsd: 0.25, medianVoiceFirstMs: null }, ...extra,
 });
 
+const turn = (n: number) => ({
+  kind: "turn", n, text: "t", model: "m", promptVersion: 1, startedAt: 0, totalMs: null,
+  ops: [{ name: "say", input: { text: "Hi." } }], warnings: [], usage: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 }, costUsd: 0.75,
+});
+const architect = (id: string) => ({
+  version: 3, appMode: "architect", id, startedAt: new Date(2026, 0, 2, 3, 4, 5).getTime(), updatedAt: 0, model: "m", speechLang: "en-US", summary: "",
+  timeline: [turn(1), { kind: "click", type: "reject", proposal: "P1", at: 1 }, turn(2)], totals: { requests: 2, costUsd: 1.5, medianVoiceFirstMs: null },
+});
+
 let dir: string;
 beforeEach(async () => { dir = join(await mkdtemp(join(tmpdir(), "grafito-")), "sessions"); });
 afterEach(async () => { await rm(join(dir, ".."), { recursive: true, force: true }); });
@@ -69,6 +78,26 @@ describe("saved sessions", () => {
     const nf = fakeRes();
     await h.get({ params: { file: "no.json" } } as any, nf);
     expect(nf.code).toBe(404);
+  });
+  it("stores version 3: a version 2 record is written back as a live version 3 record", async () => {
+    const h = createSessionsHandlers(dir);
+    const r = fakeRes();
+    await h.save({ body: rec("abc") } as never, r);
+    expect(JSON.parse(await readFile(join(dir, r.body.file), "utf8"))).toMatchObject({ version: 3, appMode: "live", id: "abc" });
+  });
+  it("saves architect records with the same file naming; the list shows each file's app mode", async () => {
+    const h = createSessionsHandlers(dir);
+    const s = fakeRes();
+    await h.save({ body: architect("arc") } as never, s);
+    expect(s.body.file).toBe("2026-01-02_03-04-05_arc.json");
+    await h.save({ body: rec("uno", { startedAt: new Date(2026, 5, 1).getTime() }) } as never, fakeRes());
+    // a version 2 file already in the folder (saved before version 3) is a live session
+    await writeFile(join(dir, "2025-01-01_00-00-00_old.json"), JSON.stringify(rec("old", { startedAt: 1 })));
+    const l = fakeRes();
+    await h.list({} as never, l);
+    expect(l.body.map((x: { file: string; appMode: string; requests: number; costUsd: number }) => [x.file.split("_").at(-1), x.appMode, x.requests, x.costUsd])).toEqual([
+      ["uno.json", "live", 1, 0.25], ["arc.json", "architect", 2, 1.5], ["old.json", "live", 1, 0.25],
+    ]);
   });
   it("empty list if the folder does not exist", async () => {
     const l = fakeRes();

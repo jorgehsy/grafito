@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { IconBars, IconDoc, IconExport, IconGear, IconImport, IconMic, IconStop, IconTrash, IconUndo, IconWave } from "../../ui/icons";
 import type { BoardController, Subtitle } from "@grafito/board";
 import { isModelId, MODELS, parseRecord } from "@grafito/contract";
+import type { ArchitectRecord } from "@grafito/contract";
+import type { ArchitectRecordControl } from "../../architect/ui/ArchitectPanel";
 import type { Settings } from "../session";
 import { useLiveSession } from "./useLiveSession";
 import { useMic } from "./useMic";
@@ -23,7 +25,10 @@ interface Props {
   exportSvg(): string | null;
   onSubtitle(s: Subtitle): void;
   onClear(): void;
-  /** The app mode; null until it is known. The voice, import and clear controls only work in live mode. */
+  /**
+   * The app mode; null until it is known. The voice controls only work in live mode; import, export and clear in
+   * live and architect mode; undo in live mode only.
+   */
   mode: "demo" | "live" | "architect" | null;
   onMode(m: "demo" | "live"): void;
   modeLocked: boolean;
@@ -37,12 +42,18 @@ interface Props {
   onMuteControl(c: { muted: boolean; toggle(): void } | null): void;
   /** Another mode's model choice (architect mode has its own); the options popover shows it instead of live mode's. */
   modelControl: ModelControl | null;
+  /** Architect mode's session, while it is on: export, import and clear act on it. */
+  architect: ArchitectRecordControl | null;
+  /** Reopens an imported architect record in architect mode, switching to it if needed. */
+  onOpenArchitect(rec: ArchitectRecord): void;
 }
 
-export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript, onMuteControl, modelControl }: Props) {
+export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript, onMuteControl, modelControl, architect, onOpenArchitect }: Props) {
   const t = useT();
   const lang = useLang();
   const active = mode === "live";
+  // The architect session, when architect mode is on and its panel is mounted.
+  const arch = mode === "architect" ? architect : null;
   const [statsOpen, setStatsOpen] = useState(() => readFlag(STATS_KEY, true));
   const [optsOpen, setOptsOpen] = useState(false);
   const gearRef = useRef<HTMLButtonElement>(null);
@@ -110,9 +121,9 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  const clear = () => { session.reset(); setImportWarn(""); };
+  const clear = () => { if (arch) arch.reset(); else session.reset(); setImportWarn(""); };
   const exportAll = () => {
-    const rec = session.snapshot();
+    const rec = arch ? arch.snapshot() : session.snapshot();
     const base = `grafito_${rec.id}`;
     download(base + ".json", JSON.stringify(rec, null, 2), "application/json");
     const svg = exportSvg();
@@ -123,7 +134,12 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
     try {
       const p = parseRecord(JSON.parse(await f.text()));
       if (!p.ok) throw new Error(p.outdated ? t("record.outdated") : t("import.notRecord"));
-      session.restore(p.record);
+      // A record reopens in its own app mode, switching the app to it.
+      if (p.record.appMode === "architect") onOpenArchitect(p.record);
+      else {
+        if (!active) onMode("live");
+        session.restore(p.record);
+      }
       setImportWarn("");
     } catch (e: any) {
       setImportWarn(t("import.failed", { error: e?.message ?? e }));
@@ -133,7 +149,8 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
 
   const listening = mic.state === "listening";
   const langLabel = LANGS.find((l) => l.code === lang)?.label ?? lang;
-  const warn = importWarn || live.warning;
+  const warn = importWarn || (arch ? "" : live.warning);
+  const savedAt = arch ? arch.savedAt : live.savedAt;
 
   return (
     <div className="live" data-testid="live-panel">
@@ -141,15 +158,15 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
         <button className={"tb" + (micOn ? " on" : "")} data-testid="mic" aria-pressed={micOn} aria-label={micOn ? t("toolbar.mic.stop") : t("toolbar.mic.talk")} title={micOn ? t("toolbar.mic.stopTitle") : t("toolbar.mic.talkTitle")} disabled={!active} onClick={toggleMic}>
           {micOn ? <IconStop /> : <IconMic />}
         </button>
-        <button className="tb" data-testid="import" aria-label={t("toolbar.import")} title={t("toolbar.importTitle")} disabled={!active} onClick={() => fileIn.current?.click()}><IconImport /></button>
+        <button className="tb" data-testid="import" aria-label={t("toolbar.import")} title={t("toolbar.importTitle")} disabled={!active && !arch} onClick={() => fileIn.current?.click()}><IconImport /></button>
         <input ref={fileIn} type="file" accept="application/json,.json" hidden onChange={(e) => void importFile(e.target.files?.[0])} />
         <hr />
         <button className={"tb mode" + (active ? " sel" : "")} aria-pressed={active} aria-label={t("toolbar.liveMode")} title={t("toolbar.liveModeTitle")} disabled={modeLocked} onClick={() => onMode("live")}><IconWave /></button>
         <button className={"tb mode" + (mode === "demo" ? " sel" : "")} aria-pressed={mode === "demo"} aria-label={t("toolbar.demoMode")} title={t("toolbar.demoModeTitle")} disabled={modeLocked} onClick={() => onMode("demo")}><IconDoc /></button>
         <hr />
-        <button className="tb" data-testid="undo" aria-label={t("toolbar.undo")} title={t("toolbar.undo")} disabled={!live.canUndo} onClick={() => session.undoLastInstruction()}><IconUndo /></button>
-        <button className="tb" data-testid="export" aria-label={t("toolbar.export")} title={t("toolbar.exportTitle")} disabled={!live.entries.length} onClick={exportAll}><IconExport /></button>
-        <button className="tb" data-testid="clear" aria-label={t("toolbar.clear")} title={t("toolbar.clearTitle")} disabled={!active} onClick={clear}><IconTrash /></button>
+        <button className="tb" data-testid="undo" aria-label={t("toolbar.undo")} title={t("toolbar.undo")} disabled={!active || !live.canUndo} onClick={() => session.undoLastInstruction()}><IconUndo /></button>
+        <button className="tb" data-testid="export" aria-label={t("toolbar.export")} title={t("toolbar.exportTitle")} disabled={arch ? !arch.canExport : !live.entries.length} onClick={exportAll}><IconExport /></button>
+        <button className="tb" data-testid="clear" aria-label={t("toolbar.clear")} title={t("toolbar.clearTitle")} disabled={!active && !arch} onClick={clear}><IconTrash /></button>
         <hr />
         <button ref={gearRef} className={"tb" + (optsOpen ? " on" : "")} aria-pressed={optsOpen} aria-expanded={optsOpen} aria-label={t("toolbar.options")} title={t("toolbar.options")} onClick={() => setOptsOpen((v) => !v)}><IconGear /></button>
         <button className={"tb" + (statsOpen ? " on" : "")} aria-pressed={statsOpen} aria-label={t("toolbar.stats")} title={t("toolbar.statsTitle")} onClick={() => setStatsOpen((v) => !v)}><IconBars /></button>
@@ -185,7 +202,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
 
       {statsOpen && mode !== "architect" && <StatsPanel session={live} model={model} summary={summary} warnings={warnings} onClose={() => setStatsOpen(false)} />}
 
-      <div className="corner">{listening && <span className="dot" />}{listening ? t(muted ? "mic.muted" : "mic.listening") + " · " : ""}{langLabel}{live.savedAt ? ` · ${t("corner.saved", { time: hhmm(live.savedAt) })}` : ""}</div>
+      <div className="corner">{listening && <span className="dot" />}{listening ? t(muted ? "mic.muted" : "mic.listening") + " · " : ""}{langLabel}{savedAt ? ` · ${t("corner.saved", { time: hhmm(savedAt) })}` : ""}</div>
     </div>
   );
 }

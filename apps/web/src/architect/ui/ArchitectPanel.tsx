@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findProposal, proposalItems } from "@grafito/board";
 import type { Board } from "@grafito/board";
-import { ARCHITECT_DEFAULT_MODEL } from "@grafito/contract";
-import type { Op } from "@grafito/contract";
+import { ARCHITECT_DEFAULT_MODEL, isModelId } from "@grafito/contract";
+import type { ArchitectRecord, Op } from "@grafito/contract";
 import { createArchitectSession, pickProposal } from "../session";
 import type { ArchitectSessionState } from "../session";
 import { loadCatalogs } from "../../live/catalogs";
-import { fetchAvailableModels, usableModel } from "../../live/models";
+import { fetchAvailableModels, totalCost, usableModel } from "../../live/models";
 import type { ModelControl } from "../../live/models";
-import { t as translate, useLang, useT } from "../../i18n";
+import { isLang, setLang, t as translate, useLang, useT } from "../../i18n";
+import { browserStore } from "../../storage";
 import { ProposalToolbar } from "./ProposalToolbar";
 import { SpeechBubbles } from "./SpeechBubbles";
 import { TimelineRail } from "./TimelineRail";
@@ -22,38 +23,62 @@ export interface BoardCanvas {
   screenRect(key: string): DOMRect | null;
 }
 
+/** What the toolbar's export, import and clear buttons do in architect mode. There is no undo. */
+export interface ArchitectRecordControl {
+  snapshot(): ArchitectRecord;
+  restore(rec: ArchitectRecord): void;
+  /** Starts over on a blank board and forgets the autosaved session. */
+  reset(): void;
+  /** At least one turn to export. */
+  canExport: boolean;
+  savedAt: number | null;
+}
+
 interface Props {
   board: { get(): Board; submit(ops: Op[]): Promise<void>; clear(): void };
   canvas: BoardCanvas;
   /** The model choice for the options popover, while this panel is mounted. */
   onModelControl(c: ModelControl | null): void;
+  /** The session controls for the toolbar, while this panel is mounted. */
+  onRecordControl(c: ArchitectRecordControl | null): void;
+  /** A record to reopen on mount (an import that switched the app to architect mode) instead of a blank board. */
+  initialRecord?: ArchitectRecord | null;
 }
 
 /**
- * Architect mode's controls: the speech bubbles, the timeline rail of bubble markers and the one text box.
- * Mounting it starts a session on a blank board.
+ * Architect mode's controls: the speech bubbles, the timeline rail of bubble markers, the one text box and the
+ * restore banner. Mounting it starts a session on a blank board, or reopens `initialRecord`; unmounting saves it.
  */
-export function ArchitectPanel({ board, canvas, onModelControl }: Props) {
+export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl, initialRecord }: Props) {
   const t = useT();
   const lang = useLang();
   const [available, setAvailable] = useState<string[] | null>(null);
   const [model, setModel] = useState(ARCHITECT_DEFAULT_MODEL);
-  const deps = useRef({ board, canvas, model, lang });
-  deps.current = { board, canvas, model, lang };
+  const deps = useRef({ board, canvas, model, lang, available });
+  deps.current = { board, canvas, model, lang, available };
   const session = useMemo(
     () => createArchitectSession({
       board: { get: () => deps.current.board.get(), submit: (ops) => deps.current.board.submit(ops), clear: () => deps.current.board.clear() },
       // The icon catalogs are the live panel's setting, saved on every change.
-      settings: { get: () => ({ model: deps.current.model, catalogs: loadCatalogs(), lang: deps.current.lang }) },
+      settings: {
+        get: () => ({ model: deps.current.model, catalogs: loadCatalogs(), lang: deps.current.lang }),
+        apply: (s) => {
+          if (isModelId(s.model)) setModel(usableModel(s.model, deps.current.available, ARCHITECT_DEFAULT_MODEL));
+          if (isLang(s.lang)) setLang(s.lang);
+        },
+      },
       zoneTitle: () => translate("architect.zoneTitle"),
+      storage: browserStore,
     }),
     [],
   );
-  const [state, setState] = useState<ArchitectSessionState>({ turns: [], busy: false, bubble: null, error: "", clicks: [] });
+  const [state, setState] = useState<ArchitectSessionState>({ turns: [], busy: false, bubble: null, error: "", clicks: [], unclosed: null, savedAt: null, warning: "" });
+  const seed = useRef(initialRecord);
   useEffect(() => {
     const off = session.subscribe(setState);
-    session.start();
-    return () => { off(); session.stop(); };
+    if (seed.current) session.restore(seed.current);
+    else session.start();
+    return () => { off(); session.close(); };
   }, [session]);
 
   useEffect(() => {
@@ -96,11 +121,21 @@ export function ArchitectPanel({ board, canvas, onModelControl }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [sel]);
+  const restore = useCallback((rec: ArchitectRecord) => { setSel(null); session.restore(rec); }, [session]);
+  const reset = useCallback(() => { setSel(null); session.reset(); }, [session]);
+  const canExport = state.turns.length > 0;
+  useEffect(() => {
+    onRecordControl({ snapshot: session.snapshot, restore, reset, canExport, savedAt: state.savedAt });
+  }, [session, restore, reset, canExport, state.savedAt, onRecordControl]);
+  useEffect(() => () => onRecordControl(null), [onRecordControl]);
+
   const decide = (type: "accept" | "reject") => {
     if (sel) session.decide(type, sel.proposal);
     setSel(null);
     input.current?.focus();
   };
+
+  const unclosedModels = state.unclosed?.timeline.flatMap((e) => (e.kind === "turn" ? [e.model] : [])) ?? [];
 
   return (
     <div className="architect" data-testid="architect-panel">
@@ -119,7 +154,17 @@ export function ArchitectPanel({ board, canvas, onModelControl }: Props) {
           onGone={() => setSel(null)}
         />
       )}
-      {state.error && <div className="toasts"><div className="toast warn" data-testid="architect-error" role="alert">{state.error}</div></div>}
+      <div className="toasts">
+        {state.unclosed && (
+          <div className="toast" data-testid="architect-restore-banner">
+            {t("restore.architect", { count: unclosedModels.length, cost: totalCost(unclosedModels, state.unclosed.totals.costUsd, t("cost.included")) })}
+            <button className="pbtn" onClick={() => state.unclosed && restore(state.unclosed)}>{t("restore.restore")}</button>
+            <button className="pbtn" onClick={reset}>{t("restore.discard")}</button>
+          </div>
+        )}
+        {state.error && <div className="toast warn" data-testid="architect-error" role="alert">{state.error}</div>}
+        {state.warning && <div className="toast warn" data-testid="architect-save-warn" role="alert">{state.warning}</div>}
+      </div>
       <TimelineRail
         markers={markers}
         view={view}

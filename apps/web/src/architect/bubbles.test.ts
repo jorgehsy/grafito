@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ARCHITECT_ZONE_ID, applyOps, architectZoneOp, emptyBoard } from "@grafito/board";
+import { ARCHITECT_ZONE_ID, applyOps, architectZoneOp, emptyBoard, lastSay } from "@grafito/board";
 import { op } from "@grafito/contract";
 import type { Op } from "@grafito/contract";
 import {
-  bubbleMarkers, initialBubbleView, isOpen, lastSay, openBubbles, placeBubble, resolveTarget, tailShape, tailTip, toggleDot,
+  bubbleMarkers, initialBubbleView, isOpen, openBubbles, placeBubble, resolveTarget, tailShape, tailTip, toggleDot,
   toggleRail, unionRect, withCurrent,
 } from "./bubbles";
 import type { Rect } from "./bubbles";

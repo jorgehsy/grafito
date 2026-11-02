@@ -11,6 +11,7 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 - Architect mode (hidden): what Claude adds on its own is drawn in pencil (grey and sketchy) with a question; type "yes" and it is inked, "no" and it is erased. When the right choice depends on you, Claude draws two alternatives side by side and you answer "A" or "B". What you ask for is drawn in ink straight away.
 - Architect mode (hidden): click a pencil sketch for a small ✓/✗ toolbar that keeps or erases it at once; click one of two alternatives to choose it. Claude hears about your clicks with your next message.
 - Architect mode (hidden): Claude's speech bubble points at what it talks about (a component, group or pencil proposal), or sits in the corner for a general remark. Past bubbles shrink to dots on a timeline rail above the text box: hover one to read it, click it to reopen the bubble, click the rail to show or hide them all.
+- Architect mode (hidden): the session autosaves like live mode, in its own slot and to `sessions/`. Coming back offers to restore it, with pending pencil proposals and the bubble rail as they were; export, import and clear work in architect mode too, and a file reopens in the mode it was saved in. Session records are now version 3 and name their mode; version 2 files still open (as live sessions) and are written back as version 3.
 
 ## v0.2.0-alpha.6 · 2026-10-31
 

@@ -15,7 +15,7 @@ const v1 = {
 describe("convertV1", () => {
   it("renames the fields, fills the defaults and stamps prompt version 1", () => {
     const r = convertV1(v1);
-    expect(r).toMatchObject({ version: 2, id: "abc", shape: "auto", speechLang: "es-CL", summary: "s" });
+    expect(r).toMatchObject({ version: 3, appMode: "live", id: "abc", shape: "auto", speechLang: "es-CL", summary: "s" });
     expect(r.requests[0]).toMatchObject({ n: 1, promptVersion: 1, batch: "hola", mode: "content", warnings: ["x: bad"], firstOpMs: 5 });
     expect(r.requests[1]).toMatchObject({ batch: "árbol", mode: "instruction", undone: true, error: "HTTP 500" });
     expect(r.requests[0]).not.toHaveProperty("text");

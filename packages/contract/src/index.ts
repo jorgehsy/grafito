@@ -9,5 +9,5 @@ export type { ModelInfo, Price, Provider } from "./models";
 export * from "./pricing";
 export { DEFAULT_LANG, LANGS, isLang, languageName } from "./lang";
 export type { Lang } from "./lang";
-export { ARCHITECT_PROMPT_VERSION, OUTDATED_RECORD, PROMPT_VERSION, parseRecord } from "./record";
-export type { ParsedRecord, RecordRequest, SessionRecord } from "./record";
+export { ARCHITECT_PROMPT_VERSION, OUTDATED_RECORD, PROMPT_VERSION, RECORD_VERSION, parseRecord } from "./record";
+export type { AppMode, ArchitectRecord, LiveRecord, ParsedRecord, RecordClick, RecordRequest, RecordTurn, SessionRecord, TimelineEntry } from "./record";
