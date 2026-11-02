@@ -4,6 +4,8 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 
 ## Unreleased
 
+## v0.2.0-alpha.8 · 2026-11-02
+
 - Flow and system diagrams pick left-to-right or top-to-bottom from what they mean, no longer from their width: Claude says which when it creates the zone (a sequence runs across, layers and peers stack so peers share a row), and without it a long chain runs across and a fan of peers runs down. Prompt version 3.
 
 ## v0.2.0-alpha.7 · 2026-11-02
