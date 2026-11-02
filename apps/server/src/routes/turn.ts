@@ -14,14 +14,19 @@ export function availableModelIds(clients: Clients): string[] {
   return MODELS.filter((m) => clients[m.provider]).map((m) => m.id);
 }
 
+/** The error for a plan model asked for while the subscription switch is off. */
+export const PLAN_OFF = "Plan models are off: set GRAFITO_SUBSCRIPTION=1 in .env";
+
 /**
- * The model to run and its adapter. An unknown or unavailable model falls back quietly to `fallback`, or to
- * `DEFAULT_MODEL` when `fallback` is the API twin of the requested plan model (`fallbackModel`); `client` is
- * missing when the fallback's provider is off too.
+ * The model to run and its adapter. An unknown or unavailable API model falls back quietly to `fallback`; an
+ * unavailable plan model is an error, never a paid API call (`fallbackModel`, ADR 0004). Also an error when
+ * the fallback's provider is off too.
  */
-export function pickModel(clients: Clients, model: unknown, fallback: string): { model: string; client: ClaudeClient | undefined } {
+export function pickModel(clients: Clients, model: unknown, fallback: string): { model: string; client: ClaudeClient } | { error: string } {
   const use = typeof model === "string" && availableModelIds(clients).includes(model) ? model : fallbackModel(model, fallback);
-  return { model: use, client: clients[MODELS.find((m) => m.id === use)!.provider] };
+  if (use === null) return { error: PLAN_OFF };
+  const client = clients[MODELS.find((m) => m.id === use)!.provider];
+  return client ? { model: use, client } : { error: "Missing API key in .env" };
 }
 
 /** `catalogs` from the body: an array of known catalog ids (absent = off). Returns the error message or null. */

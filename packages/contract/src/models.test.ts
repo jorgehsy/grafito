@@ -39,15 +39,17 @@ describe("model registry", () => {
 });
 
 describe("fallbackModel", () => {
-  it("keeps the mode's fallback for API, unknown and other plan models", () => {
+  it("keeps the mode's fallback for API and unknown models", () => {
     expect(fallbackModel("claude-haiku-5-5", ARCHITECT_DEFAULT_MODEL)).toBe(ARCHITECT_DEFAULT_MODEL);
     expect(fallbackModel("gone", ARCHITECT_DEFAULT_MODEL)).toBe(ARCHITECT_DEFAULT_MODEL);
-    expect(fallbackModel(undefined, ARCHITECT_DEFAULT_MODEL)).toBe(ARCHITECT_DEFAULT_MODEL);
-    expect(fallbackModel("claude-haiku-5-5@subscription", ARCHITECT_DEFAULT_MODEL)).toBe(ARCHITECT_DEFAULT_MODEL);
+    expect(fallbackModel(undefined, DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
   });
 
-  it("never names the paid API twin of the requested plan model (ADR 0004)", () => {
-    expect(fallbackModel("claude-sonnet-5-5@subscription", ARCHITECT_DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
+  it("never falls back from a plan model to a paid one (ADR 0004)", () => {
+    expect(fallbackModel("claude-haiku-5-5@subscription", DEFAULT_MODEL)).toBeNull();
+    expect(fallbackModel("claude-sonnet-5-5@subscription", DEFAULT_MODEL)).toBeNull();
+    expect(fallbackModel("claude-haiku-5-5@subscription", ARCHITECT_DEFAULT_MODEL)).toBeNull();
+    expect(fallbackModel("claude-sonnet-5-5@subscription", ARCHITECT_DEFAULT_MODEL)).toBeNull();
   });
 });
 

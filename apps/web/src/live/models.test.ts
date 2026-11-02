@@ -26,10 +26,10 @@ describe("usable model", () => {
     expect(usableModel("gone", API, ARCHITECT_DEFAULT_MODEL)).toBe("claude-sonnet-5-5");
     expect(usableModel(API[0], PLAN, ARCHITECT_DEFAULT_MODEL)).toBe(PLAN[0]);
   });
-  it("never falls back from a plan model to its API twin (ADR 0004)", () => {
-    expect(usableModel(PLAN[0], API, ARCHITECT_DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
-    expect(usableModel(PLAN[0], null, ARCHITECT_DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
-    expect(usableModel(PLAN[1], API, ARCHITECT_DEFAULT_MODEL)).toBe(ARCHITECT_DEFAULT_MODEL);
+  it("selects the mode's default tile for a plan model that is not offered", () => {
+    expect(usableModel(PLAN[0], API, ARCHITECT_DEFAULT_MODEL)).toBe(ARCHITECT_DEFAULT_MODEL);
+    expect(usableModel(PLAN[0], null, ARCHITECT_DEFAULT_MODEL)).toBe(ARCHITECT_DEFAULT_MODEL);
+    expect(usableModel(PLAN[1], API)).toBe(DEFAULT_MODEL);
   });
 });
 

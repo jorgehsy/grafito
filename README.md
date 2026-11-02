@@ -113,7 +113,7 @@ You can run Claude on your own Claude plan instead of the API. It is for your ow
 2. Add `GRAFITO_SUBSCRIPTION=1` to `apps/server/.env` and restart.
 3. In Options → Model, pick a **plan** model. It shows tokens and "included in plan", no dollars, and counts against your plan limit.
 
-The API key is never sent on a plan call. If a plan model is not available, Grafito uses the default API model, never the paid twin. The eval can run plan models without the switch:
+The API key is never sent on a plan call. If a plan model is asked for with the switch off, the request fails with "Plan models are off" instead of billing the API; a restored session picks the default API tile, which shows its price. The eval can run plan models without the switch:
 
 ```bash
 pnpm --filter @grafito/server eval instruction <record.json> "<instruction>" --model claude-sonnet-5-5@subscription
