@@ -31,6 +31,8 @@ afterEach(() => { open.splice(0).forEach((s) => s.stop()); });
 interface Extra {
   storage?: Store;
   saveStatus?: number;
+  /** Each submit applies after this many ms, like the controller awaiting layout. */
+  submitMs?: number;
 }
 
 function harness(respond: (i: number) => string[] = () => [done], settings: Partial<ArchitectSettings> = {}, lag?: Op[][], extra: Extra = {}) {
@@ -47,7 +49,14 @@ function harness(respond: (i: number) => string[] = () => [done], settings: Part
   }) as unknown as typeof fetch;
   const session = createArchitectSession({
     // With `lag`, submitted ops wait there until the test applies them, like the controller's layout step.
-    board: { get: () => board, submit: async (ops) => { if (lag) lag.push(ops); else board = applyOps(board, ops).board; }, clear: () => { board = emptyBoard(); } },
+    board: {
+      get: () => board,
+      submit: async (ops) => {
+        if (lag) return void lag.push(ops);
+        if (extra.submitMs) await tick(extra.submitMs);
+        board = applyOps(board, ops).board;
+      },
+      clear: () => { board = emptyBoard(); } },
     settings: { get: () => ({ model: "claude-sonnet-5-5", catalogs: ["aws"], lang: "es-CL", ...settings }), apply: (s) => applied.push(s) },
     zoneTitle: () => "Architecture",
     storage,
@@ -308,6 +317,20 @@ describe("architect session: clicks", () => {
     h.session.send("third");
     await settled(h, 3);
     expect(h.requests[2].body.actions).toEqual([{ type: "reject", proposal: "P1" }]);
+  });
+
+  it("the next turn sends the board after the clicks and the last turn's ops are applied, not before", async () => {
+    const h = harness((i) => (i === 0 ? three : [say("Noted."), done]), {}, undefined, { submitMs: 15 });
+    h.session.send("build it");
+    await settled(h, 1);
+    expect(h.requests[0].body.board).toContain("- system [system]");
+    h.session.decide("accept", "P1");
+    h.session.decide("reject", "P2");
+    h.session.send("now a queue");
+    await settled(h, 2);
+    expect(h.requests[1].body.board).not.toContain("pencil P1");
+    expect(h.requests[1].body.board).not.toContain("P2");
+    expect(h.requests[1].body.board).toContain("[pencil P3]");
   });
 
   it("a click on the board selects a lone proposal, chooses an alternative at once, and ignores ink and paper", async () => {

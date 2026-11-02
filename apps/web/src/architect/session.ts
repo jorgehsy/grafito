@@ -161,6 +161,12 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
   let timeline: Step[] = [];
   let busy = false;
   let abort: AbortController | null = null;
+  // Every board submit not yet applied: a turn serializes the board only once they are.
+  let applying: Promise<void> = Promise.resolve();
+  const submit = (ops: Op[]) => {
+    const p = d.board.submit(ops);
+    applying = Promise.all([applying, p]).then(() => undefined, () => undefined);
+  };
   // Bumped by start and stop, so a turn still finishing does not touch the new state.
   let epoch = 0;
   let { unclosed, warning } = readStored(d.storage);
@@ -227,7 +233,6 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
   async function run(text: string) {
     const myEpoch = epoch;
     const { model, catalogs, lang } = d.settings.get();
-    const board = d.board.get();
     const recent = recentTurns(turns);
     // Sent once: a click made while this turn is in flight waits for the next one.
     const actions = clickActions(clicks);
@@ -243,11 +248,13 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     abort = new AbortController();
     changed();
     const mine = () => myEpoch === epoch;
+    await applying; // the board sent must show the clicks and the last turn's ops
+    if (!mine()) return;
+    const board = d.board.get();
     const setUsage = (u: UsageInfo) => {
       turn.usage = { input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_input_tokens: u.cache_read_input_tokens, cache_creation_input_tokens: u.cache_creation_input_tokens };
       turn.costUsd = costUsd(model, turn.usage);
     };
-    let last: Promise<void> = Promise.resolve();
     await streamOps(
       "/api/architect",
       { text, board: serializeBoard(board, { catalog: catalogs.length > 0 }), summary: board.summary, recent, actions, model, lang, catalogs },
@@ -258,7 +265,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
           turn.ops.push(o);
           // say is not a board element: the last one of the turn is its bubble.
           if (o.name === "say") turn.bubble = { text: o.input.text, ...(o.input.target ? { target: o.input.target } : {}) };
-          else last = d.board.submit([o]);
+          else submit([o]);
           changed();
         },
         onInvalid(w) { if (mine()) { turn.warnings.push(w); changed(); } },
@@ -271,7 +278,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     );
     if (turn.totalMs === null) turn.totalMs = Date.now() - turn.startedAt;
     turn.done = true;
-    await last; // the next turn must see the board already updated
+    await applying;
     if (!mine()) return;
     abort = null;
     busy = false;
@@ -287,7 +294,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     id = newSessionId(); startedAt = Date.now();
     dirty = false; savedAt = null;
     d.board.clear();
-    void d.board.submit([architectZoneOp(d.zoneTitle())]);
+    submit([architectZoneOp(d.zoneTitle())]);
     emit();
   }
 
@@ -313,7 +320,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
       const click: ArchitectClick = { type, proposal, at: Date.now() };
       clicks = [...clicks, click];
       timeline = [...timeline, { kind: "click", click }];
-      void d.board.submit([{ name: type, input: { proposal } }]);
+      submit([{ name: type, input: { proposal } }]);
       changed();
       return true;
     },
@@ -336,7 +343,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
       unclosed = null;
       d.settings.apply?.({ model: rec.model, lang: rec.speechLang });
       d.board.clear(); // then every op is replayed at once (the queue switches to fast mode)
-      void d.board.submit(r.boardOps);
+      submit(r.boardOps);
       changed(true);
     },
     subscribe(fn) {
