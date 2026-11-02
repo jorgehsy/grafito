@@ -1,6 +1,6 @@
 [
   { "say": "I want to build a photo sharing app.", "expect": ["pencil"] },
-  { "say": "Users need to sign in.", "expect": ["pencil"] },
+  { "say": "Photos must never be lost.", "expect": ["pencil"] },
   { "say": "Photos should load fast for users all over the world.", "expect": ["pencil"] },
   { "say": "Moderators need to review reported photos.", "expect": ["asksKeep"] }
 ]
