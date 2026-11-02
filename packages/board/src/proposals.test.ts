@@ -107,7 +107,7 @@ describe("proposals: propose", () => {
 
 describe("proposals: what a click finds", () => {
   it("proposalOf names the open proposal an item was drawn under; ink and unknown ids have none", () => {
-    const b = run([comp("api", "service"), conn("c9", "api", "dns")], staticSite());
+    const b = run([comp("api", "service"), comp("db", "database"), conn("c9", "api", "db")], staticSite());
     expect(["dns", "c1", "c2"].map((id) => proposalOf(b, id))).toEqual(["P1", "P1", "P1"]);
     expect(["api", "c9", "nope", "P1", "system"].map((id) => proposalOf(b, id))).toEqual([undefined, undefined, undefined, undefined, undefined]);
     expect(proposalOf(run([op.accept({ proposal: "P1" })], b), "dns")).toBeUndefined();
@@ -151,8 +151,8 @@ describe("proposals: accept", () => {
 });
 
 describe("proposals: reject", () => {
-  it("erases everything drawn under it, and ink arrows touching it", () => {
-    const b = run([comp("api", "service"), conn("c3", "api", "cdn"), op.reject({ proposal: "P1" })], staticSite());
+  it("erases everything drawn under it, and the arrows that touch it", () => {
+    const b = run([comp("api", "service"), conn("c3", "api", "cdn", "P1"), op.reject({ proposal: "P1" })], staticSite());
     expect(ids(b)).toEqual({ elements: ["api"], groups: [], connections: [], proposals: [] });
   });
 
@@ -187,6 +187,42 @@ describe("proposals: reject", () => {
     const b = run([op.reject({ proposal: "P2" }), op.propose({ id: "P2", label: "Again" })], twoDatabases());
     expect(alternativesOf(b, "P2")).toEqual(["P2"]);
     expect(alternativesOf(b, "P3")).toEqual(["P3"]);
+  });
+});
+
+describe("proposals: ink never hangs on pencil", () => {
+  it("an ink arrow with a pencil end is drawn in pencil under that end's proposal, with a warning", () => {
+    const r = applyOps(staticSite(), [comp("mod", "service"), conn("c3", "mod", "site")]);
+    expect(r.warnings).toEqual(["connect: 'c3' has a pencil end under P1; drawn in pencil under P1"]);
+    expect(proposalOf(r.board, "c3")).toBe("P1");
+    expect(proposalOf(r.board, "mod")).toBeUndefined();
+  });
+
+  it("rejecting that proposal erases the arrow and keeps the ink component", () => {
+    const b = applyOps(staticSite(), [comp("mod", "service"), conn("c3", "mod", "site"), op.reject({ proposal: "P1" })]).board;
+    expect(ids(b)).toEqual({ elements: ["mod"], groups: [], connections: [], proposals: [] });
+  });
+
+  it("accepting it turns the arrow to ink with the rest", () => {
+    const b = applyOps(staticSite(), [comp("mod", "service"), conn("c3", "mod", "site"), op.accept({ proposal: "P1" })]).board;
+    expect(b.connections.every((c) => !c.proposal)).toBe(true);
+  });
+
+  it("an arrow given a proposal keeps it, whatever its ends are", () => {
+    const b = run([op.propose({ id: "P2", label: "API" }), comp("api", "service", "P2"), conn("c3", "cdn", "api", "P2")], staticSite());
+    expect(proposalOf(b, "c3")).toBe("P2");
+  });
+
+  it("accepting a proposal whose arrow reaches another open one leaves that arrow in pencil under the other", () => {
+    const b = run([op.propose({ id: "P2", label: "API" }), comp("api", "service", "P2"), conn("c3", "cdn", "api", "P2"), op.accept({ proposal: "P2" })], staticSite());
+    expect(proposalOf(b, "api")).toBeUndefined();
+    expect(proposalOf(b, "c3")).toBe("P1");
+    expect(ids(run([op.reject({ proposal: "P1" })], b))).toEqual({ elements: ["api"], groups: [], connections: [], proposals: [] });
+  });
+
+  it("an ink arrow between ink components stays ink", () => {
+    const b = run([comp("a", "service"), comp("b", "service"), conn("c3", "a", "b")], staticSite());
+    expect(proposalOf(b, "c3")).toBeUndefined();
   });
 });
 

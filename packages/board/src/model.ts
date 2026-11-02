@@ -172,6 +172,17 @@ export function proposalOf(b: Board, id: string): string | undefined {
   return x?.proposal && findProposal(b, x.proposal) ? x.proposal : undefined;
 }
 
+/** The open proposal of a connection's first pencil end; undefined when both ends are ink. */
+const pencilEnd = (b: Board, from: string, to: string) => proposalOf(b, from) ?? proposalOf(b, to);
+
+/**
+ * Ink never hangs on pencil: an ink arrow with a pencil end goes under that end's proposal, so a reject erases it
+ * with that end instead of leaving the user's ink depending on an answer they have not given.
+ */
+function penInkArrows(b: Board) {
+  for (const c of b.connections) if (!c.proposal) { const p = pencilEnd(b, c.from, c.to); if (p) c.proposal = p; }
+}
+
 /** Ids of everything drawn under a proposal: groups, components, then connections. */
 export function proposalItems(b: Board, proposal: string): string[] {
   return [...b.groups, ...b.elements, ...b.connections].filter((x) => x.proposal === proposal).map((x) => x.id);
@@ -380,9 +391,11 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       for (const end of [i.from, i.to]) if (findGroup(b, end)) return bad(`'${end}' is a group; arrows join components only`);
       if (!findElement(b, i.from)) return bad(`source '${i.from}' does not exist`);
       if (!findElement(b, i.to)) return bad(`target '${i.to}' does not exist`);
+      const pencil = i.proposal ?? pencilEnd(b, i.from, i.to);
+      if (pencil !== i.proposal) warnings.push(`connect: '${i.id}' has a pencil end under ${pencil}; drawn in pencil under ${pencil}`);
       b.connections.push({
         id: i.id, from: i.from, to: i.to, label: str(i.label) ? i.label : undefined,
-        style: i.style === "dashed" ? "dashed" : "solid", both: !!i.both_ways, ...proposal,
+        style: i.style === "dashed" ? "dashed" : "solid", both: !!i.both_ways, ...(pencil ? { proposal: pencil } : {}),
       });
       return { board: b, warnings };
     }
@@ -562,6 +575,8 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (op.name === "accept") for (const x of [...b.elements, ...b.groups, ...b.connections]) if (x.proposal === id) delete x.proposal;
       eraseProposals(b, new Set(erased));
       closeProposals(b, new Set([id, ...erased]));
+      // an arrow of this proposal that reaches another, still open one stays pencil under that one
+      if (op.name === "accept") penInkArrows(b);
       return { board: b, warnings };
     }
     case "update_summary": {
