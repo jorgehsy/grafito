@@ -1,6 +1,7 @@
 // The architect session: one run of architect mode on a board that starts blank with the app-made system zone.
 // Each typed message is one turn: POST /api/architect, drawing ops onto the board, the `say` into the speech bubble.
-// A click on a proposal (✓, ✗, or choosing an alternative) applies at once and rides along with the next turn.
+// A click on a proposal (✓, ✗, or choosing an alternative) applies at once and rides along with the next turn; there
+// is none while a turn is in flight, since the replay could not put it between that turn's ops.
 // The session is saved as a timeline of turns and clicks (session record version 3) and restored by replaying it.
 import { alternativesOf, architectZoneOp, findProposal, lastSay, proposalOf, replayArchitect, serializeBoard } from "@grafito/board";
 import type { Board, ReplayedTurn } from "@grafito/board";
@@ -92,7 +93,8 @@ export interface ArchitectSession {
   send(text: string): boolean;
   /**
    * Accepts or rejects an open proposal by click: applied to the board at once, with no Claude call, and queued for
-   * the next turn. Returns false, doing nothing, if the proposal is not open or a click already settled it.
+   * the next turn. Returns false, doing nothing, if a turn is in flight, the proposal is not open or a click already
+   * settled it.
    */
   decide(type: ArchitectAction["type"], proposal: string): boolean;
   /** Cancels the turn in flight; the session stays usable. */
@@ -234,7 +236,6 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     const myEpoch = epoch;
     const { model, catalogs, lang } = d.settings.get();
     const recent = recentTurns(turns);
-    // Sent once: a click made while this turn is in flight waits for the next one.
     const actions = clickActions(clicks);
     clicks = [];
     const turn: ArchitectTurn = {
@@ -313,6 +314,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
       return true;
     },
     decide(type, proposal) {
+      if (busy) return false;
       const board = d.board.get();
       // The board lags the ops still being applied, so a click already queued also counts as settling it.
       const settled = clicks.some((c) => c.proposal === proposal || (c.type === "accept" && alternativesOf(board, c.proposal).includes(proposal)));

@@ -157,7 +157,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .canvas2 svg [data-selected] { filter: drop-shadow(0 0 1.5px var(--pizarra)) drop-shadow(0 0 6px rgba(62,94,140,0.45)); }
 .decide { position: fixed; display: flex; gap: 4px; padding: 3px; background: #fff; border: 1px solid var(--hueso); border-radius: 16px; box-shadow: var(--sombra); z-index: 8; animation: decide-pop .15s both; }
 .decide button { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--grafito); background: #fff; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; font-family: inherit; }
-.decide button:hover { background: var(--papel); }
+.decide button:hover:not(:disabled) { background: var(--papel); }
+.decide button:disabled { opacity: .35; cursor: not-allowed; }
 .decide .ok { color: #2F7D4F; }
 .decide .no { color: #D1453B; }
 @keyframes decide-pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }

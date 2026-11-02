@@ -306,17 +306,16 @@ describe("architect session: clicks", () => {
     expect(h.board().elements.map((e) => e.id)).toEqual(["rds"]);
   });
 
-  it("a click while a turn is in flight waits for the next turn", async () => {
+  it("a click while a turn is in flight is refused: replay could not put it between that turn's ops", async () => {
     const h = await drawn();
     h.session.send("second");
     expect(h.state().busy).toBe(true);
-    h.session.decide("reject", "P1");
+    expect(h.session.decide("reject", "P1")).toBe(false);
+    expect(h.state().clicks).toEqual([]);
     await settled(h, 2);
-    expect(h.requests[1].body.actions).toEqual([]);
-    expect(h.state().clicks.map((c) => c.proposal)).toEqual(["P1"]);
-    h.session.send("third");
-    await settled(h, 3);
-    expect(h.requests[2].body.actions).toEqual([{ type: "reject", proposal: "P1" }]);
+    expect(h.board().proposals.map((p) => p.id)).toEqual(["P1", "P2", "P3"]);
+    expect(h.session.snapshot().timeline.map((e) => e.kind)).toEqual(["turn", "turn"]);
+    expect(h.session.decide("reject", "P1")).toBe(true);
   });
 
   it("the next turn sends the board after the clicks and the last turn's ops are applied, not before", async () => {

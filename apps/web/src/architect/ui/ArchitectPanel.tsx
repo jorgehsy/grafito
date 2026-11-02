@@ -54,8 +54,7 @@ export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl,
   const lang = useLang();
   const [available, setAvailable] = useState<string[] | null>(null);
   const [model, setModel] = useState(ARCHITECT_DEFAULT_MODEL);
-  const deps = useRef({ board, canvas, model, lang, available });
-  deps.current = { board, canvas, model, lang, available };
+  const deps = useRef({ board, canvas, model, lang, available, busy: false });
   const session = useMemo(
     () => createArchitectSession({
       board: { get: () => deps.current.board.get(), submit: (ops) => deps.current.board.submit(ops), clear: () => deps.current.board.clear() },
@@ -73,6 +72,7 @@ export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl,
     [],
   );
   const [state, setState] = useState<ArchitectSessionState>({ turns: [], busy: false, bubble: null, error: "", clicks: [], unclosed: null, savedAt: null, warning: "" });
+  deps.current = { board, canvas, model, lang, available, busy: state.busy };
   const seed = useRef(initialRecord);
   useEffect(() => {
     const off = session.subscribe(setState);
@@ -109,8 +109,10 @@ export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl,
     const c = deps.current.canvas;
     c.onPick((key) => {
       const pick = pickProposal(deps.current.board.get(), key);
-      if (pick.do === "choose") session.decide("accept", pick.proposal);
-      setSel(pick.do === "select" && key ? { proposal: pick.proposal, key } : null);
+      // While a turn is in flight an alternative is not chosen: it is selected, and the toolbar says to wait.
+      const choose = pick.do === "choose" && !deps.current.busy;
+      if (choose) session.decide("accept", pick.proposal);
+      setSel(pick.do !== "none" && !choose && key ? { proposal: pick.proposal, key } : null);
     });
     return () => { c.onPick(null); c.select([]); };
   }, [session]);
@@ -151,6 +153,7 @@ export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl,
           proposal={sel.proposal}
           anchor={() => (findProposal(deps.current.board.get(), sel.proposal) ? deps.current.canvas.screenRect(sel.key) : null)}
           onDecide={decide}
+          busy={state.busy}
           onGone={() => setSel(null)}
         />
       )}

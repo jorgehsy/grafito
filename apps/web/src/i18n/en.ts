@@ -78,6 +78,7 @@ export const en = {
   "architect.decide.label": "Proposal {proposal}",
   "architect.decide.accept": "Keep this proposal",
   "architect.decide.reject": "Discard this proposal",
+  "architect.decide.wait": "Wait for Claude to finish this turn",
   "architect.thinking": "Thinking…",
   "architect.bubble.turn": "Turn {n}",
   "architect.rail.label": "Past bubbles",
