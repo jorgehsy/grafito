@@ -8,7 +8,8 @@ import { fakeClaude, start, stop, toolBlock } from "../../src/claude/fake";
 import type { FakeAttempt } from "../../src/claude/fake";
 import { createArchitectHandler } from "../../src/routes/architect";
 import { serveHandler } from "../serve";
-import { dryScenario, formatTable, rowFailed, runScenario, saveRecord } from "./run";
+import { dryScenario, formatTable, rowFailed, runScenario, saveRecord, stepVerdicts } from "./run";
+import type { StepRow } from "./run";
 import { parseScenario } from "./scenario";
 import type { Scenario } from "./scenario";
 
@@ -69,10 +70,10 @@ describe("runScenario", () => {
     const { fake, url } = await serveFake(SCRIPT);
     const { rows, record } = await runScenario(SCENARIO, 1, { url, model: "claude-sonnet-5-5" });
 
-    expect(rows.map((r) => [r.step, r.text])).toEqual([
-      [1, "An online store needs a database. RDS or DynamoDB?"],
-      [2, "choose B (accept P2)"],
-      [3, "Add an SQS queue for orders."],
+    expect(rows.map((r) => [r.step, r.text, r.clicks])).toEqual([
+      [1, "An online store needs a database. RDS or DynamoDB?", undefined],
+      [2, "choose B", "accept P2"],
+      [3, "Add an SQS queue for orders.", undefined],
     ]);
     expect(rows[0].checks).toEqual({ oneSay: { pass: true }, oneQuestion: { pass: true }, alternatives: { pass: true }, bpIds: { pass: true }, pencil: { pass: true } });
     expect(rows[0].usd).toBeGreaterThan(0);
@@ -102,6 +103,7 @@ describe("runScenario", () => {
     expect(table).toContain("| rds-or-dynamo | 1 | 2 | choose B (accept P2) | - | - | - | - | - | pass | - |");
     expect(table).toContain("| rds-or-dynamo | 1 | 3 | Add an SQS queue for orders. | pass | FAIL | pass | pass | ink pass | FAIL | $");
     expect(table).toContain("rds-or-dynamo run 1 step 3: oneQuestion FAIL: 2 questions");
+    expect(table).toContain("| rds-or-dynamo | 3 | Add an SQS queue for orders. | 0/1 | oneQuestion 1/1 | FAIL |");
     expect(table).toContain("1 of 3 steps failed.");
 
     const dir = mkdtempSync(join(tmpdir(), "grafito-eval-"));
@@ -122,6 +124,42 @@ describe("runScenario", () => {
     expect(parseRecord(record).ok).toBe(true);
   });
 
+  it("starts from the scripted start turn without sending it, and checks asked services in ink", async () => {
+    const { fake, url } = await serveFake([
+      turn([
+        ["add_component", comp("mods", "actor", "")],
+        ["add_component", comp("queue", "queue", "sqs")],
+        ["say", { text: "Keep these three before we go on?" }],
+      ]),
+    ]);
+    const sc = scenario({
+      start: {
+        say: "A photo app.",
+        ops: [
+          { name: "propose", input: { id: "P1", label: "Core" } },
+          { name: "add_component", input: comp("photos", "storage", "s3", "P1") },
+          { name: "propose", input: { id: "P2", label: "Copy" } },
+          { name: "add_component", input: comp("replica", "storage", "s3", "P2") },
+          { name: "propose", input: { id: "P3", label: "Sign-in" } },
+          { name: "add_component", input: comp("auth", "service", "cognito", "P3") },
+          { name: "say", input: { text: "Sketched three things. Public photos?" } },
+        ],
+      },
+      steps: [{ say: "Moderators review reports through a queue.", expect: ["ink", "asksKeep"], asked: ["sqs", "lambda"] }],
+    });
+    const { rows, record } = await runScenario(sc, 1, { url, model: "claude-sonnet-5-5" });
+
+    expect(fake.calls).toHaveLength(1);
+    const text = fake.calls[0].params.userText;
+    expect(text).toContain("USER: A photo app.\nYOUR BUBBLE: Sketched three things. Public photos?");
+    expect(text).toContain("[pencil P3]");
+    expect(rows.map((r) => r.step)).toEqual([1]);
+    expect(rows[0].checks).toMatchObject({ asksKeep: { pass: true }, ink: { pass: false, detail: "not in ink: lambda" } });
+    expect(record.timeline.map((e) => e.kind === "turn" && e.model)).toEqual(["scripted", "claude-sonnet-5-5"]);
+    expect(record.totals.requests).toBe(1);
+    expect(parseRecord(record).ok).toBe(true);
+  });
+
   it("shows a plan model's cost as included in plan", async () => {
     const fake = fakeClaude([turn([["say", { text: "Hi." }]])]);
     const s = await serveHandler("/api/architect", createArchitectHandler({ "claude-subscription": fake }));
@@ -133,6 +171,32 @@ describe("runScenario", () => {
   });
 });
 
+describe("stepVerdicts", () => {
+  const row = (run: number, step: number, fail?: "oneQuestion" | "error"): StepRow => ({
+    scenario: "s", run, step, text: `step ${step}`,
+    checks: { oneSay: { pass: true }, oneQuestion: fail === "oneQuestion" ? { pass: false, detail: "2 questions" } : { pass: true } },
+    ...(fail === "error" ? { error: "HTTP 500" } : {}),
+  });
+
+  it("passes a step that passes in most of its runs, and counts each failing check", () => {
+    const rows = [row(1, 1), row(1, 2, "oneQuestion"), row(2, 1, "error"), row(2, 2, "oneQuestion"), row(3, 1), row(3, 2)];
+    expect(stepVerdicts(rows)).toEqual([
+      { scenario: "s", step: 1, text: "step 1", runs: 3, passed: 2, failing: { error: 1 }, pass: true },
+      { scenario: "s", step: 2, text: "step 2", runs: 3, passed: 1, failing: { oneQuestion: 2 }, pass: false },
+    ]);
+    const table = formatTable(rows);
+    expect(table).toContain("| s | 1 | step 1 | 2/3 | error 1/3 | pass |");
+    expect(table).toContain("| s | 2 | step 2 | 1/3 | oneQuestion 2/3 | FAIL |");
+    expect(table).toContain("1 of 2 steps failed (a step passes when it passes in most of its runs).");
+  });
+
+  it("needs both runs of two, and the one run of one", () => {
+    expect(stepVerdicts([row(1, 1), row(2, 1, "oneQuestion")])[0].pass).toBe(false);
+    expect(stepVerdicts([row(1, 1, "oneQuestion")])[0].pass).toBe(false);
+    expect(stepVerdicts([row(1, 1)])[0].pass).toBe(true);
+  });
+});
+
 describe("dryScenario", () => {
   it("prints the language line and each step's user text, naming clicks", () => {
     const text = dryScenario(scenario({ lang: "es-CL", steps: [{ say: "una app web", expect: ["pencil"] }, { accept: "all" }, { say: "y una cola" }] }));
@@ -141,5 +205,16 @@ describe("dryScenario", () => {
     expect(text).toContain("--- STEP 1: USER TEXT [expect pencil] ---\nCURRENT BOARD:\nZONES\n- system [system] \"Arquitectura\"");
     expect(text).toContain("--- STEP 2: click accept all (resolved at run time) ---");
     expect(text).toContain("USER: una app web\nYOUR BUBBLE: (none)\n\nUSER MESSAGE:\ny una cola");
+  });
+
+  it("shows the scripted start, its board and its bubble, and the asked services", () => {
+    const text = dryScenario(scenario({
+      start: { say: "a photo app", ops: [{ name: "propose", input: { id: "P1", label: "Core" } }, { name: "add_component", input: comp("photos", "storage", "s3", "P1") }, { name: "say", input: { text: "Public?" } }] },
+      steps: [{ say: "add a queue", expect: ["ink"], asked: ["sqs"] }],
+    }));
+    expect(text).toContain("--- START (scripted, not sent): a photo app ---");
+    expect(text).toContain("--- STEP 1: USER TEXT [expect ink, asked sqs] ---");
+    expect(text).toContain("[pencil P1]");
+    expect(text).toContain("USER: a photo app\nYOUR BUBBLE: Public?");
   });
 });

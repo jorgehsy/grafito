@@ -9,7 +9,8 @@ import {
 
 const say = (text: string): Op => op.say({ text });
 const summary = op.update_summary({ text: "s" });
-const comp = (id: string, proposal?: string): Op => op.add_component({ zone: "system", id, label: id, type: "service", ...(proposal ? { proposal } : {}) });
+const comp = (id: string, proposal?: string, service?: string): Op =>
+  op.add_component({ zone: "system", id, label: id, type: "service", ...(proposal ? { proposal } : {}), ...(service ? { service } : {}) });
 const link = (id: string, from: string, to: string, proposal?: string): Op => op.connect({ id, from, to, ...(proposal ? { proposal } : {}) });
 const propose = (id: string, alternative_to?: string): Op => op.propose({ id, label: id, ...(alternative_to ? { alternative_to } : {}) });
 const group = (id: string, proposal?: string): Op => op.add_group({ id, kind: "vpc", label: id, ...(proposal ? { proposal } : {}) });
@@ -52,10 +53,22 @@ describe("every turn", () => {
 });
 
 describe("only when expect names it", () => {
-  it("ink: something is drawn and nothing carries a proposal", () => {
+  it("ink: something is drawn in ink, and Claude's own additions may be pencil beside it", () => {
     expect(checkInk([comp("api"), link("c1", "api", "db"), say("Done."), summary])).toEqual({ pass: true });
+    expect(checkInk([comp("q"), propose("P1"), comp("ses", "P1"), link("c1", "q", "ses", "P1"), say("Penciled in SES.")])).toEqual({ pass: true });
     expect(checkInk([say("Done.")])).toEqual({ pass: false, detail: "nothing drawn" });
-    expect(checkInk([propose("P1"), comp("api", "P1"), comp("db"), say("ok")])).toEqual({ pass: false, detail: "in pencil: propose P1, add_component api" });
+    expect(checkInk([propose("P1"), comp("api", "P1"), say("ok")])).toEqual({ pass: false, detail: "nothing drawn in ink" });
+  });
+
+  it("ink: each asked service is on an ink component, once per time it is asked", () => {
+    const ops = [comp("q", undefined, "sqs"), comp("mailer", undefined, "aws:lambda"), propose("P1"), comp("ses", "P1", "ses"), say("ok")];
+    expect(checkInk(ops, ["sqs", "lambda"])).toEqual({ pass: true });
+    expect(checkInk(ops, ["sqs", "ses"])).toEqual({ pass: false, detail: "not in ink: ses" });
+    expect(checkInk(ops, ["lambda", "lambda"])).toEqual({ pass: false, detail: "not in ink: lambda" });
+    // set_service on an ink component counts; on a pencil one it does not.
+    expect(checkInk([comp("q"), comp("x", "P1"), op.set_service({ id: "q", service: "sqs" }), op.set_service({ id: "x", service: "ses" })], ["sqs", "ses"])).toEqual({
+      pass: false, detail: "not in ink: ses",
+    });
   });
 
   it("pencil: something is drawn and every drawing op carries a proposal", () => {

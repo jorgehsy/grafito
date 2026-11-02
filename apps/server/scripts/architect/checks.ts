@@ -3,6 +3,7 @@
 import { lastSay, openProposals } from "@grafito/board";
 import type { Board, Proposal } from "@grafito/board";
 import type { Op } from "@grafito/contract";
+import { serviceIdOf } from "@grafito/icons";
 import { isBestPracticeId } from "@grafito/wellarchitected";
 import type { Expect } from "./scenario";
 
@@ -77,12 +78,34 @@ export function checkBpIds(ops: readonly Op[]): CheckResult {
   return unknown.length ? failed(`not in the digest: ${unknown.join(", ")}`) : PASS;
 }
 
-/** What the user asked for is ink. Something must be drawn, or a turn that drew nothing would pass. */
-export function checkInk(ops: readonly Op[]): CheckResult {
+/** The services put on ink components this turn, by add_component or set_service, without the catalog prefix. */
+function inkServices(ops: readonly Op[]): string[] {
+  const ink = ops.filter((o) => o.name === "add_component" && !proposalOfOp(o));
+  const inkIds = new Set(ink.map(drawnId));
+  const serviceOf = (o: Op) => (o.input as { service?: string }).service;
+  return [
+    ...ink.map(serviceOf),
+    ...ops.filter((o) => o.name === "set_service" && inkIds.has(drawnId(o))).map(serviceOf),
+  ].flatMap((s) => (s ? [serviceIdOf(s)] : []));
+}
+
+/**
+ * What the user asked for is ink (prompt rule 11): something is drawn in ink, and each service in `asked` (the
+ * step's, one per component the user named) is on an ink component. What Claude adds on its own may sit beside
+ * it in pencil.
+ */
+export function checkInk(ops: readonly Op[], asked: readonly string[] = []): CheckResult {
   const drawing = ops.filter((o) => DRAWING.has(o.name));
   if (!drawing.length) return failed("nothing drawn");
-  const pencil = ops.filter((o) => o.name === "propose" || (DRAWING.has(o.name) && proposalOfOp(o)));
-  return pencil.length ? failed(`in pencil: ${pencil.map((o) => `${o.name} ${drawnId(o)}`).join(", ")}`) : PASS;
+  if (drawing.every(proposalOfOp)) return failed("nothing drawn in ink");
+  const left = inkServices(ops);
+  const missing = asked.filter((s) => {
+    const k = left.indexOf(s);
+    if (k < 0) return true;
+    left.splice(k, 1);
+    return false;
+  });
+  return missing.length ? failed(`not in ink: ${missing.join(", ")}`) : PASS;
 }
 
 /** Claude's own idea is pencil: every drawing op carries a proposal. */
@@ -115,7 +138,7 @@ export function checkReview(ops: readonly Op[]): CheckResult {
 }
 
 /** Every check of one turn. `before` is the board the turn was sent with (clicks applied). */
-export function checkTurn(ops: readonly Op[], ctx: { before: Board; expect: readonly Expect[] }): TurnChecks {
+export function checkTurn(ops: readonly Op[], ctx: { before: Board; expect: readonly Expect[]; asked?: readonly string[] }): TurnChecks {
   const out: TurnChecks = {
     oneSay: checkOneSay(ops),
     oneQuestion: checkOneQuestion(ops),
@@ -123,7 +146,7 @@ export function checkTurn(ops: readonly Op[], ctx: { before: Board; expect: read
     bpIds: checkBpIds(ops),
   };
   for (const e of ctx.expect) {
-    if (e === "ink") out.ink = checkInk(ops);
+    if (e === "ink") out.ink = checkInk(ops, ctx.asked);
     else if (e === "pencil") out.pencil = checkPencil(ops);
     else if (e === "bubbleOnly") out.bubbleOnly = checkBubbleOnly(ops);
     else if (e === "asksKeep") out.asksKeep = checkAsksKeep(ops, pendingCount(ctx.before));
