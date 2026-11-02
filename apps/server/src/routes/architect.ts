@@ -26,14 +26,15 @@ function parseRecent(raw: unknown): RecentTurn[] | null {
  * `POST /api/architect`: one architect turn. Same SSE events, adapters and retry rule as `POST /api/board`,
  * with the architect prompt and op set. Body: `text` (required), `board`, `summary`, `recent`, `actions`
  * (proposals the user accepted or rejected by click since the last turn), `model`, `lang`, `catalogs`. An
- * unknown or unavailable model falls back to `ARCHITECT_DEFAULT_MODEL` (to `DEFAULT_MODEL` for a plan Sonnet).
+ * unknown or unavailable API model falls back to `ARCHITECT_DEFAULT_MODEL`; a plan model with the switch off is an error.
  */
 export function createArchitectHandler(clients: Clients) {
   return async function architectHandler(req: Request, res: Response) {
     openSse(res);
     const { text, board, summary, recent: rawRecent, actions: rawActions, model, catalogs: rawCatalogs, lang: rawLang } = req.body ?? {};
-    const { model: useModel, client } = pickModel(clients, model, ARCHITECT_DEFAULT_MODEL);
-    if (!client) return sseFail(res, "Missing API key in .env");
+    const picked = pickModel(clients, model, ARCHITECT_DEFAULT_MODEL);
+    if ("error" in picked) return sseFail(res, picked.error);
+    const { model: useModel, client } = picked;
     if (typeof text !== "string" || !text.trim()) return sseFail(res, "The text is empty");
     const recent = parseRecent(rawRecent);
     if (!recent) return sseFail(res, "Invalid recent: expected a list of {text, bubble}");

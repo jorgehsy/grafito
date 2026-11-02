@@ -12,7 +12,7 @@ We decided:
 - **One turn only** (`maxTurns: 1`), like the API adapter. With more turns Claude repeated ops after the "ok" results.
 - **The API key is stripped from the SDK env** (also the auth token, base URL, Bedrock, Vertex and Foundry switches), so a plan call can never bill the API. Login is `CLAUDE_CODE_OAUTH_TOKEN` if set, else the local `claude` login.
 - **Off by default and local only.** `GRAFITO_SUBSCRIPTION=1` turns it on. Anthropic does not allow an app to offer claude.ai login to other people, so this is for the owner's own machine and must not be hosted for others.
-- **Fallback never reaches the paid twin.** A request (or restored session) naming an unavailable model uses `DEFAULT_MODEL`, never the API version of a plan model. "Not logged in" (401) and "plan limit reached" (402) are plain English errors and are not retried.
+- **A plan model never falls back to the API.** A request naming an unavailable plan model fails with "Plan models are off" (`fallbackModel` returns `null`); an unknown or unavailable API model still falls back to the mode's default. A restored session whose plan model is not offered selects the mode's default tile, which shows its price before the user speaks. "Not logged in" (401) and "plan limit reached" (402) are plain English errors and are not retried.
 
 Considered: spawning `claude -p` (no partial events, so ops would arrive at the end); one adapter that switches on the model id (every new provider would edit it); falling back to the API when the plan is unavailable (a silent charge).
 

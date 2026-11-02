@@ -14,6 +14,8 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 - `pnpm --filter @grafito/server eval architect <scenarios>` runs scripted architect sessions (6 English scenarios and a Spanish one) through Claude and checks each turn by rule: one bubble, one question at most, two alternatives at most, real Well-Architected ids, and ink, pencil, bubble-only or "keep these?" where the scenario expects it. Each run is saved as a session record you can import.
   - Each scenario runs 3 times by default (`--runs N`), and a step passes when it passes in most of its runs; the table ends with each step's pass rate. The ink check accepts Claude's own pencil additions beside what you asked for, and a scenario can start from a scripted board (`start`).
 
+- A plan model asked for while `GRAFITO_SUBSCRIPTION` is off now fails with "Plan models are off" instead of running on a paid API model (ADR 0004).
+
 ## v0.2.0-alpha.6 · 2026-10-31
 
 - Mute button: while the mic is on, a button next to the subtitles (or the M key) lets you keep talking without Grafito drawing. Muting first closes the turn, so what you said before still gets drawn.

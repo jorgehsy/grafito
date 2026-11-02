@@ -8,15 +8,16 @@ import type { Clients } from "./turn";
 
 /**
  * `POST /api/board`: validates the request, streams Claude's ops back over SSE
- * (events `op`, `usage`, `error`, `done`). The adapter is picked by the model's provider; a model
- * whose provider is off falls back to `DEFAULT_MODEL` (never to the API twin of a plan model).
+ * (events `op`, `usage`, `error`, `done`). The adapter is picked by the model's provider; an API model
+ * whose provider is off falls back to `DEFAULT_MODEL`; a plan model with the switch off is an error.
  */
 export function createBoardHandler(clients: Clients) {
   return async function boardHandler(req: Request, res: Response) {
     openSse(res);
     const { delta, summary, board, model, shape, mode: rawMode, catalogs: rawCatalogs, lang: rawLang } = req.body ?? {};
-    const { model: useModel, client } = pickModel(clients, model, DEFAULT_MODEL);
-    if (!client) return sseFail(res, "Missing API key in .env");
+    const picked = pickModel(clients, model, DEFAULT_MODEL);
+    if ("error" in picked) return sseFail(res, picked.error);
+    const { model: useModel, client } = picked;
     if (typeof delta !== "string" || !delta.trim()) return sseFail(res, "The text is empty");
     if (shape !== undefined && shape !== "auto" && !(ZONE_KINDS as readonly string[]).includes(shape))
       return sseFail(res, `Invalid shape: ${JSON.stringify(shape)}`);

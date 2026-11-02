@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, fallbackModel, fmtUsd, MODELS, priceOf } from "@grafito/contract";
+import { DEFAULT_MODEL, fmtUsd, MODELS, priceOf } from "@grafito/contract";
 import type { ModelInfo } from "@grafito/contract";
 
 /** A mode's model choice, as the options popover shows and changes it. */
@@ -14,14 +14,13 @@ export const visibleModels = (available: readonly string[] | null): readonly Mod
   available ? MODELS.filter((m) => available.includes(m.id)) : MODELS.filter((m) => m.provider === "anthropic-api");
 
 /**
- * A model that is not offered falls back to the mode's default (or to the first one offered); never from a plan
- * model to its API twin (`fallbackModel`).
+ * A model that is not offered falls back to the mode's default (or to the first one offered). From a plan model
+ * this selects a priced tile the user sees before speaking; the server never makes that switch itself (ADR 0004).
  */
 export const usableModel = (id: string, available: readonly string[] | null, modeDefault = DEFAULT_MODEL): string => {
   const shown = visibleModels(available);
   if (shown.some((m) => m.id === id)) return id;
-  const fallback = fallbackModel(id, modeDefault);
-  return shown.some((m) => m.id === fallback) ? fallback : (shown[0]?.id ?? fallback);
+  return shown.some((m) => m.id === modeDefault) ? modeDefault : (shown[0]?.id ?? modeDefault);
 };
 
 /** Model ids the server offers, from `/api/health`; null if it does not answer. */

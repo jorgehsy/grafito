@@ -3,6 +3,7 @@ import express from "express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createArchitectHandler } from "./architect";
+import { PLAN_OFF } from "./turn";
 import type { Clients } from "./turn";
 import type { ClaudeClient } from "../claude/client";
 import { fakeClaude, fail, start, stop, toolBlock } from "../claude/fake";
@@ -139,9 +140,9 @@ describe("POST /api/architect", () => {
     expect(names(evs)).toEqual(["op", "op", "op", "done"]);
   });
 
-  it("falls back to Sonnet for an unknown or unavailable model; a plan model goes to the subscription client", async () => {
+  it("falls back to Sonnet for an unknown model; a plan model goes to the subscription client", async () => {
     const api = fakeClaude([s3Turn]);
-    await post(api, { text: "hi", model: "claude-haiku-5-5@subscription" });
+    await post(api, { text: "hi", model: "gone" });
     expect(api.calls[0].params.model).toBe("claude-sonnet-5-5");
     const haiku = fakeClaude([s3Turn]);
     await post(haiku, { text: "hi", model: "claude-haiku-5-5" });
@@ -152,11 +153,13 @@ describe("POST /api/architect", () => {
     expect(evs.at(-1)!.data).toMatchObject({ model: "claude-sonnet-5-5@subscription" });
   });
 
-  it("a plan Sonnet with the switch off falls back to the default, never to its API twin (ADR 0004)", async () => {
-    const api = fakeClaude([s3Turn]);
-    const evs = await post(api, { text: "hi", model: "claude-sonnet-5-5@subscription" });
-    expect(api.calls[0].params.model).toBe("claude-haiku-5-5");
-    expect(evs.at(-1)!.data).toMatchObject({ model: "claude-haiku-5-5" });
+  it("a plan model with the switch off is an error, never a paid API call (ADR 0004)", async () => {
+    for (const model of ["claude-sonnet-5-5@subscription", "claude-haiku-5-5@subscription"]) {
+      const api = fakeClaude([s3Turn]);
+      const evs = await post(api, { text: "hi", model });
+      expect(evs).toEqual([{ event: "error", data: { message: PLAN_OFF } }]);
+      expect(api.calls).toHaveLength(0);
+    }
   });
 
   it("shows Claude the clicks since the last turn; none and absent are the same", async () => {

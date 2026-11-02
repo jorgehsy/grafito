@@ -3,7 +3,7 @@ import express from "express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createBoardHandler } from "./board";
-import { availableModelIds } from "./turn";
+import { PLAN_OFF, availableModelIds } from "./turn";
 import type { Clients } from "./turn";
 import type { ClaudeClient } from "../claude/client";
 import { fakeClaude, fail, start, stop, toolBlock } from "../claude/fake";
@@ -220,11 +220,13 @@ describe("POST /api/board", () => {
       expect(plan.calls).toHaveLength(0);
     });
 
-    it("a plan model with the switch off falls back to the default, never to its API twin", async () => {
-      const api = fakeClaude([ok]);
-      const evs = await post({ "anthropic-api": api }, { delta: "hola", model: PLAN });
-      expect(evs.at(-1)!.data).toMatchObject({ model: HAIKU });
-      expect(api.calls.map((c) => c.params.model)).toEqual([HAIKU]);
+    it("a plan model with the switch off is an error, never a paid API call (ADR 0004)", async () => {
+      for (const model of [PLAN, "claude-haiku-5-5@subscription"]) {
+        const api = fakeClaude([ok]);
+        const evs = await post({ "anthropic-api": api }, { delta: "hola", model });
+        expect(evs).toEqual([{ event: "error", data: { message: PLAN_OFF } }]);
+        expect(api.calls).toHaveLength(0);
+      }
     });
 
     it("with no API key, an API model does not fall back to a plan model: it errors", async () => {
