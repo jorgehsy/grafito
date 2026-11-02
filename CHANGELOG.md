@@ -4,16 +4,18 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 
 ## Unreleased
 
+## v0.2.0-alpha.7 · 2026-11-02
+
 - **Architect mode**: design an AWS architecture with Claude. Press the new compass button in the toolbar (next to live and demo) or open `?mode=architect`. You start on a blank board with one system zone and type in one text box at the bottom; Claude draws in the system zone and answers in a short speech bubble (Sonnet 5.5 by default; `POST /api/architect`).
   - Claude's advice follows the AWS Well-Architected Framework, and when nothing big is left open it offers a review against the six pillars, one gap per turn. The framework titles in `packages/wellarchitected/` are CC BY-SA 4.0 (see its `NOTICE.md`).
   - Claude can draw AWS groups (AWS Cloud, Region, VPC, Availability Zone, public and private subnets) as nested boxes in AWS's colours, only when they mean something. Deleting a group keeps what was inside it.
   - What you ask for is drawn in ink. What Claude adds on its own is drawn in pencil (grey and sketchy) with a question: type "yes" or "no", or click the sketch for a small ✓/✗ toolbar. When the right choice depends on you, Claude draws two alternatives side by side: answer "A" or "B", or click the one you want. Claude hears about your clicks with your next message.
+  - An arrow from something you asked for to a pencil proposal is drawn in pencil with that proposal: rejecting the proposal erases the arrow too, and accepting it inks the arrow.
   - The speech bubble points at what it talks about (a component, group or pencil proposal), or sits in the corner for a general remark. Past bubbles shrink to small markers on a timeline rail above the text box: hover one to read it, click it to reopen the bubble, click the rail to show or hide them all.
   - The session autosaves in its own slot (live and architect mode never overwrite each other) and to `sessions/`. Switching modes wipes the board without asking; coming back offers to restore it, with pending pencil proposals and the bubble rail as they were. Export, import and clear work in architect mode too, and a file reopens in the mode it was saved in.
 - Session records are now version 3 and name their mode; version 2 files still open (as live sessions) and are written back as version 3.
 - `pnpm --filter @grafito/server eval architect <scenarios>` runs scripted architect sessions (6 English scenarios and a Spanish one) through Claude and checks each turn by rule: one bubble, one question at most, two alternatives at most, real Well-Architected ids, and ink, pencil, bubble-only or "keep these?" where the scenario expects it. Each run is saved as a session record you can import.
   - Each scenario runs 3 times by default (`--runs N`), and a step passes when it passes in most of its runs; the table ends with each step's pass rate. The ink check accepts Claude's own pencil additions beside what you asked for, and a scenario can start from a scripted board (`start`).
-
 - A plan model asked for while `GRAFITO_SUBSCRIPTION` is off now fails with "Plan models are off" instead of running on a paid API model (ADR 0004).
 
 ## v0.2.0-alpha.6 · 2026-10-31
