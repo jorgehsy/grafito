@@ -1,12 +1,12 @@
 // Architect scenarios (GLOSSARY): a scripted architect session for the eval. A file is a JSON list of steps, or
-// `{ name?, lang?, catalogs?, steps }` when the session needs a language or catalogs other than the defaults.
+// `{ name?, lang?, catalogs?, start?, steps }` when the session needs a language, catalogs or a starting board.
 // A click names its proposal by meaning; it is resolved to Claude's real ids on the board at run time.
 import { z } from "zod";
-import { openProposals } from "@grafito/board";
+import { openProposals, replayArchitect } from "@grafito/board";
 import type { Board } from "@grafito/board";
-import { DEFAULT_LANG, isLang } from "@grafito/contract";
-import type { Lang, ProposalClick } from "@grafito/contract";
-import { isCatalogId } from "@grafito/icons";
+import { ARCHITECT_PROMPT_VERSION, DEFAULT_LANG, isLang, parseOp } from "@grafito/contract";
+import type { Lang, Op, ProposalClick, RecordTurn } from "@grafito/contract";
+import { catalogServiceIds, isCatalogId } from "@grafito/icons";
 
 export const EXPECTS = ["ink", "pencil", "bubbleOnly", "asksKeep", "review"] as const;
 export type Expect = (typeof EXPECTS)[number];
@@ -23,7 +23,9 @@ const STEP_SCHEMAS = {
       .optional()
       .refine((e) => !(e?.includes("ink") && e.includes("pencil")), "ink and pencil exclude each other")
       .refine((e) => !(e?.includes("bubbleOnly") && (e.includes("ink") || e.includes("pencil"))), "bubbleOnly excludes ink and pencil"),
-  }),
+    /** The services the user names, one per component (two Lambdas = "lambda" twice): the ink check wants each in ink. */
+    asked: z.array(z.string().min(1)).min(1).optional(),
+  }).refine((s) => !s.asked || s.expect?.includes("ink"), { message: "asked needs expect ink", path: ["asked"] }),
   accept: z.strictObject({ accept: which }),
   reject: z.strictObject({ reject: which }),
   /** Which of the two open alternatives, 1 = A, 2 = B, in the order PROPOSALS lists them. */
@@ -34,17 +36,31 @@ export type SayStep = z.output<typeof STEP_SCHEMAS.say>;
 export type ClickStep = z.output<typeof STEP_SCHEMAS.accept> | z.output<typeof STEP_SCHEMAS.reject> | z.output<typeof STEP_SCHEMAS.choose>;
 export type Step = SayStep | ClickStep;
 
+/**
+ * A scripted first turn: what the user said and the ops Claude "answered" with, never sent to Claude. It sets up
+ * the board a step needs (three open proposals for asksKeep) without depending on what earlier real turns drew.
+ */
+export interface ScenarioStart {
+  say: string;
+  ops: Op[];
+}
+
 export interface Scenario {
   name: string;
   lang: Lang;
   catalogs: string[];
+  start?: ScenarioStart;
   steps: Step[];
 }
+
+/** The model a scripted start turn is recorded with: it shows in the record that no model made it. */
+export const SCRIPTED_MODEL = "scripted";
 
 const wrapperSchema = z.strictObject({
   name: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, "letters, digits, - and _ only, at most 40").optional(),
   lang: z.string().refine(isLang, "unknown language tag").optional(),
   catalogs: z.array(z.string().refine(isCatalogId, "unknown catalog")).optional(),
+  start: z.strictObject({ say: z.string().trim().min(1, "must not be blank"), ops: z.array(z.unknown()).min(1) }).optional(),
   steps: z.array(z.unknown()),
 });
 
@@ -69,19 +85,47 @@ export function parseScenario(x: unknown, fallbackName: string): { ok: true; sce
       head = r.data;
     }
     if (!head.steps.length) throw new Error("no steps");
+    const catalogs = head.catalogs ?? DEFAULT_CATALOGS;
     const steps = head.steps.map((s, k) => parseStep(s, k + 1));
-    // Claude makes the proposals, so nothing can be clicked before its first turn.
-    if (!("say" in steps[0])) throw new Error("step 1: the first step must be a say");
-    return {
-      ok: true,
-      scenario: { name: head.name ?? fallbackName, lang: (head.lang as Lang | undefined) ?? DEFAULT_LANG, catalogs: head.catalogs ?? DEFAULT_CATALOGS, steps },
-    };
+    // Claude (or the scripted start) makes the proposals, so nothing can be clicked before the first turn.
+    if (!head.start && !("say" in steps[0])) throw new Error("step 1: the first step must be a say");
+    const services = new Set(catalogServiceIds(catalogs));
+    for (const [k, s] of steps.entries()) {
+      const unknown = (isSay(s) ? s.asked ?? [] : []).filter((id) => !services.has(id));
+      if (unknown.length) throw new Error(`step ${k + 1} (say): asked: not a service of ${catalogs.join(", ") || "no catalog"}: ${unknown.join(", ")}`);
+    }
+    const start = head.start && parseStart(head.start, catalogs);
+    const lang = (head.lang as Lang | undefined) ?? DEFAULT_LANG;
+    return { ok: true, scenario: { name: head.name ?? fallbackName, lang, catalogs, ...(start ? { start } : {}), steps } };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
 }
 
 export const isSay = (s: Step): s is SayStep => "say" in s;
+
+/** Each start op must be a valid architect op that the board takes without a warning. */
+function parseStart(raw: { say: string; ops: unknown[] }, catalogs: string[]): ScenarioStart {
+  const ops = raw.ops.map((x, k) => {
+    const p = parseOp(x, catalogs, "architect");
+    if (!p.ok) throw new Error(`start.ops.${k}: ${p.error}`);
+    return p.op;
+  });
+  const start = { say: raw.say, ops };
+  const { warnings } = replayArchitect(startTimeline(start, 0), "Architecture");
+  if (warnings.length) throw new Error(`start: ${warnings.join("; ")}`);
+  return start;
+}
+
+/** The timeline a scenario's session begins with: its scripted start as turn 1, or nothing. */
+export function startTimeline(start: ScenarioStart | undefined, at: number): RecordTurn[] {
+  if (!start) return [];
+  return [{
+    kind: "turn", n: 1, text: start.say, model: SCRIPTED_MODEL, promptVersion: ARCHITECT_PROMPT_VERSION, startedAt: at, totalMs: 0,
+    ops: start.ops.map(({ name, input }) => ({ name, input })), warnings: [],
+    usage: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 }, costUsd: 0,
+  }];
+}
 
 /** The step as the table shows it. */
 export function stepText(s: Step): string {

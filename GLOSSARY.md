@@ -325,7 +325,7 @@ One run of architect mode, from start to reset: a sequence of turns and the appr
 _Avoid_: sesión de arquitecto, design session, conversation
 
 **Architect scenario**:
-A scripted architect session used to eval prompt changes: a list of steps, each a user message or a click named by meaning (accept or reject all or the newest, choose alternative A or B), some with expectations about the turn that follows.
+A scripted architect session used to eval prompt changes: a list of steps, each a user message or a click named by meaning (accept or reject all or the newest, choose alternative A or B), some with expectations about the turn that follows. It may begin with a scripted start turn that sets up the board without calling Claude.
 _Avoid_: test conversation, script, fixture
 
 **Session record**:

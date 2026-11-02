@@ -39,10 +39,25 @@ describe("parseScenario", () => {
     [[{ say: "x" }, { accept: "first" }], "step 2 (accept): accept: Invalid option"],
     [[{ say: "x" }, { choose: 3 }], "step 2 (choose): choose: Invalid input"],
     [[{ say: "x" }, { choose: 1, accept: "all" }], 'step 2 (accept): Unrecognized key: "choose"'],
+    [[{ say: "x", asked: ["sqs"] }], "step 1 (say): asked: asked needs expect ink"],
+    [[{ say: "x", expect: ["ink"], asked: ["sqs", "azure-blob"] }], "step 1 (say): asked: not a service of aws: azure-blob"],
+    [{ catalogs: [], steps: [{ say: "x", expect: ["ink"], asked: ["sqs"] }] }, "asked: not a service of no catalog: sqs"],
+    [{ start: { say: "x", ops: [{ name: "draw_cat", input: {} }] }, steps: [{ say: "y" }] }, "start.ops.0:"],
+    [{ start: { say: "x", ops: [{ name: "connect", input: { id: "c1", from: "a", to: "b" } }] }, steps: [{ say: "y" }] }, "start:"],
+    [{ start: { say: "x", ops: [] }, steps: [{ say: "y" }] }, "start.ops"],
   ])("rejects %j with a clear error", (x, error) => {
     const r = parseScenario(x, "f");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain(error);
+  });
+
+  it("reads a scripted start, after which a click may come first", () => {
+    const ops = [{ name: "propose", input: { id: "P1", label: "Core" } }, { name: "say", input: { text: "Core?" } }];
+    const r = parseScenario({ start: { say: "a web app", ops }, steps: [{ accept: "all" }, { say: "and a queue", expect: ["ink"], asked: ["sqs"] }] }, "f");
+    expect(r).toMatchObject({
+      ok: true,
+      scenario: { start: { say: "a web app", ops: [{ name: "propose", input: { id: "P1", label: "Core" } }, { name: "say", input: { text: "Core?" } }] }, steps: [{ accept: "all" }, { asked: ["sqs"] }] },
+    });
   });
 
   it("parses every committed scenario", () => {

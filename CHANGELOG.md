@@ -12,6 +12,7 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
   - The session autosaves in its own slot (live and architect mode never overwrite each other) and to `sessions/`. Switching modes wipes the board without asking; coming back offers to restore it, with pending pencil proposals and the bubble rail as they were. Export, import and clear work in architect mode too, and a file reopens in the mode it was saved in.
 - Session records are now version 3 and name their mode; version 2 files still open (as live sessions) and are written back as version 3.
 - `pnpm --filter @grafito/server eval architect <scenarios>` runs scripted architect sessions (6 English scenarios and a Spanish one) through Claude and checks each turn by rule: one bubble, one question at most, two alternatives at most, real Well-Architected ids, and ink, pencil, bubble-only or "keep these?" where the scenario expects it. Each run is saved as a session record you can import.
+  - Each scenario runs 3 times by default (`--runs N`), and a step passes when it passes in most of its runs; the table ends with each step's pass rate. The ink check accepts Claude's own pencil additions beside what you asked for, and a scenario can start from a scripted board (`start`).
 
 ## v0.2.0-alpha.6 · 2026-10-31
 

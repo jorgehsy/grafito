@@ -12,7 +12,7 @@ import { fileTimestamp } from "../../src/sessions";
 import { readSse } from "../sse";
 import { checkTurn, EVERY_TURN } from "./checks";
 import type { CheckName, TurnChecks } from "./checks";
-import { isSay, resolveClick, stepText } from "./scenario";
+import { isSay, resolveClick, SCRIPTED_MODEL, startTimeline, stepText } from "./scenario";
 import type { Scenario } from "./scenario";
 
 /** One row of the results table: one step of one run. */
@@ -21,6 +21,8 @@ export interface StepRow {
   run: number;
   step: number;
   text: string;
+  /** A click step's clicks on this run's ids, e.g. "accept P2". */
+  clicks?: string;
   /** A turn's checks; a click has none. */
   checks: TurnChecks;
   /** The turn's cost; null = included in plan; undefined for a click. */
@@ -51,7 +53,7 @@ function turnBody(sc: Scenario, replay: ArchitectReplay, text: string, model: st
 export async function runScenario(sc: Scenario, run: number, opts: { url: string; model: string; fetchImpl?: typeof fetch }): Promise<ScenarioRun> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const startedAt = Date.now();
-  const timeline: TimelineEntry[] = [];
+  const timeline: TimelineEntry[] = startTimeline(sc.start, startedAt);
   const rows: StepRow[] = [];
   const now = () => replayArchitect(timeline, zoneTitle(sc.lang));
 
@@ -63,7 +65,7 @@ export async function runScenario(sc: Scenario, run: number, opts: { url: string
     if (!isSay(step)) {
       const r = resolveClick(board, step);
       if (!r.ok) { row.error = `click: ${r.error}`; continue; }
-      row.text += ` (${r.actions.map((a) => `${a.type} ${a.proposal}`).join(", ")})`;
+      row.clicks = r.actions.map((a) => `${a.type} ${a.proposal}`).join(", ");
       for (const a of r.actions) timeline.push({ kind: "click", ...a, at: Date.now() });
       continue;
     }
@@ -101,12 +103,12 @@ export async function runScenario(sc: Scenario, run: number, opts: { url: string
     turn.usage = recordUsage(usage);
     turn.costUsd = usd ?? 0;
     timeline.push(turn);
-    row.checks = checkTurn(ops, { before: board, expect: step.expect ?? [] });
+    row.checks = checkTurn(ops, { before: board, expect: step.expect ?? [], asked: step.asked });
     row.usd = usd;
     if (turn.error) row.error = turn.error;
   }
 
-  const turns = timeline.filter((e): e is RecordTurn => e.kind === "turn" && !e.error);
+  const turns = timeline.filter((e): e is RecordTurn => e.kind === "turn" && !e.error && e.model !== SCRIPTED_MODEL);
   const record: ArchitectRecord = {
     version: RECORD_VERSION, appMode: "architect", id: recordId(sc.name, run, startedAt), startedAt, updatedAt: Date.now(),
     model: opts.model, speechLang: sc.lang, summary: now().board.summary, timeline,
@@ -133,12 +135,14 @@ export function saveRecord(rec: ArchitectRecord, dir: string): string {
  * Claude had drawn nothing and said nothing so far. Clicks are only named: nothing exists to resolve them on.
  */
 export function dryScenario(sc: Scenario): string {
-  const { board } = replayArchitect([], zoneTitle(sc.lang));
+  const { board, turns } = replayArchitect(startTimeline(sc.start, 0), zoneTitle(sc.lang));
   const lines = [`===== ${sc.name} (${sc.lang}, catalogs: ${sc.catalogs.join(", ") || "none"})`, "--- SYSTEM (last block) ---", architectSystemPrompt({ catalogs: sc.catalogs, lang: sc.lang }).at(-1)!.text];
-  const recent: { text: string; bubble: string }[] = [];
+  const recent = turns.map((t) => ({ text: t.entry.text, bubble: lastSay(t.ops)?.text ?? "" }));
+  if (sc.start) lines.push(`\n--- START (scripted, not sent): ${sc.start.say} ---`);
   for (const [k, step] of sc.steps.entries()) {
     if (!isSay(step)) { lines.push(`\n--- STEP ${k + 1}: click ${stepText(step)} (resolved at run time) ---`); continue; }
-    const expect = step.expect?.length ? ` [expect ${step.expect.join(", ")}]` : "";
+    const asked = step.asked ? `, asked ${step.asked.join(", ")}` : "";
+    const expect = step.expect?.length ? ` [expect ${step.expect.join(", ")}${asked}]` : "";
     lines.push(`\n--- STEP ${k + 1}: USER TEXT${expect} ---`);
     lines.push(buildArchitectUserText({ board: serializeBoard(board, { catalog: sc.catalogs.length > 0 }), summary: board.summary, recent: recent.slice(-RECENT_TURNS), text: step.say }));
     recent.push({ text: step.say, bubble: "" });
@@ -158,8 +162,44 @@ export const rowFailed = (r: StepRow) => !!r.error || Object.values(r.checks).so
 const cost = (r: StepRow) => (r.usd === undefined ? "-" : r.usd === null ? "included in plan" : `$${r.usd.toFixed(4)}`);
 const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\s+/g, " ");
 const short = (s: string) => (s.length > 48 ? `${s.slice(0, 47)}…` : s);
+const rowText = (r: StepRow) => (r.clicks ? `${r.text} (${r.clicks})` : r.text);
 
-/** The results table (Markdown), then one line per failure or n/a with its reason. */
+/** Runs per scenario unless `--runs` says otherwise. */
+export const DEFAULT_RUNS = 3;
+
+/** One scenario step over all its runs. */
+export interface StepVerdict {
+  scenario: string;
+  step: number;
+  text: string;
+  runs: number;
+  passed: number;
+  /** Per failing check (or "error"), in how many runs it failed. */
+  failing: Partial<Record<CheckName | "error", number>>;
+  pass: boolean;
+}
+
+/**
+ * A step passes when it passes in most of its runs: one answer from a model is one sample, so a single run says
+ * little either way (#58). The rates stay in the table, so a step that passes 2 of 3 still shows its 1 failure.
+ */
+export function stepVerdicts(rows: readonly StepRow[]): StepVerdict[] {
+  const byStep = new Map<string, StepVerdict>();
+  for (const r of rows) {
+    const key = `${r.scenario}\u0000${r.step}`;
+    const v = byStep.get(key) ?? { scenario: r.scenario, step: r.step, text: r.text, runs: 0, passed: 0, failing: {}, pass: false };
+    byStep.set(key, v);
+    v.runs++;
+    if (!rowFailed(r)) v.passed++;
+    const failed = [...(r.error ? ["error" as const] : []), ...(Object.keys(r.checks) as CheckName[]).filter((n) => r.checks[n]?.pass === false)];
+    for (const n of failed) v.failing[n] = (v.failing[n] ?? 0) + 1;
+  }
+  const verdicts = [...byStep.values()];
+  for (const v of verdicts) v.pass = v.passed * 2 > v.runs;
+  return verdicts;
+}
+
+/** The results table (Markdown), one row per step and run, then one line per failure or n/a with its reason, then the per-step pass rates. */
 export function formatTable(rows: readonly StepRow[]): string {
   const out = [
     `| Scenario | Run | Step | Input | ${COLUMNS.map((c) => c.title).join(" | ")} | Expect | Result | Cost |`,
@@ -169,7 +209,7 @@ export function formatTable(rows: readonly StepRow[]): string {
   for (const r of rows) {
     const expect = (Object.keys(r.checks) as CheckName[]).filter((n) => !(EVERY_TURN as readonly string[]).includes(n)).map((n) => `${n} ${mark(r.checks[n])}`).join(", ") || "-";
     const turn = Object.keys(r.checks).length > 0;
-    out.push(`| ${r.scenario} | ${r.run} | ${r.step} | ${cell(short(r.text))} | ${COLUMNS.map((c) => (turn ? mark(r.checks[c.name]) : "-")).join(" | ")} | ${expect} | ${rowFailed(r) ? "FAIL" : "pass"} | ${cost(r)} |`);
+    out.push(`| ${r.scenario} | ${r.run} | ${r.step} | ${cell(short(rowText(r)))} | ${COLUMNS.map((c) => (turn ? mark(r.checks[c.name]) : "-")).join(" | ")} | ${expect} | ${rowFailed(r) ? "FAIL" : "pass"} | ${cost(r)} |`);
     const at = `${r.scenario} run ${r.run} step ${r.step}`;
     if (r.error) notes.push(`${at}: ${r.error}`);
     for (const [n, c] of Object.entries(r.checks)) if (c?.detail) notes.push(`${at}: ${n} ${mark(c)}: ${c.detail}`);
@@ -177,6 +217,18 @@ export function formatTable(rows: readonly StepRow[]): string {
   const turns = rows.filter((r) => r.usd !== undefined);
   const priced = turns.filter((r) => typeof r.usd === "number");
   const total = priced.length ? `Total USD ${priced.reduce((a, r) => a + (r.usd ?? 0), 0).toFixed(4)}` : turns.length ? "Cost included in plan" : "";
-  const failedRows = rows.filter(rowFailed).length;
-  return [...out, ...(notes.length ? ["", ...notes] : []), "", `${failedRows ? `${failedRows} of ${rows.length} steps failed` : `All ${rows.length} steps passed`}. ${total}`.trim()].join("\n");
+  const verdicts = stepVerdicts(rows);
+  const rates = [
+    "| Scenario | Step | Input | Passed | Failing checks | Result |",
+    "|---|---|---|---|---|---|",
+    ...verdicts.map((v) => {
+      const failing = Object.entries(v.failing).map(([n, k]) => `${n} ${k}/${v.runs}`).join(", ") || "-";
+      return `| ${v.scenario} | ${v.step} | ${cell(short(v.text))} | ${v.passed}/${v.runs} | ${failing} | ${v.pass ? "pass" : "FAIL"} |`;
+    }),
+  ];
+  const failedSteps = verdicts.filter((v) => !v.pass).length;
+  const verdict = failedSteps ? `${failedSteps} of ${verdicts.length} steps failed` : `All ${verdicts.length} steps passed`;
+  const runs = Math.max(...verdicts.map((v) => v.runs));
+  const rule = runs > 1 ? " (a step passes when it passes in most of its runs)" : "";
+  return [...out, ...(notes.length ? ["", ...notes] : []), "", ...rates, "", `${verdict}${rule}. ${total}`.trim()].join("\n");
 }

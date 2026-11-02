@@ -1,5 +1,5 @@
 [
-  { "say": "Draw an S3 bucket for user uploads behind a CloudFront distribution.", "expect": ["ink"] },
+  { "say": "Draw an S3 bucket for user uploads behind a CloudFront distribution.", "expect": ["ink"], "asked": ["cloudfront", "s3"] },
   { "say": "Now write the Terraform code for this.", "expect": ["bubbleOnly"] },
   { "say": "Actually, can we run all of this on Azure instead?", "expect": ["bubbleOnly"] }
 ]

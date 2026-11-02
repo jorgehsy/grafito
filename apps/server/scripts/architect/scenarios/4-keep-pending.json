@@ -1,6 +1,28 @@
-[
-  { "say": "I want to build a photo sharing app.", "expect": ["pencil"] },
-  { "say": "Photos must never be lost.", "expect": ["pencil"] },
-  { "say": "Photos should load fast for users all over the world.", "expect": ["pencil"] },
-  { "say": "Moderators need to review reported photos.", "expect": ["asksKeep"] }
-]
+{
+  "start": {
+    "say": "I want to build a photo sharing app. Photos must never be lost, and users sign in.",
+    "ops": [
+      { "name": "propose", "input": { "id": "P1", "label": "Photo app core" } },
+      { "name": "add_component", "input": { "zone": "system", "id": "app", "label": "Mobile app", "type": "client", "proposal": "P1" } },
+      { "name": "add_component", "input": { "zone": "system", "id": "api", "label": "API", "type": "service", "service": "api-gateway", "proposal": "P1" } },
+      { "name": "add_component", "input": { "zone": "system", "id": "fn", "label": "Photo logic", "type": "service", "service": "lambda", "proposal": "P1" } },
+      { "name": "add_component", "input": { "zone": "system", "id": "photos", "label": "Photos", "type": "storage", "service": "s3", "proposal": "P1" } },
+      { "name": "add_component", "input": { "zone": "system", "id": "meta", "label": "Photo metadata", "type": "database", "service": "dynamodb", "proposal": "P1" } },
+      { "name": "connect", "input": { "id": "c1", "from": "app", "to": "api", "proposal": "P1" } },
+      { "name": "connect", "input": { "id": "c2", "from": "api", "to": "fn", "proposal": "P1" } },
+      { "name": "connect", "input": { "id": "c3", "from": "fn", "to": "photos", "label": "stores", "proposal": "P1" } },
+      { "name": "connect", "input": { "id": "c4", "from": "fn", "to": "meta", "label": "reads/writes", "proposal": "P1" } },
+      { "name": "propose", "input": { "id": "P2", "label": "Photo safety copy" } },
+      { "name": "add_component", "input": { "zone": "system", "id": "replica", "label": "Replica bucket (other Region)", "type": "storage", "service": "s3", "proposal": "P2" } },
+      { "name": "connect", "input": { "id": "c5", "from": "photos", "to": "replica", "label": "replicates", "proposal": "P2" } },
+      { "name": "propose", "input": { "id": "P3", "label": "Sign-in" } },
+      { "name": "add_component", "input": { "zone": "system", "id": "auth", "label": "User sign-in", "type": "service", "service": "cognito", "proposal": "P3" } },
+      { "name": "connect", "input": { "id": "c6", "from": "app", "to": "auth", "label": "signs in", "proposal": "P3" } },
+      { "name": "say", "input": { "text": "I sketched the core, a replica bucket in another Region and user sign-in. Are photos public, or only for friends?", "target": "P1" } },
+      { "name": "update_summary", "input": { "text": "Photo sharing app. Proposed the core (P1), a cross-Region replica (P2) and sign-in (P3); all pending." } }
+    ]
+  },
+  "steps": [
+    { "say": "Moderators need to review reported photos.", "expect": ["asksKeep"] }
+  ]
+}

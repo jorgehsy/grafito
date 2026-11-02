@@ -1,5 +1,5 @@
 [
-  { "say": "Draw a web app: Route 53, CloudFront, an Application Load Balancer, EC2 app servers and one RDS database.", "expect": ["ink"] },
+  { "say": "Draw a web app: Route 53, CloudFront, an Application Load Balancer, EC2 app servers and one RDS database.", "expect": ["ink"], "asked": ["route-53", "cloudfront", "elb", "ec2", "rds"] },
   { "say": "That's the whole design. Review it.", "expect": ["review"] },
   { "say": "Next gap.", "expect": ["review"] }
 ]

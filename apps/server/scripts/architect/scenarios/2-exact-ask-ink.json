@@ -1,4 +1,4 @@
 [
-  { "say": "Draw an API Gateway in front of a Lambda function that writes to a DynamoDB table.", "expect": ["ink"] },
-  { "say": "Add an SQS queue between the Lambda function and a second Lambda that sends emails.", "expect": ["ink"] }
+  { "say": "Draw an API Gateway in front of a Lambda function that writes to a DynamoDB table.", "expect": ["ink"], "asked": ["api-gateway", "lambda", "dynamodb"] },
+  { "say": "Add an SQS queue between the Lambda function and a second Lambda that sends emails.", "expect": ["ink"], "asked": ["sqs", "lambda"] }
 ]

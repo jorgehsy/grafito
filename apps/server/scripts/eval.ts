@@ -17,7 +17,7 @@ import type { Clients } from "../src/routes/turn";
 import { DEFAULT_DIR } from "../src/sessions";
 import { languageLine } from "../src/prompt/system";
 import { buildUserText } from "../src/prompt/user-text";
-import { dryScenario, formatTable, rowFailed, runScenario, saveRecord } from "./architect/run";
+import { DEFAULT_RUNS, dryScenario, formatTable, runScenario, saveRecord, stepVerdicts } from "./architect/run";
 import type { StepRow } from "./architect/run";
 import { parseScenario } from "./architect/scenario";
 import type { Scenario } from "./architect/scenario";
@@ -42,10 +42,11 @@ Commands:
       --json    also write the results, labels included, to a file
   architect <scenario.json | dir>... [--dry] [--runs N] [--out <dir>] [--model <id>]
       Run architect scenarios (scripted architect sessions) through POST /api/architect and end with a
-      table: one row per step and run, pass/fail per check, cost. Exits non-zero if any check fails.
+      table: one row per step and run, pass/fail per check, cost, then each step's pass rate over its runs.
+      A step passes when it passes in most of its runs; exits non-zero if any step fails.
       Each run is saved as an architect session record, openable in the app (Import).
       --dry     print the language line and the user text of each step only, without calling Claude
-      --runs N  run each scenario N times (default 1)
+      --runs N  run each scenario N times (default ${DEFAULT_RUNS}: one answer from a model is one sample)
       --out     where the records go (default apps/server/sessions, the app's saved sessions)
   All three accept --model <id>: the model to run (default ${EVAL_MODEL}; ${ARCHITECT_DEFAULT_MODEL} for architect).
       Models: ${MODELS.map((m) => m.id).join(", ")}.
@@ -289,7 +290,7 @@ if (command === "instruction") {
   if (!positional.length) fail(USAGE);
   MODEL = ARCHITECT_DEFAULT_MODEL;
   pickModel(values["--model"]);
-  const runs = values["--runs"] === undefined ? 1 : Number(values["--runs"]);
+  const runs = values["--runs"] === undefined ? DEFAULT_RUNS : Number(values["--runs"]);
   if (!Number.isInteger(runs) || runs < 1) fail(`--runs must be a whole number of at least 1, got ${String(values["--runs"])}`);
   const out = typeof values["--out"] === "string" ? resolve(values["--out"]) : DEFAULT_DIR;
   const scenarios = jsonFiles(positional).map(loadScenario);
@@ -310,7 +311,7 @@ if (command === "instruction") {
     }
     console.log(`\n--- RESULTS (${MODEL}) ---`);
     console.log(formatTable(rows));
-    if (rows.some(rowFailed)) process.exitCode = 1;
+    if (stepVerdicts(rows).some((v) => !v.pass)) process.exitCode = 1;
   }
 } else if (command === "convert-v1") {
   const { positional, values } = parseArgs(args, { "--out": true });
