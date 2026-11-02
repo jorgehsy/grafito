@@ -26,7 +26,7 @@ function parseRecent(raw: unknown): RecentTurn[] | null {
  * `POST /api/architect`: one architect turn. Same SSE events, adapters and retry rule as `POST /api/board`,
  * with the architect prompt and op set. Body: `text` (required), `board`, `summary`, `recent`, `actions`
  * (proposals the user accepted or rejected by click since the last turn), `model`, `lang`, `catalogs`. An
- * unknown or unavailable model falls back to `ARCHITECT_DEFAULT_MODEL`.
+ * unknown or unavailable model falls back to `ARCHITECT_DEFAULT_MODEL` (to `DEFAULT_MODEL` for a plan Sonnet).
  */
 export function createArchitectHandler(clients: Clients) {
   return async function architectHandler(req: Request, res: Response) {

@@ -30,6 +30,17 @@ export const ARCHITECT_DEFAULT_MODEL = SONNET.id;
 /** The model the eval runs against. */
 export const EVAL_MODEL = SONNET.id;
 
+/**
+ * What a request for `requested` runs on when that model is not available: the mode's `fallback`, unless that
+ * is the paid API twin of a requested plan model; then `DEFAULT_MODEL` (ADR 0004).
+ */
+export function fallbackModel(requested: unknown, fallback: string): string {
+  const want = MODELS.find((m) => m.id === requested);
+  const twin = MODELS.find((m) => m.id === fallback);
+  const paidTwin = want?.provider === "claude-subscription" && twin?.provider === "anthropic-api" && twin.apiModel === want.apiModel;
+  return paidTwin ? DEFAULT_MODEL : fallback;
+}
+
 export const isModelId = (id: unknown): id is string => MODELS.some((m) => m.id === id);
 /** `null` for subscription models; unknown ids are priced as HAIKU. */
 export const priceOf = (id: string): Price | null => (MODELS.find((m) => m.id === id) ?? HAIKU).price;

@@ -152,6 +152,13 @@ describe("POST /api/architect", () => {
     expect(evs.at(-1)!.data).toMatchObject({ model: "claude-sonnet-5-5@subscription" });
   });
 
+  it("a plan Sonnet with the switch off falls back to the default, never to its API twin (ADR 0004)", async () => {
+    const api = fakeClaude([s3Turn]);
+    const evs = await post(api, { text: "hi", model: "claude-sonnet-5-5@subscription" });
+    expect(api.calls[0].params.model).toBe("claude-haiku-5-5");
+    expect(evs.at(-1)!.data).toMatchObject({ model: "claude-haiku-5-5" });
+  });
+
   it("shows Claude the clicks since the last turn; none and absent are the same", async () => {
     const fake = fakeClaude([s3Turn]);
     await post(fake, { text: "and a queue", actions: [{ type: "accept", proposal: "P3" }, { type: "reject", proposal: "P4" }] });
