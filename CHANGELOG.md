@@ -4,6 +4,8 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 
 ## Unreleased
 
+- Flow and system diagrams pick left-to-right or top-to-bottom from what they mean, no longer from their width: Claude says which when it creates the zone (a sequence runs across, layers and peers stack so peers share a row), and without it a long chain runs across and a fan of peers runs down. Prompt version 3.
+
 ## v0.2.0-alpha.7 · 2026-11-02
 
 - **Architect mode**: design an AWS architecture with Claude. Press the new compass button in the toolbar (next to live and demo) or open `?mode=architect`. You start on a blank board with one system zone and type in one text box at the bottom; Claude draws in the system zone and answers in a short speech bubble (Sonnet 5.5 by default; `POST /api/architect`).

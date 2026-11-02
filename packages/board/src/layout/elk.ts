@@ -1,7 +1,7 @@
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { Connection, Element, Group, Zone } from "../model";
 import { placeLabel } from "./edges";
-import { GROUP_HEAD, GROUP_PAD, elementSize, emphasisRect, groupHeaderRect, groupMinSize, labelRect, overlaps, union } from "./geometry";
+import { GROUP_HEAD, GROUP_PAD, elementSize, emphasisRect, groupHeaderRect, groupMinSize, labelRect, overlaps } from "./geometry";
 import type { Pt, Rect, ZoneLocal } from "./types";
 
 const elk = new ELK();
@@ -16,8 +16,7 @@ const ROOT_ONLY = ["elk.layered.considerModelOrder.strategy", "elk.layered.cycle
 // group's box comes from its children and arrows cross group borders. What we found about the existing options:
 // - NETWORK_SIMPLEX node placement works inside groups, also at several levels.
 // - separateConnectedComponents is ignored at every level once INCLUDE_CHILDREN is on (componentComponent spacing
-//   never shows): unconnected parts share the layers like one graph. That is why a grouped zone always tries both
-//   directions and keeps the one closer to the target aspect (layoutElkBest).
+//   never shows): unconnected parts share the layers like one graph.
 // - The two model-order options crash when set on a group (ROOT_ONLY); on the root they still order the run.
 // - A group's minimum size is applied transposed when the direction is DOWN (handled where the node is built).
 // Coordinates come back in the root's frame (elk.json.shapeCoords/edgeCoords = ROOT), so nothing is re-offset.
@@ -110,24 +109,37 @@ export async function layoutElk(zone: Zone, elements: Element[], connections: Co
   return out;
 }
 
-/** Width/height ratio we aim for: that of a landscape screen. */
-const TARGET_ASPECT = 1.6;
-/** Below this width, left→right is always fine (it reads better). */
-const MAX_RIGHT_W = 1000;
-function contentBox(z: ZoneLocal): Rect {
-  return union([...Object.values(z.elements), ...Object.values(z.groups ?? {}), ...Object.values(z.connections).flatMap((g) => (g.label ? [labelRect(g.label)] : []))]);
-}
-const aspectMiss = (r: Rect) => Math.abs(Math.log(r.w / Math.max(1, r.h) / TARGET_ASPECT));
+type ElkDir = "RIGHT" | "DOWN";
 
-/** Left→right unless it ends up too wide and top→bottom makes better use of the available height. */
-/** With groups both directions are always tried: components cannot be packed apart (see layoutElk). */
-async function layoutElkBest(zone: Zone, elements: Element[], connections: Connection[], extraObs: Rect[], dir: "RIGHT" | "DOWN" | undefined, groups: Group[]): Promise<ZoneLocal> {
-  if (dir) return layoutElk(zone, elements, connections, extraObs, dir, groups);
-  const right = await layoutElk(zone, elements, connections, extraObs, "RIGHT", groups);
-  const rb = contentBox(right);
-  if (rb.w <= MAX_RIGHT_W && !groups.length) return right;
-  const down = await layoutElk(zone, elements, connections, extraObs, "DOWN", groups);
-  return aspectMiss(contentBox(down)) < aspectMiss(rb) ? down : right;
+/**
+ * Direction from the shape of the graph when Claude gave none: a long chain reads left to right, a fan of peers
+ * reads top to bottom with the peers in a row. Depth is the longest path in arrows (an arrow back to an earlier
+ * element is a loop and is skipped, as ELK's MODEL_ORDER cycle breaking does); breadth is the most elements at
+ * one depth. A tie stays left to right. No pixel sizes take part, so the answer does not change with the screen.
+ */
+export function directionFromShape(elements: Element[], connections: Connection[]): ElkDir {
+  if (!elements.length) return "RIGHT";
+  const order = new Map(elements.map((e, i) => [e.id, i]));
+  const incoming = new Map<string, string[]>();
+  for (const c of connections) {
+    const a = order.get(c.from), b = order.get(c.to);
+    if (a === undefined || b === undefined || a >= b) continue;
+    incoming.set(c.to, [...(incoming.get(c.to) ?? []), c.from]);
+  }
+  const depth = new Map<string, number>();
+  for (const e of elements) depth.set(e.id, Math.max(0, ...(incoming.get(e.id) ?? []).map((p) => depth.get(p)! + 1)));
+  const perDepth = new Map<number, number>();
+  for (const d of depth.values()) perDepth.set(d, (perDepth.get(d) ?? 0) + 1);
+  const levels = perDepth.size, breadth = Math.max(...perDepth.values());
+  return breadth > levels ? "DOWN" : "RIGHT";
+}
+
+const ELK_DIR = { horizontal: "RIGHT", vertical: "DOWN" } as const;
+
+/** Claude's direction for the zone when it gave one; otherwise the one the graph's shape suggests. */
+function layoutElkBest(zone: Zone, elements: Element[], connections: Connection[], extraObs: Rect[], dir: ElkDir | undefined, groups: Group[]): Promise<ZoneLocal> {
+  const chosen = dir ?? (zone.direction ? ELK_DIR[zone.direction] : directionFromShape(elements, connections));
+  return layoutElk(zone, elements, connections, extraObs, chosen, groups);
 }
 
 /** The emphasis circle depends on the final position: computed with a first ELK pass. */

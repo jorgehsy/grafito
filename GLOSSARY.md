@@ -152,6 +152,10 @@ _Avoid_: resumen, recap, context
 The fill color a zone gets from its creation order; the user can name a zone by its color.
 _Avoid_: hue, color index, color de zona
 
+**Zone direction**:
+Which way the arrows run in a flow or system zone: horizontal (left to right, peers stacked in a column) or vertical (top to bottom, peers side by side in a row). Claude gives it when a zone is created, from the meaning; without it the layout picks one from the shape of the graph (a long chain is horizontal, a fan of peers wider than it is deep is vertical).
+_Avoid_: orientation, rankdir, aspect
+
 **Placement hint**:
 An optional "right of" or "below" another zone, given when a zone is created; the only say Claude has in where things go.
 _Avoid_: place, posición, coordinates

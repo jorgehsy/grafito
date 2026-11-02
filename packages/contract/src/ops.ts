@@ -50,6 +50,12 @@ const INPUTS = {
     min_label: str("Scale only: label of the left end of the bar (default '0%').").optional(),
     max_label: str("Scale only: label of the right end of the bar (default '100%').").optional(),
     center_label: str("Cycle only: text in the center of the cycle, what cycles (e.g. 'Context window').").optional(),
+    direction: z
+      .enum(["horizontal", "vertical"])
+      .describe(
+        "Flow and system only: which way the arrows run. horizontal = left to right, elements at the same level stack in a column (a sequence of steps). vertical = top to bottom, elements at the same level sit side by side in a row (layers such as users, frontend, services, data). Omit it when the meaning does not decide: the board picks one from the shape of the graph.",
+      )
+      .optional(),
     place: z
       .strictObject({ relation: z.enum(["right_of", "below"]), of: id("Id of the reference zone.") })
       .describe("Optional placement hint relative to another zone.")

@@ -4,7 +4,7 @@
 import { z } from "zod";
 
 /** Bump when the system prompt or the tools Claude sees change; each request records it. */
-export const PROMPT_VERSION = 2;
+export const PROMPT_VERSION = 3;
 
 /**
  * Architect mode's own counter, stamped in each architect turn's `promptVersion` (the record's `appMode` says
