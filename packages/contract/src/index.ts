@@ -1,5 +1,5 @@
-export { ZONE_KINDS, op } from "./ops";
-export type { ComponentType, EmphasisStyle, MarkTone, Op, OpInputs, OpName, OpSet, TextField, ZoneKind } from "./ops";
+export { GROUP_KINDS, ZONE_KINDS, op } from "./ops";
+export type { ComponentType, EmphasisStyle, GroupKind, MarkTone, Op, OpInputs, OpName, OpSet, TextField, ZoneKind } from "./ops";
 export { normalizeCatalogs, parseOp, toolDefs } from "./parse";
 export type { ParsedOp, ToolDef } from "./parse";
 export { ARCHITECT_DEFAULT_MODEL, DEFAULT_MODEL, EVAL_MODEL, MODELS, isModelId, priceOf } from "./models";

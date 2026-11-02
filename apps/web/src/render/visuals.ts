@@ -3,8 +3,9 @@ import rough from "roughjs";
 import type { Options } from "roughjs/bin/core";
 import type { Drawable } from "roughjs/bin/core";
 import type { Geom, RenderItem } from "@grafito/board";
-import { LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "@grafito/board";
-import { BLUE, OUTLINES, FILLS, FONT_FAMILY, INK, PAPER, RED, TONES } from "@grafito/board";
+import { GROUP_ICON, GROUP_LABEL_SIZE, LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "@grafito/board";
+import { BLUE, GROUP_STYLES, OUTLINES, FILLS, FONT_FAMILY, INK, PAPER, RED, TONES } from "@grafito/board";
+import type { GroupKind } from "@grafito/contract";
 import { addServiceIcon } from "./stamp";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -17,6 +18,9 @@ export function hash(s: string): number {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0) % 2147483646 + 1;
 }
+
+/** Line style: solid (false), dashed (true) or dotted ("dot"). */
+type Dash = boolean | "dot";
 
 export interface Stroke { anim: SVGPathElement; show: SVGPathElement; len: number }
 export interface TextRun { node: SVGTextElement; chars: SVGTSpanElement[]; offsets: number[] }
@@ -47,7 +51,7 @@ class Builder {
   seed(part: string) { return hash(this.key + ":" + part); }
 
   /** Adds a rough Drawable: outline strokes (as independent segments) and fill. */
-  shape(d: Drawable, o: { stroke: string; width: number; dash?: boolean; fill?: string; fillOpacity?: number }) {
+  shape(d: Drawable, o: { stroke: string; width: number; dash?: Dash; fill?: string; fillOpacity?: number }) {
     for (const p of gen.toPaths(d)) {
       if (p.fill && p.fill !== "none") {
         const f = svgEl("path", { d: p.d, fill: p.fill, stroke: "none", opacity: o.fillOpacity ?? 1 });
@@ -56,11 +60,11 @@ class Builder {
         const f = svgEl("path", { d: p.d, fill: "none", stroke: p.stroke, "stroke-width": p.strokeWidth, "stroke-linecap": "round", opacity: o.fillOpacity ?? 1 });
         this.v.g.appendChild(f); this.v.fills.push(f);
       } else {
-        for (const sub of p.d.split(/(?=M)/)) if (sub.trim()) this.stroke(sub, o.stroke, o.width, !!o.dash);
+        for (const sub of p.d.split(/(?=M)/)) if (sub.trim()) this.stroke(sub, o.stroke, o.width, o.dash ?? false);
       }
     }
   }
-  stroke(d: string, color: string, width: number, dash: boolean) {
+  stroke(d: string, color: string, width: number, dash: Dash) {
     const base = { d, fill: "none", stroke: color, "stroke-width": width, "stroke-linecap": "round", "stroke-linejoin": "round" };
     if (!dash) {
       const p = svgEl("path", base);
@@ -75,11 +79,11 @@ class Builder {
     const mp = svgEl("path", { d, fill: "none", stroke: PAPER, "stroke-width": width + 8, "stroke-linecap": "round" });
     mask.appendChild(mp);
     this.defs.appendChild(mask);
-    const shown = svgEl("path", { ...base, "stroke-dasharray": "9 7", mask: `url(#${id})` });
+    const shown = svgEl("path", { ...base, "stroke-dasharray": dash === "dot" ? "1 7" : "9 7", mask: `url(#${id})` });
     this.v.g.appendChild(shown);
     this.v.strokes.push({ anim: mp, show: shown, len: 0 });
   }
-  rough(kind: "rect" | "ellipse" | "poly" | "path" | "line" | "curve", part: string, args: any[], o: Options, style: { stroke: string; width: number; dash?: boolean; fill?: string; fillOpacity?: number }) {
+  rough(kind: "rect" | "ellipse" | "poly" | "path" | "line" | "curve", part: string, args: any[], o: Options, style: { stroke: string; width: number; dash?: Dash; fill?: string; fillOpacity?: number }) {
     const opts: Options = { roughness: 1.3, bowing: 1.2, seed: this.seed(part), strokeWidth: style.width, stroke: style.stroke, ...o };
     opts.roughness = (opts.roughness ?? 1.3) * ROUGH_SCALE;
     opts.bowing = (opts.bowing ?? 1.2) * ROUGH_SCALE;
@@ -148,9 +152,37 @@ function star(w: number): [number, number][] {
   return pts;
 }
 
+/**
+ * The corner icon of a group: a square in the kind's colour with a white glyph, hand-drawn. packages/icons has
+ * none of AWS's group icons (and AWS has none for an Availability Zone or a generic group), so every kind gets
+ * a simple drawn stand-in: cloud, flag, cloud with a lock, "AZ", open or closed padlock, a plain frame.
+ */
+function groupIcon(b: Builder, kind: GroupKind, color: string) {
+  const s = GROUP_ICON, x0 = 2, y0 = 2;
+  b.rough("rect", "icon", [x0, y0, s, s], { fillStyle: "solid", roughness: 0.6 }, { stroke: color, width: 1.6, fill: color });
+  const w = { stroke: PAPER, width: 1.8 };
+  const at = (x: number, y: number) => `${x0 + x * s} ${y0 + y * s}`;
+  const cloud = `M${at(0.24, 0.7)} C${at(0.08, 0.7)} ${at(0.1, 0.46)} ${at(0.28, 0.47)} C${at(0.3, 0.26)} ${at(0.56, 0.24)} ${at(0.6, 0.4)} C${at(0.74, 0.3)} ${at(0.92, 0.42)} ${at(0.84, 0.56)} C${at(0.94, 0.62)} ${at(0.9, 0.72)} ${at(0.78, 0.7)} Z`;
+  const lock = (open: boolean, cx: number, cy: number, k: number) => {
+    b.rough("rect", "lock", [x0 + (cx - 0.18 * k) * s, y0 + cy * s, 0.36 * k * s, 0.28 * k * s], { roughness: 0.4 }, w);
+    const lx = cx - 0.11 * k, rx = cx + 0.11 * k, top = cy - 0.2 * k;
+    b.rough("path", "shackle", [`M${at(lx, cy)} L${at(lx, top + 0.06 * k)} Q${at(cx, top - 0.06 * k)} ${at(rx, top + 0.06 * k)} L${at(rx, open ? top + 0.1 * k : cy)}`], { roughness: 0.4 }, w);
+  };
+  if (kind === "aws_cloud") b.rough("path", "glyph", [cloud], { roughness: 0.5 }, w);
+  else if (kind === "region") {
+    b.rough("line", "pole", [x0 + 0.3 * s, y0 + 0.2 * s, x0 + 0.3 * s, y0 + 0.82 * s], { roughness: 0.4 }, w);
+    b.rough("path", "flag", [`M${at(0.3, 0.22)} L${at(0.76, 0.32)} L${at(0.3, 0.5)}`], { roughness: 0.4 }, w);
+  } else if (kind === "vpc") {
+    b.rough("path", "glyph", [cloud], { roughness: 0.5 }, w);
+    lock(false, 0.5, 0.58, 0.7);
+  } else if (kind === "availability_zone") b.text(["AZ"], x0 + s / 2, y0 + s / 2 + 1, { size: 13, weight: 700, fill: PAPER });
+  else if (kind === "public_subnet" || kind === "private_subnet") lock(kind === "public_subnet", 0.5, 0.48, 1);
+  else b.rough("rect", "glyph", [x0 + 0.25 * s, y0 + 0.25 * s, 0.5 * s, 0.5 * s], { roughness: 0.4 }, w);
+}
+
 export function buildVisual(item: RenderItem, geom: Geom): Visual {
   const { w, h } = geom;
-  const translates = item.kind === "zone" || item.kind === "element" || item.kind === "emphasis" || item.kind === "question";
+  const translates = item.kind === "zone" || item.kind === "group" || item.kind === "element" || item.kind === "emphasis" || item.kind === "question";
   const b = new Builder(item.key, translates);
   const fill = item.hue >= 0 ? FILLS[item.hue] : "#F4E6A8";
   const outline = item.hue >= 0 ? OUTLINES[item.hue] : INK;
@@ -166,6 +198,15 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
       b.text([item.data.leftTitle ?? ""], (26 + item.data.divider) / 2, 84, { size: 22, weight: 600, fill: outline });
       b.text([item.data.rightTitle ?? ""], (item.data.divider + w - 26) / 2, 84, { size: 22, weight: 600, fill: outline });
     }
+  } else if (item.kind === "group") {
+    // AWS's look: border colour and line style per kind, icon in the top-left corner, label beside it.
+    // The faint tint carries its alpha in the colour, so the outline (same hue) is not mistaken for fill.
+    const kind = item.data.variant as GroupKind;
+    const look = GROUP_STYLES[kind] ?? GROUP_STYLES.generic;
+    b.v.g.dataset.depth = String(item.data.depth ?? 0);
+    b.rough("rect", "box", [2, 2, w - 4, h - 4], { roughness: 1.1, bowing: 0.8, fillStyle: "solid" }, { stroke: look.color, width: 2.2, dash: look.line === "solid" ? false : look.line === "dot" ? "dot" : true, fill: `${look.color}0A` });
+    groupIcon(b, kind, look.color);
+    b.text([item.data.title ?? ""], GROUP_ICON + 12, 2 + GROUP_ICON / 2, { size: GROUP_LABEL_SIZE, anchor: "start", weight: 600, fill: INK });
   } else if (item.kind === "element") {
     const lines = item.data.lines ?? [];
     const v = item.data.variant!;

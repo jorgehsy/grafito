@@ -24,14 +24,15 @@ export async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
       ? [...derivedConnections(board), ...board.connections].filter((c) => ids.has(c.from) && ids.has(c.to))
       : [];
   const circled = board.emphasis.filter((m) => m.style === "circle" && ids.has(m.target)).map((m) => m.target);
-  const key = JSON.stringify([zone.kind, zone.title, zone.leftTitle, zone.rightTitle, zone.minLabel, zone.maxLabel, zone.centerLabel, elements, connections, circled]);
+  const groups = zone.kind === "system" ? board.groups.filter((g) => g.zone === zone.id) : [];
+  const key = JSON.stringify([zone.kind, zone.title, zone.leftTitle, zone.rightTitle, zone.minLabel, zone.maxLabel, zone.centerLabel, elements, connections, circled, groups]);
   let content = cache.get(key);
   if (!content) {
     if (zone.kind === "scale") content = layoutScale(zone, elements);
     else if (zone.kind === "cycle") content = layoutCycle(zone, elements);
     else if (zone.kind === "timeline") content = layoutTimeline(zone, elements);
-    else if (!elements.length) content = { w: 0, h: 0, elements: {}, connections: {} };
-    else if (zone.kind === "flow" || zone.kind === "system") content = await layoutElkWithEmph(zone, elements, connections, circled);
+    else if (!elements.length && !groups.length) content = { w: 0, h: 0, elements: {}, connections: {} };
+    else if (zone.kind === "flow" || zone.kind === "system") content = await layoutElkWithEmph(zone, elements, connections, circled, groups);
     else if (zone.kind === "mindmap") content = layoutMindmap(elements);
     else if (zone.kind === "tree") content = layoutTree(elements);
     else content = layoutStack(zone, elements);
@@ -39,7 +40,7 @@ export async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
     cache.set(key, content);
   }
   // normalize: content starts at (0,0)
-  const all = [...Object.values(content.elements), ...Object.values(content.labels ?? {}), ...(content.scale ? [content.scale.bar] : [])];
+  const all = [...Object.values(content.elements), ...Object.values(content.groups ?? {}), ...Object.values(content.labels ?? {}), ...(content.scale ? [content.scale.bar] : [])];
   const box = union(all);
   const connectionPts = Object.values(content.connections).flatMap((e) => e.pts);
   const minX = Math.min(box.x, ...connectionPts.map((p) => p.x)), minY = Math.min(box.y, ...connectionPts.map((p) => p.y));
@@ -63,6 +64,7 @@ export async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
   if (content.labels) res.labels = Object.fromEntries(Object.entries(content.labels).map(([id, r]) => [id, { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h }]));
   if (content.scale) res.scale = { ...content.scale, bar: { ...content.scale.bar, x: content.scale.bar.x + ox, y: content.scale.bar.y + oy } };
   for (const [id, r] of Object.entries(content.elements)) res.elements[id] = { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h };
+  if (content.groups) res.groups = Object.fromEntries(Object.entries(content.groups).map(([id, r]) => [id, { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h }]));
   for (const [id, e] of Object.entries(content.connections))
     res.connections[id] = { kind: e.kind, pts: e.pts.map(sh), label: e.label ? { ...e.label, ...sh(e.label) } : undefined };
   return res;

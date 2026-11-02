@@ -10,7 +10,7 @@ export type SeqTask =
 export interface MoveTask { kind: "move"; key: string }
 export interface Diff { sequential: SeqTask[]; moves: MoveTask[] }
 
-const KIND_ORDER = ["zone", "element", "connection", "emphasis", "question", "callout"];
+const KIND_ORDER = ["zone", "group", "element", "connection", "emphasis", "question", "callout"];
 
 export function diffTrees(prev: RenderTree, next: RenderTree): Diff {
   const sequential: SeqTask[] = [];

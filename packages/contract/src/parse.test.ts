@@ -59,16 +59,26 @@ describe("toolDefs: the architect op set", () => {
   it("architect, AWS catalog on", async () => {
     await expect(JSON.stringify(toolDefs(["aws"], "architect"), null, 2) + "\n").toMatchFileSnapshot("./__snapshots__/tools.architect.aws.json");
   });
-  it("keeps the component, connection, label, delete and summary ops, adds say, and drops every zone op", () => {
-    expect(toolDefs([], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", "say", "update_summary"]);
-    expect(toolDefs(["aws"], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", "say", "set_service", "update_summary"]);
+  it("keeps the component, connection, label, delete and summary ops, adds say and the group ops, and drops every zone op", () => {
+    const own = ["say", "add_group", "set_parent"];
+    expect(toolDefs([], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", ...own, "update_summary"]);
+    expect(toolDefs(["aws"], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", ...own, "set_service", "update_summary"]);
   });
-  it("kept ops are the same tool definitions as in the board set", () => {
+  it("kept ops have the board set's inputs; add_component also takes a parent group", () => {
     const board = new Map(toolDefs(["aws"]).map((t) => [t.name, t]));
-    for (const t of toolDefs(["aws"], "architect")) if (t.name !== "say") expect(t).toEqual(board.get(t.name));
+    for (const t of toolDefs(["aws"], "architect")) {
+      const b = board.get(t.name);
+      if (!b) continue;
+      if (t.name === "add_component") {
+        const { parent, ...rest } = t.input_schema.properties;
+        expect(parent).toEqual({ type: "string", minLength: 1, description: expect.stringContaining("group") });
+        expect({ ...t.input_schema, properties: rest }).toEqual(b.input_schema);
+      } else expect(t.input_schema).toEqual(b.input_schema);
+    }
+    expect(board.get("add_component")!.input_schema.properties).not.toHaveProperty("parent");
   });
   it("the board set never shows architect ops and stays the default", () => {
-    expect(toolDefs([]).map((t) => t.name)).not.toContain("say");
+    for (const name of ["say", "add_group", "set_parent"]) expect(toolDefs(["aws"]).map((t) => t.name)).not.toContain(name);
     expect(toolDefs([], "board")).toBe(toolDefs([]));
     expect(toolDefs([], "architect")).toBe(toolDefs([], "architect"));
   });
@@ -185,6 +195,30 @@ describe("parseOp: op sets", () => {
       const r = arch(name, {});
       expect(r.ok ? null : r.error).toBe(`${name}: unknown tool "${name}"`);
     }
+  });
+  it("add_group: id, a known kind and a label; parent optional", () => {
+    expect(arch("add_group", { id: "vpc", kind: "vpc", label: "VPC" })).toEqual({ ok: true, op: { name: "add_group", input: { id: "vpc", kind: "vpc", label: "VPC" } } });
+    for (const kind of ["aws_cloud", "region", "vpc", "availability_zone", "public_subnet", "private_subnet", "generic"])
+      expect(arch("add_group", { id: "g", kind, label: "G", parent: "vpc" }).ok).toBe(true);
+    expect(error("add_group", { id: "g", kind: "vpc", label: "G" })).toBe('add_group: unknown tool "add_group"');
+    const r = arch("add_group", { id: "g", kind: "security_group", label: "SG" });
+    expect(r.ok ? null : r.error).toMatch(/^add_group: .*\(at \/kind\)$/);
+    expect(arch("add_group", { id: "g", kind: "vpc", label: " " }).ok).toBe(false);
+    expect(arch("add_group", { id: "g", kind: "vpc", label: "G", parent: "" }).ok).toBe(false);
+    expect(arch("add_group", { id: "g", kind: "vpc", label: "G", zone: "system" }).ok).toBe(false);
+  });
+  it("set_parent: a group id or null, never missing or blank", () => {
+    expect(arch("set_parent", { id: "db", parent: "az1" }).ok).toBe(true);
+    expect(arch("set_parent", { id: "db", parent: null })).toEqual({ ok: true, op: { name: "set_parent", input: { id: "db", parent: null } } });
+    expect(arch("set_parent", { id: "db" }).ok).toBe(false);
+    expect(arch("set_parent", { id: "db", parent: " " }).ok).toBe(false);
+    expect(arch("set_parent", { id: "", parent: null }).ok).toBe(false);
+    expect(error("set_parent", { id: "db", parent: null })).toBe('set_parent: unknown tool "set_parent"');
+  });
+  it("add_component takes a parent group only in architect mode", () => {
+    expect(arch("add_component", { zone: "system", id: "db", label: "DB", type: "database", parent: "az1" }).ok).toBe(true);
+    expect(arch("add_component", { zone: "system", id: "db", label: "DB", type: "database", parent: "" }).ok).toBe(false);
+    expect(ok("add_component", { zone: "system", id: "db", label: "DB", type: "database", parent: "az1" })).toBe(false);
   });
   it("kept ops validate as in live mode; set_service only with a catalog on", () => {
     expect(arch("add_component", { zone: "system", id: "b", label: "Bucket", type: "storage", service: "s3" }, ["aws"]).ok).toBe(true);

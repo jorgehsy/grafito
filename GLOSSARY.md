@@ -77,7 +77,7 @@ How a component is drawn: actor, client, service, database, queue, storage or ex
 _Avoid_: comp, component kind
 
 **Group**:
-An AWS boundary box inside a system zone that holds components and other groups: AWS Cloud, Region, VPC, Availability Zone or subnet. Groups nest; each component and each group has at most one parent group.
+An AWS boundary box inside a system zone that holds components and other groups: AWS Cloud, Region, VPC, Availability Zone, public or private subnet, or a generic one. Groups nest; each component and each group has at most one parent group. Arrows never join a group, and deleting one keeps what was inside it.
 _Avoid_: container (an ECS or Docker container is a component), box, boundary, zone
 
 **Node**:

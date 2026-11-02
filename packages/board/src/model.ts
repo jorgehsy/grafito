@@ -1,6 +1,7 @@
 // Pure board model. No React, no coordinates.
 import { qualifyService } from "@grafito/icons";
-import type { ComponentType, EmphasisStyle, MarkTone, Op, ZoneKind } from "@grafito/contract";
+import type { ComponentType, EmphasisStyle, GroupKind, MarkTone, Op, ZoneKind } from "@grafito/contract";
+import { ARCHITECT_ZONE_ID } from "./architect";
 
 export interface Zone {
   id: string;
@@ -28,6 +29,8 @@ export interface Element {
   /** Service icon prefixed with its catalog (`aws:lambda`). Independent of `icon`. */
   service?: string;
   comp?: ComponentType;
+  /** component: id of the group it sits in (architect mode). */
+  group?: string;
   after?: string;
   parent?: string;
   column?: "left" | "right";
@@ -38,6 +41,15 @@ export interface Element {
   when?: string;
   note?: string;
   tone?: MarkTone;
+}
+/** An AWS group (architect mode): a box in a system zone holding components and other groups. */
+export interface Group {
+  id: string;
+  zone: string;
+  kind: GroupKind;
+  label: string;
+  /** Id of the group it sits in; none = the top of the zone. */
+  parent?: string;
 }
 export interface Connection {
   id: string;
@@ -54,6 +66,8 @@ export interface Callout { id: string; target: string; text: string }
 export interface Board {
   zones: Zone[];
   elements: Element[];
+  /** Groups as a flat list; `parent` makes the tree. */
+  groups: Group[];
   connections: Connection[];
   emphasis: Emphasis[];
   questions: Question[];
@@ -63,7 +77,7 @@ export interface Board {
 }
 
 export const emptyBoard = (): Board => ({
-  zones: [], elements: [], connections: [], emphasis: [], questions: [], callouts: [], summary: "", zoneCounter: 0,
+  zones: [], elements: [], groups: [], connections: [], emphasis: [], questions: [], callouts: [], summary: "", zoneCounter: 0,
 });
 
 export interface ApplyResult { board: Board; warnings: string[] }
@@ -74,8 +88,9 @@ const ELEMENT_ZONE: Record<ElementType, ZoneKind[]> = {
 
 export const findZone = (b: Board, id: string) => b.zones.find((z) => z.id === id);
 export const findElement = (b: Board, id: string) => b.elements.find((e) => e.id === id);
+export const findGroup = (b: Board, id: string) => b.groups.find((g) => g.id === id);
 export const idTaken = (b: Board, id: string) =>
-  !!findZone(b, id) || !!findElement(b, id) || b.connections.some((c) => c.id === id) || b.callouts.some((c) => c.id === id);
+  !!findZone(b, id) || !!findElement(b, id) || !!findGroup(b, id) || b.connections.some((c) => c.id === id) || b.callouts.some((c) => c.id === id);
 const isTarget = (b: Board, id: string) => !!findZone(b, id) || !!findElement(b, id) || b.connections.some((c) => c.id === id);
 
 /** Implicit connections (after / parent) as regular connections with id "auto:<element>". */
@@ -87,6 +102,21 @@ export function derivedConnections(b: Board): Connection[] {
     if (from && findElement(b, from)) out.push({ id: `auto:${e.id}`, from, to: e.id, style: "solid", both: false });
   }
   return out;
+}
+
+/** The zone a top-level group goes in: the architect zone, else the first system zone. */
+function groupZone(b: Board): Zone | undefined {
+  const system = b.zones.filter((z) => z.kind === "system");
+  return system.find((z) => z.id === ARCHITECT_ZONE_ID) ?? system[0];
+}
+
+/** True if `id` is `group` or one of the groups inside it. */
+function isInside(b: Board, id: string, group: string): boolean {
+  for (let g: string | undefined = id, n = 0; g && n <= b.groups.length; n++) {
+    if (g === group) return true;
+    g = findGroup(b, g)?.parent;
+  }
+  return false;
 }
 
 function clone(b: Board): Board {
@@ -174,6 +204,11 @@ export function applyOp(board: Board, op: Op): ApplyResult {
         else element.parent = p.id;
       }
       if (type === "item" && zone.kind === "compare") element.column = i.column === "right" ? "right" : "left";
+      if (type === "component" && i.parent !== undefined) {
+        const g = findGroup(b, i.parent);
+        if (!g || g.zone !== zone.id) warnings.push(`add_component: parent '${i.parent}' is not a group of the zone; ignored`);
+        else element.group = g.id;
+      }
       b.elements.push(element);
       return { board: b, warnings };
     }
@@ -251,6 +286,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
     case "connect": {
       const e = needNew(i.id);
       if (e) return bad(e);
+      for (const end of [i.from, i.to]) if (findGroup(b, end)) return bad(`'${end}' is a group; arrows join components only`);
       if (!findElement(b, i.from)) return bad(`source '${i.from}' does not exist`);
       if (!findElement(b, i.to)) return bad(`target '${i.to}' does not exist`);
       b.connections.push({
@@ -283,6 +319,8 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (z) { z.title = i.label; return { board: b, warnings }; }
       const element = findElement(b, i.id);
       if (element) { element.label = i.label; return { board: b, warnings }; }
+      const g = findGroup(b, i.id);
+      if (g) { g.label = i.label; return { board: b, warnings }; }
       const c = b.connections.find((x) => x.id === i.id);
       if (c) { c.label = i.label; return { board: b, warnings }; }
       const co = b.callouts.find((x) => x.id === i.id);
@@ -339,6 +377,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
         for (const e of b.elements) if (e.zone === i.id) gone.add(e.id);
         b.zones = b.zones.filter((z) => z.id !== i.id);
         b.elements = b.elements.filter((e) => e.zone !== i.id);
+        b.groups = b.groups.filter((g) => g.zone !== i.id);
         // other zones that were placed relative to this one lose their hint
         for (const z of b.zones) if (z.place?.of === i.id) z.place = undefined;
       } else if (findElement(b, i.id)) {
@@ -349,6 +388,13 @@ export function applyOp(board: Board, op: Op): ApplyResult {
           if (e.after === i.id) e.after = undefined;
           if (e.parent === i.id) e.parent = element.parent; // children move up a level
         }
+      } else if (findGroup(b, i.id)) {
+        // what was inside moves up to the group's own parent: nothing disappears unless it is named
+        const up = findGroup(b, i.id)!.parent;
+        gone.add(i.id);
+        b.groups = b.groups.filter((g) => g.id !== i.id);
+        for (const g of b.groups) if (g.parent === i.id) g.parent = up;
+        for (const e of b.elements) if (e.group === i.id) e.group = up;
       } else if (b.connections.some((c) => c.id === i.id) || b.callouts.some((c) => c.id === i.id)) {
         gone.add(i.id);
       } else return bad(`id '${i.id}' does not exist`);
@@ -363,6 +409,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!ELEMENT_ZONE[element.type].includes(zone.kind)) return bad(`a ${element.type} does not fit in a ${zone.kind} zone`);
       if (element.zone === zone.id) return bad("already in that zone");
       element.zone = zone.id;
+      element.group = undefined;
       element.after = undefined;
       element.parent = undefined;
       for (const o of b.elements) {
@@ -370,6 +417,36 @@ export function applyOp(board: Board, op: Op): ApplyResult {
         if (o.parent === element.id && o.zone !== zone.id) o.parent = undefined;
       }
       if (zone.kind === "compare" && !element.column) element.column = "left";
+      return { board: b, warnings };
+    }
+    case "add_group": {
+      const e = needNew(i.id);
+      if (e) return bad(e);
+      let parent: Group | undefined;
+      if (i.parent !== undefined) {
+        parent = findGroup(b, i.parent);
+        if (!parent) warnings.push(`add_group: parent '${i.parent}' is not a group; drawn at the top of the zone`);
+      }
+      const zone = parent ? findZone(b, parent.zone) : groupZone(b);
+      if (!zone) return bad("there is no system zone to draw the group in");
+      b.groups.push({ id: i.id, zone: zone.id, kind: i.kind, label: i.label, ...(parent ? { parent: parent.id } : {}) });
+      return { board: b, warnings };
+    }
+    case "set_parent": {
+      const g = findGroup(b, i.id);
+      const element = g ? undefined : findElement(b, i.id);
+      if (!g && !element) return bad(`id '${i.id}' does not exist`);
+      if (element && element.type !== "component") return bad(`'${i.id}' is a ${element.type}; only components and groups go in a group`);
+      const zoneId = g ? g.zone : element!.zone;
+      if (i.parent === null) {
+        if (g) delete g.parent; else delete element!.group;
+        return { board: b, warnings };
+      }
+      const parent = findGroup(b, i.parent);
+      if (!parent) return bad(`parent '${i.parent}' is not a group`);
+      if (parent.zone !== zoneId) return bad(`group '${i.parent}' is in another zone`);
+      if (g && isInside(b, parent.id, g.id)) return bad(`cannot put '${g.id}' inside itself or a group it contains`);
+      if (g) g.parent = parent.id; else element!.group = parent.id;
       return { board: b, warnings };
     }
     case "update_summary": {

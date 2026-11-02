@@ -1,7 +1,7 @@
 [
   {
     "name": "add_component",
-    "description": "Adds a component to a system zone. type: actor = person (stick figure); client = browser or phone; service = service box; database = cylinder; queue = queue or pipe; storage = bucket or folder; external = dotted cloud of a third party.",
+    "description": "Adds a component to the system zone. type: actor = person (stick figure); client = browser or phone; service = service box; database = cylinder; queue = queue or pipe; storage = bucket or folder; external = dotted cloud of a third party. 'parent' puts it inside a group.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -80,6 +80,11 @@
             "ses"
           ],
           "description": "AWS service (icon). Only if the speaker names it or there is no doubt."
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the group it sits in (optional; without it, outside every group)."
         }
       },
       "required": [
@@ -94,7 +99,7 @@
   },
   {
     "name": "connect",
-    "description": "Draws an arrow between two elements, inside one zone or across zones (e.g. from a step of a flow to a component of an architecture).",
+    "description": "Draws an arrow between two components. Arrows join components only, never a group.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -141,7 +146,7 @@
   },
   {
     "name": "update_label",
-    "description": "Changes the text of an element, zone, connection or callout (when the speaker corrects themselves).",
+    "description": "Changes the text of a component, group or connection.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -165,7 +170,7 @@
   },
   {
     "name": "delete",
-    "description": "Deletes an element, connection, callout or zone. Deleting a zone deletes all its content; deleting an element removes its connections.",
+    "description": "Deletes a component, group or connection. Deleting a component removes its arrows; deleting a group keeps what was inside it, moved up to the group's own parent.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -200,6 +205,81 @@
       },
       "required": [
         "text"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "add_group",
+    "description": "Draws an AWS group: a labelled box that holds components and other groups (AWS Cloud > Region > VPC > Availability Zone > subnet). The parent group must already exist. Put components in it with add_component's 'parent'. An empty group is drawn at a minimum size.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "aws_cloud",
+            "region",
+            "vpc",
+            "availability_zone",
+            "public_subnet",
+            "private_subnet",
+            "generic"
+          ],
+          "description": "aws_cloud = the AWS Cloud around everything on AWS; region = an AWS Region; vpc = a VPC; availability_zone = one Availability Zone; public_subnet = a subnet reachable from the internet; private_subnet = a subnet with no route from the internet; generic = any other boundary (an on-premises network, an account)."
+        },
+        "label": {
+          "type": "string",
+          "description": "Short label, e.g. 'VPC' or 'us-east-1a'."
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the group it sits in (optional; without it, at the top of the zone)."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "set_parent",
+    "description": "Moves a component or group into another group, or out of every group with parent null. A group cannot go inside itself or inside a group it contains.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the component or group to move."
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Id of the group to move it into; null takes it out of every group."
+        }
+      },
+      "required": [
+        "id",
+        "parent"
       ],
       "additionalProperties": false
     },

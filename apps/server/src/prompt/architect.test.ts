@@ -10,9 +10,9 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
 describe("architect system prompt", () => {
   it("prompt and tools are byte for byte the reviewed version", () => {
-    expect(sha(ARCHITECT_SYSTEM_PROMPT)).toBe("a61f8c63058800c0a2f47a56d655d986a77b2fbb41d3103896dc9c6ed224c620");
+    expect(sha(ARCHITECT_SYSTEM_PROMPT)).toBe("fc9796519000eaf435a1c12b2126249168a08209a7eb65f190993b568a8478d1");
     expect(sha(WELL_ARCHITECTED_DIGEST)).toBe("832d66dfb0b386561a47bbc433cfe764bb9e1a64e86d3c34a133c2e1a4a363be");
-    expect(sha(JSON.stringify(toolDefs([], "architect")))).toBe("e59a8ad6ab3ba4e985085d72e8f752c9876023c3a6a60eeb2ed4e3c10c8974a5");
+    expect(sha(JSON.stringify(toolDefs([], "architect")))).toBe("29d44c81d5f3443f23b5e3fd199c297103796508c1458f432951556bf411d179");
     // Architect turns stamp ARCHITECT_PROMPT_VERSION: from the session record slice on, bump it whenever these hashes change.
     expect(ARCHITECT_PROMPT_VERSION).toBe(1);
   });
@@ -54,6 +54,11 @@ describe("architect system prompt", () => {
     expect(live).not.toContain("Well-Architected");
     expect(live).not.toMatch(/[A-Z]+\d{2}-BP\d{2}/);
     expect(BOARD_SYSTEM_PROMPT).not.toContain(WELL_ARCHITECTED_DIGEST.slice(0, 40));
+  });
+
+  it("draws AWS groups only when they mean something", () => {
+    for (const rule of [/add_group/, /set_parent/, /parent null/, /only when it means something/, /private network/, /more than one Availability Zone/, /serverless design stays flat/, /Security groups and Auto Scaling groups are never boxes/, /two components, one in each AZ group, joined by an arrow/, /Arrows join components only, never a group/])
+      expect(ARCHITECT_SYSTEM_PROMPT).toMatch(rule);
   });
 
   it("draws in the app-made system zone and never makes zones", () => {

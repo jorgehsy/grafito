@@ -62,7 +62,7 @@ export class Engine implements Sink, Executor {
   follow = true;
   onFollowChange?: (f: boolean) => void;
 
-  private layers: Record<"zone" | "under" | "connection" | "element" | "ann", SVGGElement>;
+  private layers: Record<"zone" | "group" | "under" | "connection" | "element" | "ann", SVGGElement>;
   private pen: SVGGElement;
   private clock = 0;
   private lastReal = 0;
@@ -82,7 +82,7 @@ export class Engine implements Sink, Executor {
 
   constructor(private svg: SVGSVGElement) {
     const mk = () => { const g = document.createElementNS(NS, "g"); svg.appendChild(g); return g; };
-    this.layers = { zone: mk(), under: mk(), connection: mk(), element: mk(), ann: mk() };
+    this.layers = { zone: mk(), group: mk(), under: mk(), connection: mk(), element: mk(), ann: mk() };
     this.pen = this.makePen();
     svg.appendChild(this.pen);
     this.ro = new ResizeObserver(() => this.measureView());
@@ -120,7 +120,7 @@ export class Engine implements Sink, Executor {
     if (!t || this.shown.has(key)) return;
     const vis = buildVisual(t, t.geom);
     const layer = this.layerOf(t);
-    layer.appendChild(vis.g);
+    this.insert(layer, t, vis.g);
     measure(vis);
     const s: Shown = { item: t, geom: t.geom, vis, layer, busy: true };
     this.shown.set(key, s);
@@ -350,8 +350,9 @@ export class Engine implements Sink, Executor {
       const r = document.createElementNS(NS, "rect");
       const gm = s.geom;
       const local = s.vis.translates;
-      const w = kind === "zone" ? Math.min(gm.w, (s.item.data.title?.length ?? 4) * 14 + 56) : gm.w;
-      const h = kind === "zone" ? 52 : gm.h;
+      const header = kind === "zone" || kind === "group";
+      const w = header ? Math.min(gm.w, (s.item.data.title?.length ?? 4) * 14 + 56) : gm.w;
+      const h = header ? 52 : gm.h;
       r.setAttribute("x", String((local ? 0 : gm.x) - 8)); r.setAttribute("y", String((local ? 0 : gm.y) - 8));
       r.setAttribute("width", String(w + 16)); r.setAttribute("height", String(h + 16)); r.setAttribute("rx", "16");
       r.setAttribute("fill", "#ffe066");
@@ -381,8 +382,17 @@ export class Engine implements Sink, Executor {
     this.pen.setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
   }
 
+  /** Groups go under every group nested deeper, so a box never covers the boxes inside it. */
+  private insert(layer: SVGGElement, item: RenderItem, g: SVGGElement) {
+    if (item.kind !== "group") { layer.appendChild(g); return; }
+    const depth = item.data.depth ?? 0;
+    const deeper = [...layer.children].find((c) => Number((c as SVGGElement).dataset.depth) > depth);
+    layer.insertBefore(g, deeper ?? null);
+  }
+
   private layerOf(i: RenderItem) {
     if (i.under) return this.layers.under;
+    if (i.kind === "group") return this.layers.group;
     return i.kind === "zone" ? this.layers.zone : i.kind === "connection" ? this.layers.connection : i.kind === "element" ? this.layers.element : this.layers.ann;
   }
   private setFocus(g: Geom) {

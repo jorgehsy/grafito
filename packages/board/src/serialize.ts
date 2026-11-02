@@ -25,6 +25,20 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
     l += ` color:${FILL_NAMES[z.n % FILL_NAMES.length]}`;
     out.push(l);
   }
+  if (b.groups.length) {
+    // the group tree, outermost first: components by id under their group (their details are in ELEMENTS)
+    out.push("GROUPS");
+    const known = new Set(b.groups.map((g) => g.id));
+    const tree = (parent: string | undefined, depth: number) => {
+      const pad = "  ".repeat(depth);
+      for (const g of b.groups.filter((x) => (x.parent && known.has(x.parent) ? x.parent : undefined) === parent)) {
+        out.push(`${pad}- ${g.id} [${g.kind}] ${q(g.label)}${depth ? "" : ` @${g.zone}`}`);
+        tree(g.id, depth + 1);
+        for (const e of b.elements) if (e.group === g.id) out.push(`${pad}  - ${e.id}`);
+      }
+    };
+    tree(undefined, 0);
+  }
   out.push("ELEMENTS");
   for (const e of b.elements) {
     const kind = e.type === "component" ? `component/${e.comp ?? "service"}` : e.type;
@@ -39,6 +53,7 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
     if (e.column) l += ` col:${e.column}`;
     if (e.after) l += ` after:${e.after}`;
     if (e.parent) l += ` parent:${e.parent}`;
+    if (e.group) l += ` group:${e.group}`;
     if (opts.catalog && e.service) l += ` service:${e.service.slice(e.service.indexOf(":") + 1)}`;
     out.push(l);
   }

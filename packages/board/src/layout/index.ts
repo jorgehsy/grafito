@@ -16,12 +16,13 @@ export async function computeLayout(board: Board): Promise<BoardLayout> {
   const sizes: Record<string, { w: number; h: number }> = {};
   board.zones.forEach((z, i) => (sizes[z.id] = { w: locals[i].w, h: locals[i].h }));
   const zoneRects = placeZones(board.zones, sizes);
-  const out: BoardLayout = { zones: zoneRects, elements: {}, connections: {}, callouts: {}, dividers: {}, scales: {}, marks: {}, spans: {}, labels: {}, bounds: { x: 0, y: 0, w: 0, h: 0 } };
+  const out: BoardLayout = { zones: zoneRects, elements: {}, groups: {}, connections: {}, callouts: {}, dividers: {}, scales: {}, marks: {}, spans: {}, labels: {}, bounds: { x: 0, y: 0, w: 0, h: 0 } };
 
   board.zones.forEach((z, i) => {
     const o = zoneRects[z.id];
     const loc = locals[i];
     for (const [id, r] of Object.entries(loc.elements)) out.elements[id] = { x: r.x + o.x, y: r.y + o.y, w: r.w, h: r.h };
+    for (const [id, r] of Object.entries(loc.groups ?? {})) out.groups[id] = { x: r.x + o.x, y: r.y + o.y, w: r.w, h: r.h };
     for (const [id, e] of Object.entries(loc.connections))
       out.connections[id] = {
         kind: e.kind,
@@ -119,5 +120,5 @@ function placeCallout(box: Rect, target: Rect, zone: Rect, zones: Rect[], elemen
 
 export type { BoardLayout, ConnectionGeom, MarkGeom, Pt, Rect, ScaleGeom, SpanGeom } from "./types";
 export { bezierAt } from "./edges";
-export { LABEL_LH, LABEL_SIZE, labelLines, labelRect, overlaps } from "./geometry";
+export { GROUP_HEAD, GROUP_ICON, GROUP_LABEL_SIZE, LABEL_LH, LABEL_SIZE, groupHeaderRect, labelLines, labelRect, overlaps } from "./geometry";
 export { clearLayoutCache } from "./zones";

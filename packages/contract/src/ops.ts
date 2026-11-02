@@ -9,12 +9,15 @@ const MARK_TONES = ["neutral", "warn", "danger", "ok"] as const;
 const TEXT_FIELDS = ["label", "note", "text", "when"] as const;
 const COMP_TYPES = ["actor", "client", "service", "database", "queue", "storage", "external"] as const;
 const EMPHASIS_STYLES = ["circle", "underline", "star"] as const;
+/** AWS group kinds (architect mode): the boxes AWS diagrams nest, outermost first, plus a generic one. */
+export const GROUP_KINDS = ["aws_cloud", "region", "vpc", "availability_zone", "public_subnet", "private_subnet", "generic"] as const;
 
 export type ZoneKind = (typeof ZONE_KINDS)[number];
 export type MarkTone = (typeof MARK_TONES)[number];
 export type TextField = (typeof TEXT_FIELDS)[number];
 export type ComponentType = (typeof COMP_TYPES)[number];
 export type EmphasisStyle = (typeof EMPHASIS_STYLES)[number];
+export type GroupKind = (typeof GROUP_KINDS)[number];
 
 // Checks that do not show in the JSON Schema Claude sees (refinements are not exported):
 // required text must not be blank, a span must go forward, an arrow needs two ends.
@@ -186,16 +189,43 @@ export type OpSet = "board" | "architect";
 /** Board ops architect mode keeps, in tool order. No zone ops: the app makes the one system zone. */
 const ARCHITECT_KEPT = ["add_component", "connect", "update_label", "delete"] as const;
 
+/** Kept ops whose description says more in architect mode, where groups exist. */
+const ARCHITECT_KEPT_DESCRIPTIONS: Partial<Record<(typeof ARCHITECT_KEPT)[number], string>> = {
+  add_component:
+    "Adds a component to the system zone. type: actor = person (stick figure); client = browser or phone; service = service box; database = cylinder; queue = queue or pipe; storage = bucket or folder; external = dotted cloud of a third party. 'parent' puts it inside a group.",
+  connect: "Draws an arrow between two components. Arrows join components only, never a group.",
+  update_label: "Changes the text of a component, group or connection.",
+  delete: "Deletes a component, group or connection. Deleting a component removes its arrows; deleting a group keeps what was inside it, moved up to the group's own parent.",
+};
+
 /** Input schema per architect-only op, in the order Claude sees the tools. */
 const ARCHITECT_INPUTS = {
   say: z.strictObject({
     text: text("What you tell the user: about 25 words, concrete, at most one question."),
     target: id("Id of the element the bubble is about (optional; without it the bubble comes from a corner).").optional(),
   }),
+  add_group: z.strictObject({
+    id: id("Unique identifier."),
+    kind: z
+      .enum(GROUP_KINDS)
+      .describe(
+        "aws_cloud = the AWS Cloud around everything on AWS; region = an AWS Region; vpc = a VPC; availability_zone = one Availability Zone; public_subnet = a subnet reachable from the internet; private_subnet = a subnet with no route from the internet; generic = any other boundary (an on-premises network, an account).",
+      ),
+    label: text("Short label, e.g. 'VPC' or 'us-east-1a'."),
+    parent: id("Id of the group it sits in (optional; without it, at the top of the zone).").optional(),
+  }),
+  set_parent: z.strictObject({
+    id: id("Id of the component or group to move."),
+    parent: z.string().min(1).refine(notBlank, "must not be blank").nullable().describe("Id of the group to move it into; null takes it out of every group."),
+  }),
 };
 
 const ARCHITECT_DESCRIPTIONS: Record<keyof typeof ARCHITECT_INPUTS, string> = {
   say: "Speaks to the user in a speech bubble over the board. Exactly one per turn, even when nothing is drawn; if you send more than one, only the last is shown.",
+  add_group:
+    "Draws an AWS group: a labelled box that holds components and other groups (AWS Cloud > Region > VPC > Availability Zone > subnet). The parent group must already exist. Put components in it with add_component's 'parent'. An empty group is drawn at a minimum size.",
+  set_parent:
+    "Moves a component or group into another group, or out of every group with parent null. A group cannot go inside itself or inside a group it contains.",
 };
 
 // ---- Icon catalogs (optional) ----
@@ -214,12 +244,18 @@ export function inputSchemas(serviceIds: readonly string[], set: OpSet = "board"
   const board = boardSchemas(serviceIds);
   if (set === "board") return board;
   const named = (name: OpName) => board.filter((t) => t.name === name);
+  const kept = ARCHITECT_KEPT.flatMap(named).map((t) => {
+    const description = ARCHITECT_KEPT_DESCRIPTIONS[t.name as (typeof ARCHITECT_KEPT)[number]] ?? t.description;
+    if (t.name !== "add_component") return { ...t, description };
+    const parent = id("Id of the group it sits in (optional; without it, outside every group).").optional();
+    return { ...t, description, schema: (t.schema as z.ZodObject).extend({ parent }) };
+  });
   const own = (Object.keys(ARCHITECT_INPUTS) as (keyof typeof ARCHITECT_INPUTS)[]).map((name) => ({
     name: name as OpName,
     description: ARCHITECT_DESCRIPTIONS[name],
     schema: ARCHITECT_INPUTS[name] as z.ZodType,
   }));
-  return [...ARCHITECT_KEPT.flatMap(named), ...own, ...named("set_service"), ...named("update_summary")];
+  return [...kept, ...own, ...named("set_service"), ...named("update_summary")];
 }
 
 function boardSchemas(serviceIds: readonly string[]): InputSchema[] {
@@ -255,11 +291,16 @@ type WithService<T> = T & { service?: string };
 export type OpInputs = Omit<BaseInputs, (typeof SERVICE_OPS)[number]> & {
   add_step: WithService<BaseInputs["add_step"]>;
   add_decision: WithService<BaseInputs["add_decision"]>;
-  add_component: WithService<BaseInputs["add_component"]>;
+  /** `parent` (a group id) only in the architect set. */
+  add_component: WithService<BaseInputs["add_component"]> & { parent?: string };
   /** Service icon for any element; an empty `service` removes it. Only with a catalog on. */
   set_service: { id: string; service: string };
   /** Architect mode only: the turn's speech bubble. */
   say: z.output<typeof ARCHITECT_INPUTS.say>;
+  /** Architect mode only: an AWS group, optionally inside another. */
+  add_group: z.output<typeof ARCHITECT_INPUTS.add_group>;
+  /** Architect mode only: moves a component or group into a group, or out of every group (null). */
+  set_parent: z.output<typeof ARCHITECT_INPUTS.set_parent>;
 };
 export type OpName = keyof OpInputs;
 export type Op = { [K in OpName]: { name: K; input: OpInputs[K] } }[OpName];
