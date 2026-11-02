@@ -11,7 +11,7 @@ export const PROMPT_VERSION = 2;
  * which counter a number belongs to). Bump it on every change to the architect prompt, the Well-Architected
  * digest or the architect tools; apps/server/src/prompt/architect.test.ts pins their hash to this value.
  */
-export const ARCHITECT_PROMPT_VERSION = 1;
+export const ARCHITECT_PROMPT_VERSION = 2;
 
 export const RECORD_VERSION = 3;
 

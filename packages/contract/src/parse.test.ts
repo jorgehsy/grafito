@@ -89,6 +89,14 @@ describe("toolDefs: the architect op set", () => {
     expect(withProposal).toEqual(["add_component", "connect", "add_group", "accept", "reject"]);
     for (const name of ["accept", "reject"]) expect(toolDefs(["aws"], "architect").find((t) => t.name === name)!.input_schema.required).toEqual(["proposal"]);
   });
+  it("delete says what it may delete: components, groups and connections, never the system zone", () => {
+    const del = toolDefs([], "architect").find((t) => t.name === "delete")!.description;
+    expect(del).toMatch(/^Deletes a component, group or connection\. Never the system zone/);
+  });
+  it("a say may point at an element, a group or a proposal", () => {
+    const say = toolDefs([], "architect").find((t) => t.name === "say")!;
+    expect((say.input_schema.properties.target as { description: string }).description).toMatch(/^Id of the element, group or proposal/);
+  });
   it("the board set never shows architect ops and stays the default", () => {
     for (const name of ["say", "add_group", "set_parent", "propose", "accept", "reject"]) expect(toolDefs(["aws"]).map((t) => t.name)).not.toContain(name);
     expect(toolDefs([], "board")).toBe(toolDefs([]));

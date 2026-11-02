@@ -10,9 +10,9 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
 describe("architect system prompt", () => {
   it("prompt and tools are byte for byte the reviewed version", () => {
-    expect(sha(ARCHITECT_SYSTEM_PROMPT)).toBe("19b1a7d4368c572df63a100bd3d170afdc4568bcac7011845f00a092fff561ed");
+    expect(sha(ARCHITECT_SYSTEM_PROMPT)).toBe("92cb983ae740ff3745751337bc38e880d19c800afd416b22285d548dea3e0220");
     expect(sha(WELL_ARCHITECTED_DIGEST)).toBe("832d66dfb0b386561a47bbc433cfe764bb9e1a64e86d3c34a133c2e1a4a363be");
-    expect(sha(JSON.stringify(toolDefs([], "architect")))).toBe("b0b629ca41e4000ceb22e616e74a3ef6d982b1fe3a3b12e6f351d6f15c7115c1");
+    expect(sha(JSON.stringify(toolDefs([], "architect")))).toBe("5bf988abc9745e8567ad86d5fa38fefd529220f18f1464480f98727c39d0055d");
   });
 
   it("every change to the architect prompt, digest, tools or user text bumps ARCHITECT_PROMPT_VERSION", () => {
@@ -20,6 +20,7 @@ describe("architect system prompt", () => {
     // change: bump ARCHITECT_PROMPT_VERSION and add its hash here; never edit a hash already listed.
     const PINNED: Record<number, string> = {
       1: "2f330fb826cb88a9a072e9155337218230fd700465bdcb378e7ddf7329e8120d",
+      2: "d76b6d52bdd388574b410eaa3a4d286ddc5036c4847233b11f50f8582d12d787",
     };
     const userText = buildArchitectUserText({ board: "B", summary: "s", recent: [{ text: "t", bubble: "b" }], actions: [{ type: "accept", proposal: "P1" }], text: "next" });
     const all = [ARCHITECT_SYSTEM_PROMPT, WELL_ARCHITECTED_DIGEST, JSON.stringify(toolDefs([], "architect")), JSON.stringify(toolDefs(["aws"], "architect")), userText];
@@ -33,6 +34,10 @@ describe("architect system prompt", () => {
     ]);
     const cached = new Set(LANGS.map((l) => JSON.stringify(architectSystemPrompt({ catalogs: ["aws"], lang: l.code })[0])));
     expect(cached.size).toBe(1);
+  });
+
+  it("rule 6: the say's target is an element, group or proposal", () => {
+    expect(ARCHITECT_SYSTEM_PROMPT).toContain("Set its target to the id of the element, group or proposal it is about");
   });
 
   it("carries the persona rules", () => {

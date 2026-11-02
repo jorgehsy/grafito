@@ -134,7 +134,7 @@
   },
   {
     "name": "delete",
-    "description": "Deletes a component, group or connection. Deleting a component removes its arrows; deleting a group keeps what was inside it, moved up to the group's own parent.",
+    "description": "Deletes a component, group or connection. Never the system zone: it stays for the whole session. Deleting a component removes its arrows; deleting a group keeps what was inside it, moved up to the group's own parent.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -164,7 +164,7 @@
         "target": {
           "type": "string",
           "minLength": 1,
-          "description": "Id of the element or proposal the bubble is about (optional; without it the bubble comes from a corner)."
+          "description": "Id of the element, group or proposal the bubble is about (optional; without it the bubble comes from a corner)."
         }
       },
       "required": [

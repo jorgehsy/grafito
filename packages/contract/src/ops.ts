@@ -203,14 +203,14 @@ const ARCHITECT_KEPT_DESCRIPTIONS: Partial<Record<(typeof ARCHITECT_KEPT)[number
     "Adds a component to the system zone. type: actor = person (stick figure); client = browser or phone; service = service box; database = cylinder; queue = queue or pipe; storage = bucket or folder; external = dotted cloud of a third party. 'parent' puts it inside a group.",
   connect: "Draws an arrow between two components. Arrows join components only, never a group.",
   update_label: "Changes the text of a component, group or connection.",
-  delete: "Deletes a component, group or connection. Deleting a component removes its arrows; deleting a group keeps what was inside it, moved up to the group's own parent.",
+  delete: "Deletes a component, group or connection. Never the system zone: it stays for the whole session. Deleting a component removes its arrows; deleting a group keeps what was inside it, moved up to the group's own parent.",
 };
 
 /** Input schema per architect-only op, in the order Claude sees the tools. */
 const ARCHITECT_INPUTS = {
   say: z.strictObject({
     text: text("What you tell the user: about 25 words, concrete, at most one question."),
-    target: id("Id of the element or proposal the bubble is about (optional; without it the bubble comes from a corner).").optional(),
+    target: id("Id of the element, group or proposal the bubble is about (optional; without it the bubble comes from a corner).").optional(),
   }),
   add_group: z.strictObject({
     id: id("Unique identifier."),
