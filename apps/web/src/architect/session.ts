@@ -12,7 +12,7 @@ export const RECENT_TURNS = 3;
 
 export interface Bubble {
   text: string;
-  /** Id of the element the bubble is about; none = a general remark. */
+  /** Id of the element or proposal the bubble is about; none = a general remark. */
   target?: string;
 }
 

@@ -8,6 +8,9 @@ export const INK = "#2A2A2E";
 export const RED = "#e03131";
 export const BLUE = "#3E5E8C";
 export const PAPER = "#F5F3EE";
+/** The pencil look of a proposal (architect mode): grey lines, a lighter grey for its text. */
+export const PENCIL = "#8A8A90";
+export const PENCIL_TEXT = "#7A7A80";
 export const TONES: Record<string, { ink: string; fill: string }> = {
   neutral: { ink: INK, fill: "#F4E6A8" },
   warn: { ink: "#d9730d", fill: "#ffd43b" },

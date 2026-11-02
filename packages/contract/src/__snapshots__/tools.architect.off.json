@@ -39,6 +39,11 @@
           "type": "string",
           "minLength": 1,
           "description": "Id of the group it sits in (optional; without it, outside every group)."
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal this belongs to (see propose); it is drawn in pencil. Leave it out for what the user asked for: that is drawn in ink."
         }
       },
       "required": [
@@ -87,6 +92,11 @@
         "both_ways": {
           "type": "boolean",
           "description": "Arrow with a head at both ends."
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal this belongs to (see propose); it is drawn in pencil. Leave it out for what the user asked for: that is drawn in ink."
         }
       },
       "required": [
@@ -154,7 +164,7 @@
         "target": {
           "type": "string",
           "minLength": 1,
-          "description": "Id of the element the bubble is about (optional; without it the bubble comes from a corner)."
+          "description": "Id of the element or proposal the bubble is about (optional; without it the bubble comes from a corner)."
         }
       },
       "required": [
@@ -196,6 +206,11 @@
           "type": "string",
           "minLength": 1,
           "description": "Id of the group it sits in (optional; without it, at the top of the zone)."
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal this belongs to (see propose); it is drawn in pencil. Leave it out for what the user asked for: that is drawn in ink."
         }
       },
       "required": [
@@ -234,6 +249,73 @@
       "required": [
         "id",
         "parent"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "propose",
+    "description": "Opens a proposal: something you add on your own initiative, drawn in pencil until the user keeps it. Call it before the add_component, add_group and connect calls that carry its id in 'proposal'. 'alternative_to' makes it the other choice to an open proposal, drawn beside it; the user keeps one of the two.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier of the proposal, e.g. 'P1'."
+        },
+        "label": {
+          "type": "string",
+          "description": "What it is, in 1 to 4 words, e.g. 'Static site'."
+        },
+        "alternative_to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of an open proposal this one is the other choice to (optional; at most 2 side by side)."
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "accept",
+    "description": "Keeps an open proposal: everything drawn under it turns to ink. Accepting one of two alternatives erases the other.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal the user keeps."
+        }
+      },
+      "required": [
+        "proposal"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "reject",
+    "description": "Turns down an open proposal: everything drawn under it is erased, with the arrows that touch it.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal the user turns down."
+        }
+      },
+      "required": [
+        "proposal"
       ],
       "additionalProperties": false
     },

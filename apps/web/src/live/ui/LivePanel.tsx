@@ -160,6 +160,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
         model={modelControl?.model ?? model} availableModels={modelControl ? modelControl.available : available} onModel={modelControl?.onModel ?? setModel} shape={shape} onShape={setShape}
         catalogs={catalogs} onCatalogs={(v) => { setCatalogs(v); saveCatalogs(v); }}
         langLocked={micOn} follow={follow} onFollow={onFollow} showTranscript={showTranscript} onShowTranscript={onShowTranscript}
+        architect={mode === "architect"}
       />
 
       {active && (

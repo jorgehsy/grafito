@@ -1,8 +1,11 @@
 // Compact serialization of the board for the prompt (no layout or coordinates).
 import type { Board } from "./model";
+import { openProposals } from "./model";
 import { FILL_NAMES } from "./palette";
 
 const q = (s: string) => JSON.stringify(s);
+/** Tag of something drawn under an open proposal. */
+const pencil = (x: { proposal?: string }) => (x.proposal ? ` [pencil ${x.proposal}]` : "");
 
 export interface SerializeOpts {
   /** Icon catalog turned on: shows ` service:lambda` per element. Off: not shown. */
@@ -32,7 +35,7 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
     const tree = (parent: string | undefined, depth: number) => {
       const pad = "  ".repeat(depth);
       for (const g of b.groups.filter((x) => (x.parent && known.has(x.parent) ? x.parent : undefined) === parent)) {
-        out.push(`${pad}- ${g.id} [${g.kind}] ${q(g.label)}${depth ? "" : ` @${g.zone}`}`);
+        out.push(`${pad}- ${g.id} [${g.kind}] ${q(g.label)}${depth ? "" : ` @${g.zone}`}${pencil(g)}`);
         tree(g.id, depth + 1);
         for (const e of b.elements) if (e.group === g.id) out.push(`${pad}  - ${e.id}`);
       }
@@ -55,17 +58,26 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
     if (e.parent) l += ` parent:${e.parent}`;
     if (e.group) l += ` group:${e.group}`;
     if (opts.catalog && e.service) l += ` service:${e.service.slice(e.service.indexOf(":") + 1)}`;
-    out.push(l);
+    out.push(l + pencil(e));
   }
   if (b.connections.length) {
     out.push("CONNECTIONS");
     for (const c of b.connections) {
-      out.push(`- ${c.id}: ${c.from} ${c.both ? "<->" : "->"} ${c.to}${c.label ? " " + q(c.label) : ""}${c.style === "dashed" ? " dashed" : ""}`);
+      out.push(`- ${c.id}: ${c.from} ${c.both ? "<->" : "->"} ${c.to}${c.label ? " " + q(c.label) : ""}${c.style === "dashed" ? " dashed" : ""}${pencil(c)}`);
     }
   }
   if (b.callouts.length) {
     out.push("CALLOUTS");
     for (const c of b.callouts) out.push(`- ${c.id} -> ${c.target} ${q(c.text)}`);
+  }
+  if (b.proposals.length) {
+    // open proposals; two alternatives are A and B in the order they were opened, so the user can answer "A" or "B"
+    out.push("PROPOSALS");
+    for (const p of openProposals(b)) {
+      const k = p.alternatives.indexOf(p.id);
+      const others = p.alternatives.filter((x) => x !== p.id);
+      out.push(`- ${p.id} ${q(p.label)}${others.length ? ` (${"AB"[k]}; alternative to ${others.join(", ")})` : ""}`);
+    }
   }
   const marks: string[] = [];
   for (const e of b.emphasis) marks.push(`${e.target}:${e.style}`);

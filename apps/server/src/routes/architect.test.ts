@@ -105,6 +105,32 @@ describe("POST /api/architect", () => {
     expect(names(none)).toEqual(["op", "done"]);
   });
 
+  it("streams proposals: propose, drawing ops under it, and accept or reject on the next turn", async () => {
+    const comp = (id: string, type: string, service: string) => JSON.stringify({ zone: "system", id, label: id, type, service, proposal: "P1" });
+    const first = await post(fakeClaude([[
+      start(),
+      ...toolBlock(0, "propose", JSON.stringify({ id: "P1", label: "Static site" })),
+      ...toolBlock(1, "add_component", comp("dns", "service", "route-53")),
+      ...toolBlock(2, "add_component", comp("cdn", "service", "cloudfront")),
+      ...toolBlock(3, "connect", JSON.stringify({ id: "c1", from: "dns", to: "cdn", proposal: "P1" })),
+      ...toolBlock(4, "say", JSON.stringify({ text: "Does it call an API?", target: "P1" })),
+      ...stop("tool_use", 50),
+    ]]), { text: "let's build a React webpage", catalogs: ["aws"] });
+    expect(ops(first).map((o) => (o as { name: string }).name)).toEqual(["propose", "add_component", "add_component", "connect", "say"]);
+    expect(ops(first)[1]).toEqual({ name: "add_component", input: JSON.parse(comp("dns", "service", "route-53")) });
+    const fake = fakeClaude([[start(), ...toolBlock(0, "accept", '{"proposal":"P1"}'), ...toolBlock(1, "reject", '{"proposal":"P2"}'), ...toolBlock(2, "say", '{"text":"Kept."}'), ...stop("tool_use", 5)]]);
+    const next = await post(fake, { text: "yes", board: 'ELEMENTS\n- dns (component/service) "dns" @system [pencil P1]\nPROPOSALS\n- P1 "Static site"' });
+    expect(ops(next)).toEqual([{ name: "accept", input: { proposal: "P1" } }, { name: "reject", input: { proposal: "P2" } }, { name: "say", input: { text: "Kept." } }]);
+    // the typed answer goes to Claude word for word, with the open proposals in the board text
+    expect(fake.calls[0].params.userText).toContain('[pencil P1]\nPROPOSALS\n- P1 "Static site"');
+    expect(fake.calls[0].params.userText.endsWith("USER MESSAGE:\nyes")).toBe(true);
+  });
+
+  it("a proposal on an op that only changes is invalid", async () => {
+    const evs = await post(fakeClaude([[start(), ...toolBlock(0, "delete", '{"id":"cdn","proposal":"P1"}'), ...stop("tool_use", 5)]]), { text: "hi" });
+    expect(ops(evs)).toEqual([{ invalid: true, name: "delete", warning: expect.stringMatching(/^delete: /) }]);
+  });
+
   it("retries once on a 5xx before the first op, like /api/board", async () => {
     const fake = fakeClaude([[start(), fail(529, "Overloaded")], s3Turn]);
     const evs = await post(fake, { text: "hi", catalogs: ["aws"] });

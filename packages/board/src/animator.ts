@@ -6,6 +6,8 @@ import { geomEqual } from "./tree";
 export type SeqTask =
   | { kind: "draw"; key: string }
   | { kind: "update"; key: string }
+  /** Same content, pencil turned to ink (or back): restyled in place, drawn over, never struck out. */
+  | { kind: "ink"; key: string }
   | { kind: "delete"; keys: string[] };
 export interface MoveTask { kind: "move"; key: string }
 export interface Diff { sequential: SeqTask[]; moves: MoveTask[] }
@@ -20,6 +22,10 @@ export function diffTrees(prev: RenderTree, next: RenderTree): Diff {
   for (const n of next.items) {
     const p = prev.map.get(n.key);
     if (p && p.sig !== n.sig) sequential.push({ kind: "update", key: n.key });
+  }
+  for (const n of next.items) {
+    const p = prev.map.get(n.key);
+    if (p && p.sig === n.sig && !!p.data.pencil !== !!n.data.pencil) sequential.push({ kind: "ink", key: n.key });
   }
   const added = next.items
     .filter((n) => !prev.map.has(n.key))
@@ -43,6 +49,8 @@ export function speedForBacklog(pending: number): number {
 export interface Executor {
   draw(key: string, speed: number): Promise<void>;
   update(key: string, speed: number): Promise<void>;
+  /** Restyles a drawn item to its pencil or ink look (see `ItemData.pencil`). */
+  ink(key: string, speed: number): Promise<void>;
   remove(keys: string[], speed: number): Promise<void>;
   move(key: string): void;
 }
@@ -96,6 +104,7 @@ export class AnimationQueue {
       try {
         if (task.kind === "draw") await this.exec.draw(task.key, speed);
         else if (task.kind === "update") await this.exec.update(task.key, speed);
+        else if (task.kind === "ink") await this.exec.ink(task.key, speed);
         else await this.exec.remove(task.keys, speed);
       } catch {
         /* cancelled or failed: carry on with the next task */

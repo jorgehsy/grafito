@@ -59,26 +59,38 @@ describe("toolDefs: the architect op set", () => {
   it("architect, AWS catalog on", async () => {
     await expect(JSON.stringify(toolDefs(["aws"], "architect"), null, 2) + "\n").toMatchFileSnapshot("./__snapshots__/tools.architect.aws.json");
   });
-  it("keeps the component, connection, label, delete and summary ops, adds say and the group ops, and drops every zone op", () => {
-    const own = ["say", "add_group", "set_parent"];
+  it("keeps the component, connection, label, delete and summary ops, adds say, the group and proposal ops, and drops every zone op", () => {
+    const own = ["say", "add_group", "set_parent", "propose", "accept", "reject"];
     expect(toolDefs([], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", ...own, "update_summary"]);
     expect(toolDefs(["aws"], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", ...own, "set_service", "update_summary"]);
   });
-  it("kept ops have the board set's inputs; add_component also takes a parent group", () => {
+  it("kept ops have the board set's inputs; add_component also takes a parent group, the drawing ops a proposal", () => {
     const board = new Map(toolDefs(["aws"]).map((t) => [t.name, t]));
+    const proposal = { type: "string", minLength: 1, description: expect.stringContaining("pencil") };
     for (const t of toolDefs(["aws"], "architect")) {
       const b = board.get(t.name);
       if (!b) continue;
       if (t.name === "add_component") {
-        const { parent, ...rest } = t.input_schema.properties;
+        const { parent, proposal: p, ...rest } = t.input_schema.properties;
         expect(parent).toEqual({ type: "string", minLength: 1, description: expect.stringContaining("group") });
+        expect(p).toEqual(proposal);
+        expect({ ...t.input_schema, properties: rest }).toEqual(b.input_schema);
+      } else if (t.name === "connect") {
+        const { proposal: p, ...rest } = t.input_schema.properties;
+        expect(p).toEqual(proposal);
         expect({ ...t.input_schema, properties: rest }).toEqual(b.input_schema);
       } else expect(t.input_schema).toEqual(b.input_schema);
     }
     expect(board.get("add_component")!.input_schema.properties).not.toHaveProperty("parent");
+    expect(board.get("connect")!.input_schema.properties).not.toHaveProperty("proposal");
+  });
+  it("proposals only add: only add_component, add_group and connect take a proposal", () => {
+    const withProposal = toolDefs(["aws"], "architect").filter((t) => "proposal" in t.input_schema.properties).map((t) => t.name);
+    expect(withProposal).toEqual(["add_component", "connect", "add_group", "accept", "reject"]);
+    for (const name of ["accept", "reject"]) expect(toolDefs(["aws"], "architect").find((t) => t.name === name)!.input_schema.required).toEqual(["proposal"]);
   });
   it("the board set never shows architect ops and stays the default", () => {
-    for (const name of ["say", "add_group", "set_parent"]) expect(toolDefs(["aws"]).map((t) => t.name)).not.toContain(name);
+    for (const name of ["say", "add_group", "set_parent", "propose", "accept", "reject"]) expect(toolDefs(["aws"]).map((t) => t.name)).not.toContain(name);
     expect(toolDefs([], "board")).toBe(toolDefs([]));
     expect(toolDefs([], "architect")).toBe(toolDefs([], "architect"));
   });
@@ -219,6 +231,36 @@ describe("parseOp: op sets", () => {
     expect(arch("add_component", { zone: "system", id: "db", label: "DB", type: "database", parent: "az1" }).ok).toBe(true);
     expect(arch("add_component", { zone: "system", id: "db", label: "DB", type: "database", parent: "" }).ok).toBe(false);
     expect(ok("add_component", { zone: "system", id: "db", label: "DB", type: "database", parent: "az1" })).toBe(false);
+  });
+  it("propose: id and label, alternative_to optional", () => {
+    expect(arch("propose", { id: "P1", label: "Static site" })).toEqual({ ok: true, op: { name: "propose", input: { id: "P1", label: "Static site" } } });
+    expect(arch("propose", { id: "P2", label: "DynamoDB", alternative_to: "P1" }).ok).toBe(true);
+    expect(arch("propose", { id: "P1" }).ok).toBe(false);
+    expect(arch("propose", { id: "P1", label: " " }).ok).toBe(false);
+    expect(arch("propose", { id: "P2", label: "X", alternative_to: "" }).ok).toBe(false);
+    expect(error("propose", { id: "P1", label: "Static site" })).toBe('propose: unknown tool "propose"');
+  });
+  it("accept and reject name one proposal", () => {
+    for (const name of ["accept", "reject"]) {
+      expect(arch(name, { proposal: "P1" })).toEqual({ ok: true, op: { name, input: { proposal: "P1" } } });
+      expect(arch(name, {}).ok).toBe(false);
+      expect(arch(name, { proposal: "" }).ok).toBe(false);
+      expect(arch(name, { proposal: "P1", id: "x" }).ok).toBe(false);
+      expect(error(name, { proposal: "P1" })).toBe(`${name}: unknown tool "${name}"`);
+    }
+  });
+  it("the drawing ops take a proposal only in architect mode; changes and deletes never do", () => {
+    const comp = { zone: "system", id: "cdn", label: "CDN", type: "service", proposal: "P1" };
+    expect(arch("add_component", comp).ok).toBe(true);
+    expect(arch("add_group", { id: "vpc", kind: "vpc", label: "VPC", proposal: "P1" }).ok).toBe(true);
+    expect(arch("connect", { id: "c1", from: "a", to: "b", proposal: "P1" }).ok).toBe(true);
+    expect(arch("connect", { id: "c1", from: "a", to: "a", proposal: "P1" }).ok).toBe(false);
+    expect(arch("connect", { id: "c1", from: "a", to: "b", proposal: "" }).ok).toBe(false);
+    expect(ok("add_component", comp)).toBe(false);
+    expect(ok("connect", { id: "c1", from: "a", to: "b", proposal: "P1" })).toBe(false);
+    for (const [name, input] of [["delete", { id: "a" }], ["update_label", { id: "a", label: "A" }], ["set_parent", { id: "a", parent: null }]] as const)
+      expect(arch(name, { ...input, proposal: "P1" }).ok).toBe(false);
+    expect(arch("set_service", { id: "a", service: "s3", proposal: "P1" }, ["aws"]).ok).toBe(false);
   });
   it("kept ops validate as in live mode; set_service only with a catalog on", () => {
     expect(arch("add_component", { zone: "system", id: "b", label: "Bucket", type: "storage", service: "s3" }, ["aws"]).ok).toBe(true);

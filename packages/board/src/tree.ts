@@ -23,6 +23,8 @@ export interface ItemData {
   cross?: boolean;
   /** group: how many groups it sits in (0 = top of the zone); drawn outermost first, under its children. */
   depth?: number;
+  /** Drawn under an open proposal: the pencil look. Not part of `sig`: accepting inks it without a redraw. */
+  pencil?: boolean;
   /** scale / mark */
   noteLines?: string[];
   tone?: string;
@@ -49,6 +51,8 @@ export interface RenderItem {
 export interface RenderTree { items: RenderItem[]; map: Map<string, RenderItem> }
 
 export const HUES = 6;
+
+const pencil = (x: { proposal?: string }): Pick<ItemData, "pencil"> => (x.proposal ? { pencil: true } : {});
 
 function bbox(pts: Pt[]): Rect {
   const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
@@ -100,7 +104,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
   for (const g of [...board.groups].map((g) => ({ g, depth: depthOf(g.id) })).sort((a, b) => a.depth - b.depth)) {
     const r = lay.groups[g.g.id];
     if (!r) continue;
-    items.push({ key: g.g.id, kind: "group", hue: -1, sig: JSON.stringify([g.g.kind, g.g.label]), geom: { ...r }, data: { variant: g.g.kind, title: g.g.label, depth: g.depth } });
+    items.push({ key: g.g.id, kind: "group", hue: -1, sig: JSON.stringify([g.g.kind, g.g.label]), geom: { ...r }, data: { variant: g.g.kind, title: g.g.label, depth: g.depth, ...pencil(g.g) } });
   }
   for (const e of board.elements) {
     const r = lay.elements[e.id];
@@ -155,7 +159,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       }
       continue;
     }
-    items.push({ key: e.id, kind: "element", sig: JSON.stringify([variant, lines]), hue: zoneN.get(e.zone) ?? 0, geom: { ...r }, data: { variant, lines, service: e.service } });
+    items.push({ key: e.id, kind: "element", sig: JSON.stringify([variant, lines]), hue: zoneN.get(e.zone) ?? 0, geom: { ...r }, data: { variant, lines, service: e.service, ...pencil(e) } });
   }
   // brackets of a tree
   for (const [key, g] of Object.entries(lay.connections)) {
@@ -184,7 +188,7 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       key: c.id, kind: "connection", hue: -1,
       sig: JSON.stringify([c.style, c.both, c.label ?? ""]),
       geom: { ...b, pts: g.pts, curve: g.kind === "curve", lab: g.label ? { x: g.label.x, y: g.label.y } : undefined },
-      data: { dashed: c.style === "dashed", both: c.both, label: g.label?.text, cross: g.cross },
+      data: { dashed: c.style === "dashed", both: c.both, label: g.label?.text, cross: g.cross, ...pencil(c) },
     });
   }
 

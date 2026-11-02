@@ -4,7 +4,7 @@ import type { Options } from "roughjs/bin/core";
 import type { Drawable } from "roughjs/bin/core";
 import type { Geom, RenderItem } from "@grafito/board";
 import { GROUP_ICON, GROUP_LABEL_SIZE, LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "@grafito/board";
-import { BLUE, GROUP_STYLES, OUTLINES, FILLS, FONT_FAMILY, INK, PAPER, RED, TONES } from "@grafito/board";
+import { BLUE, GROUP_STYLES, OUTLINES, FILLS, FONT_FAMILY, INK, PAPER, PENCIL, PENCIL_TEXT, RED, TONES } from "@grafito/board";
 import type { GroupKind } from "@grafito/contract";
 import { addServiceIcon } from "./stamp";
 
@@ -12,6 +12,11 @@ const NS = "http://www.w3.org/2000/svg";
 const gen = rough.generator();
 /** Tames the stroke wobble: scales the final roughness and bowing. */
 const ROUGH_SCALE = 0.62;
+/**
+ * The pencil look of a proposal: every line grey, thin and sketchier, gone over twice, no fills; the text grey;
+ * the whole item semi-transparent and its service stamp greyed out.
+ */
+const PENCIL_LOOK = { maxWidth: 1.3, widthScale: 0.6, roughness: 1.9, bowing: 1.5, opacity: 0.8, stampOpacity: 0.5 };
 
 export function hash(s: string): number {
   let h = 2166136261;
@@ -45,7 +50,7 @@ const svgEl = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<strin
 class Builder {
   v: Visual;
   defs?: SVGDefsElement;
-  constructor(private key: string, translates: boolean) {
+  constructor(private key: string, translates: boolean, private pencil = false) {
     this.v = { g: svgEl("g"), strokes: [], fills: [], texts: [], translates };
   }
   seed(part: string) { return hash(this.key + ":" + part); }
@@ -84,6 +89,13 @@ class Builder {
     this.v.strokes.push({ anim: mp, show: shown, len: 0 });
   }
   rough(kind: "rect" | "ellipse" | "poly" | "path" | "line" | "curve", part: string, args: any[], o: Options, style: { stroke: string; width: number; dash?: Dash; fill?: string; fillOpacity?: number }) {
+    if (this.pencil && !part.startsWith("pencil2:")) {
+      const line = { stroke: PENCIL, width: Math.min(PENCIL_LOOK.maxWidth, style.width * PENCIL_LOOK.widthScale), dash: style.dash };
+      const sketchy = { ...o, roughness: (o.roughness ?? 1.3) * PENCIL_LOOK.roughness, bowing: (o.bowing ?? 1.2) * PENCIL_LOOK.bowing };
+      this.rough(kind, "pencil2:" + part, args, sketchy, line);
+      this.rough(kind, "pencil2:" + part + ":again", args, sketchy, line);
+      return;
+    }
     const opts: Options = { roughness: 1.3, bowing: 1.2, seed: this.seed(part), strokeWidth: style.width, stroke: style.stroke, ...o };
     opts.roughness = (opts.roughness ?? 1.3) * ROUGH_SCALE;
     opts.bowing = (opts.bowing ?? 1.2) * ROUGH_SCALE;
@@ -105,7 +117,7 @@ class Builder {
     lines.forEach((line, i) => {
       const t = svgEl("text", {
         x: cx, y: y0 + i * lh, "text-anchor": o.anchor ?? "middle", "dominant-baseline": "central",
-        "font-family": FONT_FAMILY, "font-size": size, "font-weight": o.weight ?? 400, fill: o.fill ?? INK,
+        "font-family": FONT_FAMILY, "font-size": size, "font-weight": o.weight ?? 400, fill: this.pencil ? PENCIL_TEXT : (o.fill ?? INK),
       });
       if (o.halo) { t.setAttribute("stroke", PAPER); t.setAttribute("stroke-width", "5"); t.setAttribute("paint-order", "stroke"); t.setAttribute("stroke-linejoin", "round"); }
       const chars: SVGTSpanElement[] = [], offsets: number[] = [];
@@ -183,7 +195,8 @@ function groupIcon(b: Builder, kind: GroupKind, color: string) {
 export function buildVisual(item: RenderItem, geom: Geom): Visual {
   const { w, h } = geom;
   const translates = item.kind === "zone" || item.kind === "group" || item.kind === "element" || item.kind === "emphasis" || item.kind === "question";
-  const b = new Builder(item.key, translates);
+  const pencil = !!item.data.pencil;
+  const b = new Builder(item.key, translates, pencil);
   const fill = item.hue >= 0 ? FILLS[item.hue] : "#F4E6A8";
   const outline = item.hue >= 0 ? OUTLINES[item.hue] : INK;
   const st = { stroke: INK, width: 2.2 };
@@ -359,6 +372,10 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
   }
 
   addServiceIcon(b.v, item, geom);
+  if (pencil) {
+    b.v.g.setAttribute("opacity", String(PENCIL_LOOK.opacity));
+    for (const st of b.v.stamps ?? []) { st.setAttribute("opacity", String(PENCIL_LOOK.stampOpacity)); st.style.filter = "grayscale(1)"; }
+  }
   if (translates) b.v.g.setAttribute("transform", `translate(${geom.x} ${geom.y})`);
   return b.v;
 }

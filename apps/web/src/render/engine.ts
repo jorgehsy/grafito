@@ -170,6 +170,46 @@ export class Engine implements Sink, Executor {
     s.busy = false;
   }
 
+  /**
+   * A proposal kept: the ink look is drawn over the pencil stroke by stroke, then its fills, stamp and text fade in
+   * while the pencil fades out. Nothing is struck out: the content is the same.
+   */
+  async ink(key: string, speed: number) {
+    const s = this.shown.get(key);
+    const t = this.target.map.get(key);
+    if (!s || !t || !!s.item.data.pencil === !!t.data.pencil) return;
+    s.busy = true;
+    const item: RenderItem = { ...s.item, data: { ...s.item.data, pencil: t.data.pencil } };
+    const vis = buildVisual(item, s.geom);
+    const old = s.vis;
+    s.layer.insertBefore(vis.g, old.g.nextSibling);
+    measure(vis);
+    s.vis = vis;
+    s.item = item;
+    try {
+      if (isFinite(speed)) {
+        const sp = speed * this.userSpeed;
+        this.setFocus(s.geom);
+        this.lastActive = performance.now();
+        hideForDraw(vis);
+        hideStamp(vis);
+        await this.drawStrokes(s, sp);
+        this.hidePen();
+        await this.frame(320 / sp, (p) => {
+          old.g.style.opacity = String(1 - p);
+          for (const f of vis.fills) f.style.opacity = String(p * parseFloat(f.getAttribute("opacity") ?? "1"));
+          for (const st of vis.stamps ?? []) st.style.opacity = String(p);
+          for (const r of vis.texts) for (const c of r.chars) c.setAttribute("fill-opacity", String(p));
+        });
+        for (const st of vis.stamps ?? []) st.style.opacity = "";
+      }
+    } finally {
+      showAll(vis);
+      old.g.remove();
+      s.busy = false;
+    }
+  }
+
   async remove(keys: string[], speed: number) {
     const list = keys.map((k) => this.shown.get(k)).filter((x): x is Shown => !!x);
     for (const s of list) { s.busy = true; s.tween = undefined; }
@@ -177,7 +217,8 @@ export class Engine implements Sink, Executor {
       const sp = speed * this.userSpeed;
       await this.frame(300 / sp, (p) => {
         for (const s of list) {
-          s.vis.g.style.opacity = String(1 - p);
+          // a pencil item starts from its own see-through look
+          s.vis.g.style.opacity = String((1 - p) * parseFloat(s.vis.g.getAttribute("opacity") ?? "1"));
           if (s.vis.translates) {
             const k = 1 - 0.35 * p, cx = s.geom.w / 2, cy = s.geom.h / 2;
             s.vis.g.setAttribute("transform", `translate(${s.geom.x + cx * (1 - k)} ${s.geom.y + cy * (1 - k)}) scale(${k})`);

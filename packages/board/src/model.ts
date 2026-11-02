@@ -31,6 +31,8 @@ export interface Element {
   comp?: ComponentType;
   /** component: id of the group it sits in (architect mode). */
   group?: string;
+  /** Id of the open proposal it was drawn under: pencil. None = ink. */
+  proposal?: string;
   after?: string;
   parent?: string;
   column?: "left" | "right";
@@ -50,6 +52,8 @@ export interface Group {
   label: string;
   /** Id of the group it sits in; none = the top of the zone. */
   parent?: string;
+  /** Id of the open proposal it was drawn under: pencil. None = ink. */
+  proposal?: string;
 }
 export interface Connection {
   id: string;
@@ -58,6 +62,18 @@ export interface Connection {
   label?: string;
   style: "solid" | "dashed";
   both: boolean;
+  /** Id of the open proposal it was drawn under: pencil. None = ink. */
+  proposal?: string;
+}
+/**
+ * Something Claude adds on its own initiative (architect mode), drawn in pencil until the user keeps it (accept:
+ * ink) or turns it down (reject: erased). Only open proposals are kept; what was drawn under one carries its id.
+ */
+export interface Proposal {
+  id: string;
+  label: string;
+  /** The open proposal this one is the other choice to; the two are drawn side by side and only one is kept. */
+  alternativeTo?: string;
 }
 export interface Emphasis { target: string; style: EmphasisStyle }
 export interface Question { target: string; text?: string }
@@ -72,12 +88,14 @@ export interface Board {
   emphasis: Emphasis[];
   questions: Question[];
   callouts: Callout[];
+  /** Open proposals, in the order they were opened. */
+  proposals: Proposal[];
   summary: string;
   zoneCounter: number;
 }
 
 export const emptyBoard = (): Board => ({
-  zones: [], elements: [], groups: [], connections: [], emphasis: [], questions: [], callouts: [], summary: "", zoneCounter: 0,
+  zones: [], elements: [], groups: [], connections: [], emphasis: [], questions: [], callouts: [], proposals: [], summary: "", zoneCounter: 0,
 });
 
 export interface ApplyResult { board: Board; warnings: string[] }
@@ -89,8 +107,9 @@ const ELEMENT_ZONE: Record<ElementType, ZoneKind[]> = {
 export const findZone = (b: Board, id: string) => b.zones.find((z) => z.id === id);
 export const findElement = (b: Board, id: string) => b.elements.find((e) => e.id === id);
 export const findGroup = (b: Board, id: string) => b.groups.find((g) => g.id === id);
+export const findProposal = (b: Board, id: string) => b.proposals.find((p) => p.id === id);
 export const idTaken = (b: Board, id: string) =>
-  !!findZone(b, id) || !!findElement(b, id) || !!findGroup(b, id) || b.connections.some((c) => c.id === id) || b.callouts.some((c) => c.id === id);
+  !!findZone(b, id) || !!findElement(b, id) || !!findGroup(b, id) || b.connections.some((c) => c.id === id) || b.callouts.some((c) => c.id === id) || !!findProposal(b, id);
 const isTarget = (b: Board, id: string) => !!findZone(b, id) || !!findElement(b, id) || b.connections.some((c) => c.id === id);
 
 /** Implicit connections (after / parent) as regular connections with id "auto:<element>". */
@@ -117,6 +136,63 @@ function isInside(b: Board, id: string, group: string): boolean {
     g = findGroup(b, g)?.parent;
   }
   return false;
+}
+
+/** At most this many proposals are alternatives of each other. */
+export const MAX_ALTERNATIVES = 2;
+
+/**
+ * The open proposals that are alternatives of each other with `id` (linked by alternativeTo either way, also
+ * through another one), `id` included, in the order they were opened. [] if `id` is not open.
+ */
+export function alternativesOf(b: Board, id: string): string[] {
+  if (!findProposal(b, id)) return [];
+  const set = new Set([id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const p of b.proposals) {
+      const linked = set.has(p.id) ? p.alternativeTo : p.alternativeTo && set.has(p.alternativeTo) ? p.id : undefined;
+      if (linked && findProposal(b, linked) && !set.has(linked)) { set.add(linked); grew = true; }
+    }
+  }
+  return b.proposals.filter((p) => set.has(p.id)).map((p) => p.id);
+}
+
+/** The open proposals in order, each with its alternatives (itself included; [] when it has none). */
+export function openProposals(b: Board): { id: string; label: string; alternatives: string[] }[] {
+  return b.proposals.map((p) => {
+    const set = alternativesOf(b, p.id);
+    return { id: p.id, label: p.label, alternatives: set.length > 1 ? set : [] };
+  });
+}
+
+/** Erases everything drawn under these proposals. Ink inside an erased group moves up to the group's own parent. */
+function eraseProposals(b: Board, ids: Set<string>) {
+  if (!ids.size) return;
+  const under = (x: { proposal?: string }) => !!x.proposal && ids.has(x.proposal);
+  const goneGroups = new Map(b.groups.filter(under).map((g) => [g.id, g]));
+  const lift = (g: string | undefined) => {
+    for (let n = 0; g && goneGroups.has(g) && n <= b.groups.length; n++) g = goneGroups.get(g)!.parent;
+    return g;
+  };
+  const gone = new Set<string>([...goneGroups.keys()]);
+  for (const e of b.elements) if (under(e)) gone.add(e.id);
+  for (const c of b.connections) if (under(c)) gone.add(c.id);
+  b.groups = b.groups.filter((g) => !goneGroups.has(g.id));
+  b.elements = b.elements.filter((e) => !gone.has(e.id));
+  for (const g of b.groups) if (g.parent && goneGroups.has(g.parent)) { const up = lift(g.parent); if (up) g.parent = up; else delete g.parent; }
+  for (const e of b.elements) {
+    if (e.group && goneGroups.has(e.group)) { const up = lift(e.group); if (up) e.group = up; else delete e.group; }
+    if (e.after && gone.has(e.after)) e.after = undefined;
+    if (e.parent && gone.has(e.parent)) e.parent = undefined;
+  }
+  removeRefs(b, gone);
+}
+
+/** Closes these proposals; an open one that was their alternative stands on its own. */
+function closeProposals(b: Board, ids: Set<string>) {
+  b.proposals = b.proposals.filter((p) => !ids.has(p.id));
+  for (const p of b.proposals) if (p.alternativeTo && ids.has(p.alternativeTo)) delete p.alternativeTo;
 }
 
 function clone(b: Board): Board {
@@ -151,6 +227,9 @@ export function applyOp(board: Board, op: Op): ApplyResult {
   const i = op.input as unknown as Record<string, any>;
 
   const needNew = (v: string) => (idTaken(b, v) ? `id '${v}' already exists` : null);
+  // A drawing op under a proposal that is not open is not drawn: ink means the user agreed, so it is never the fallback.
+  const notOpen = i.proposal !== undefined && !findProposal(b, i.proposal) ? `proposal '${i.proposal}' is not open; not drawn` : null;
+  const proposal: { proposal?: string } = i.proposal !== undefined ? { proposal: i.proposal } : {};
 
   switch (op.name) {
     case "create_zone": {
@@ -176,7 +255,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
     case "add_node":
     case "add_item": {
       const type: ElementType = { add_step: "step", add_decision: "decision", add_component: "component", add_node: "node", add_item: "item" }[op.name] as ElementType;
-      const e = needNew(i.id);
+      const e = needNew(i.id) ?? notOpen;
       if (e) return bad(e);
       const zone = findZone(b, i.zone);
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
@@ -209,6 +288,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
         if (!g || g.zone !== zone.id) warnings.push(`add_component: parent '${i.parent}' is not a group of the zone; ignored`);
         else element.group = g.id;
       }
+      Object.assign(element, proposal);
       b.elements.push(element);
       return { board: b, warnings };
     }
@@ -284,14 +364,14 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       return { board: b, warnings };
     }
     case "connect": {
-      const e = needNew(i.id);
+      const e = needNew(i.id) ?? notOpen;
       if (e) return bad(e);
       for (const end of [i.from, i.to]) if (findGroup(b, end)) return bad(`'${end}' is a group; arrows join components only`);
       if (!findElement(b, i.from)) return bad(`source '${i.from}' does not exist`);
       if (!findElement(b, i.to)) return bad(`target '${i.to}' does not exist`);
       b.connections.push({
         id: i.id, from: i.from, to: i.to, label: str(i.label) ? i.label : undefined,
-        style: i.style === "dashed" ? "dashed" : "solid", both: !!i.both_ways,
+        style: i.style === "dashed" ? "dashed" : "solid", both: !!i.both_ways, ...proposal,
       });
       return { board: b, warnings };
     }
@@ -420,7 +500,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       return { board: b, warnings };
     }
     case "add_group": {
-      const e = needNew(i.id);
+      const e = needNew(i.id) ?? notOpen;
       if (e) return bad(e);
       let parent: Group | undefined;
       if (i.parent !== undefined) {
@@ -429,7 +509,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       }
       const zone = parent ? findZone(b, parent.zone) : groupZone(b);
       if (!zone) return bad("there is no system zone to draw the group in");
-      b.groups.push({ id: i.id, zone: zone.id, kind: i.kind, label: i.label, ...(parent ? { parent: parent.id } : {}) });
+      b.groups.push({ id: i.id, zone: zone.id, kind: i.kind, label: i.label, ...(parent ? { parent: parent.id } : {}), ...proposal });
       return { board: b, warnings };
     }
     case "set_parent": {
@@ -447,6 +527,30 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (parent.zone !== zoneId) return bad(`group '${i.parent}' is in another zone`);
       if (g && isInside(b, parent.id, g.id)) return bad(`cannot put '${g.id}' inside itself or a group it contains`);
       if (g) g.parent = parent.id; else element!.group = parent.id;
+      return { board: b, warnings };
+    }
+    case "propose": {
+      const e = needNew(i.id);
+      if (e) return bad(e);
+      const p: Proposal = { id: i.id, label: i.label };
+      const other = i.alternative_to;
+      if (other !== undefined) {
+        if (!findProposal(b, other)) warnings.push(`propose: '${other}' is not an open proposal; ${i.id} opens on its own`);
+        else if (alternativesOf(b, other).length >= MAX_ALTERNATIVES) warnings.push(`propose: '${other}' already has an alternative (at most ${MAX_ALTERNATIVES} side by side); ${i.id} opens on its own`);
+        else p.alternativeTo = other;
+      }
+      b.proposals.push(p);
+      return { board: b, warnings };
+    }
+    case "accept":
+    case "reject": {
+      const id: string = i.proposal;
+      if (!findProposal(b, id)) return bad(`proposal '${id}' is not open`);
+      // accepting keeps this one in ink and erases its alternatives; rejecting erases only this one
+      const erased = op.name === "accept" ? alternativesOf(b, id).filter((x) => x !== id) : [id];
+      if (op.name === "accept") for (const x of [...b.elements, ...b.groups, ...b.connections]) if (x.proposal === id) delete x.proposal;
+      eraseProposals(b, new Set(erased));
+      closeProposals(b, new Set([id, ...erased]));
       return { board: b, warnings };
     }
     case "update_summary": {

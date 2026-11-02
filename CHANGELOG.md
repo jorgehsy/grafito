@@ -8,6 +8,7 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 - Architect mode (hidden): type what you want to build and Claude draws it in the system zone and answers in a speech bubble in the corner (Sonnet 5.5 by default; `POST /api/architect`).
 - Architect mode (hidden): Claude's advice follows the AWS Well-Architected Framework, and when nothing big is left open it offers a review against the six pillars, one gap per turn. The framework titles in `packages/wellarchitected/` are CC BY-SA 4.0 (see its `NOTICE.md`).
 - Architect mode (hidden): Claude can draw AWS groups (AWS Cloud, Region, VPC, Availability Zone, public and private subnets) as nested boxes in AWS's colours, only when they mean something. Deleting a group keeps what was inside it.
+- Architect mode (hidden): what Claude adds on its own is drawn in pencil (grey and sketchy) with a question; type "yes" and it is inked, "no" and it is erased. When the right choice depends on you, Claude draws two alternatives side by side and you answer "A" or "B". What you ask for is drawn in ink straight away.
 
 ## v0.2.0-alpha.6 · 2026-10-31
 

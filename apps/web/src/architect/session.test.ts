@@ -137,6 +137,57 @@ describe("architect session: a turn", () => {
   });
 });
 
+describe("architect session: proposals", () => {
+  const opEv = (name: string, input: unknown) => ev("op", { name, input });
+  const site = (id: string, service: string) => opEv("add_component", { zone: ARCHITECT_ZONE_ID, id, label: id, type: id === "files" ? "storage" : "service", service, proposal: "P1" });
+  const pencilTurn = [
+    opEv("propose", { id: "P1", label: "Static site" }),
+    site("dns", "route-53"), site("cdn", "cloudfront"), site("files", "s3"),
+    opEv("connect", { id: "c1", from: "dns", to: "cdn", proposal: "P1" }),
+    opEv("connect", { id: "c2", from: "cdn", to: "files", proposal: "P1" }),
+    say("Does it call an API, or is it only pages?", "P1"),
+    opEv("update_summary", { text: "Proposed a static site (P1)." }),
+    done,
+  ];
+
+  it("draws Claude's proposal in pencil, then sends the typed yes as is and inks it on accept", async () => {
+    const h = harness((i) => (i === 0 ? pencilTurn : [opEv("accept", { proposal: "P1" }), say("Kept. Next: the API?"), done]));
+    await tick();
+    h.session.send("let's build a React webpage");
+    await settled(h, 1);
+    expect(h.board().proposals).toEqual([{ id: "P1", label: "Static site" }]);
+    expect(h.board().elements.map((e) => [e.id, e.proposal])).toEqual([["dns", "P1"], ["cdn", "P1"], ["files", "P1"]]);
+    expect(h.state().bubble).toEqual({ text: "Does it call an API, or is it only pages?", target: "P1" });
+
+    h.session.send("yes");
+    await settled(h, 2);
+    const body = h.requests[1].body;
+    expect(body.text).toBe("yes");
+    expect(body.board).toContain('- cdn (component/service) "cdn" @system service:cloudfront [pencil P1]');
+    expect(body.board).toContain('PROPOSALS\n- P1 "Static site"');
+    expect(h.board().proposals).toEqual([]);
+    expect(h.board().elements.map((e) => e.id)).toEqual(["dns", "cdn", "files"]);
+    expect([...h.board().elements, ...h.board().connections].some((x) => x.proposal)).toBe(false);
+  });
+
+  it("no erases the proposal; B keeps the second alternative and erases the first", async () => {
+    const alts = [
+      opEv("propose", { id: "P2", label: "Relational" }),
+      opEv("add_component", { zone: ARCHITECT_ZONE_ID, id: "rds", label: "RDS", type: "database", proposal: "P2" }),
+      opEv("propose", { id: "P3", label: "Key-value", alternative_to: "P2" }),
+      opEv("add_component", { zone: ARCHITECT_ZONE_ID, id: "ddb", label: "DynamoDB", type: "database", proposal: "P3" }),
+      say("A (RDS) or B (DynamoDB)?"),
+      done,
+    ];
+    const h = harness((i) => [pencilTurn, [opEv("reject", { proposal: "P1" }), say("Gone."), done], alts, [opEv("accept", { proposal: "P3" }), say("DynamoDB it is."), done]][i]);
+    await tick();
+    for (const [k, text] of ["build a webpage", "no", "add a database", "B"].entries()) { h.session.send(text); await settled(h, k + 1); }
+    expect(h.requests[3].body.board).toContain('PROPOSALS\n- P2 "Relational" (A; alternative to P3)\n- P3 "Key-value" (B; alternative to P2)');
+    expect(h.board().elements.map((e) => e.id)).toEqual(["ddb"]);
+    expect(h.board().proposals).toEqual([]);
+  });
+});
+
 describe("recent turns", () => {
   it("leaves out the turn in flight", () => {
     const turn = (text: string, isDone: boolean) => ({ text, done: isDone, bubble: { text: "b" } }) as Parameters<typeof recentTurns>[0][number];
