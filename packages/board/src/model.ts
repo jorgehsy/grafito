@@ -3,6 +3,7 @@ import { qualifyService } from "@grafito/icons";
 import type { ComponentType, EmphasisStyle, GroupKind, MarkTone, Op, ZoneKind } from "@grafito/contract";
 import { ARCHITECT_ZONE_ID } from "./architect-zone";
 
+export type ZoneDirection = "horizontal" | "vertical";
 export interface Zone {
   id: string;
   kind: ZoneKind;
@@ -15,6 +16,8 @@ export interface Zone {
   level?: { at: number; label?: string };
   /** cycle: center text. */
   centerLabel?: string;
+  /** flow/system: which way the arrows run, chosen by Claude from the meaning. Absent: the layout picks one. */
+  direction?: ZoneDirection;
   place?: { relation: "right_of" | "below"; of: string };
   /** Creation order number (gives the zone a stable color). */
   n: number;
@@ -263,10 +266,12 @@ export function applyOp(board: Board, op: Op): ApplyResult {
           warnings.push(`create_zone: place ignored (unknown zone '${i.place?.of}')`);
         else place = { relation: i.place.relation, of: i.place.of };
       }
+      if (i.direction && i.kind !== "flow" && i.kind !== "system") warnings.push(`create_zone: direction ignored on a ${i.kind} zone`);
       b.zones.push({
         id: i.id, kind: i.kind, title: i.title, place, n: b.zoneCounter++,
         ...(i.kind === "compare" ? { leftTitle: i.left_title ?? "", rightTitle: i.right_title ?? "" } : {}),
         ...(i.kind === "cycle" && str(i.center_label) ? { centerLabel: i.center_label } : {}),
+        ...(i.direction && (i.kind === "flow" || i.kind === "system") ? { direction: i.direction } : {}),
         ...(i.kind === "scale" ? { minLabel: str(i.min_label) ? i.min_label : "0%", maxLabel: str(i.max_label) ? i.max_label : "100%" } : {}),
       });
       return { board: b, warnings };

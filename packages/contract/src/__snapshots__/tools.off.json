@@ -48,6 +48,14 @@
           "type": "string",
           "description": "Cycle only: text in the center of the cycle, what cycles (e.g. 'Context window')."
         },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "horizontal",
+            "vertical"
+          ],
+          "description": "Flow and system only: which way the arrows run. horizontal = left to right, elements at the same level stack in a column (a sequence of steps). vertical = top to bottom, elements at the same level sit side by side in a row (layers such as users, frontend, services, data). Omit it when the meaning does not decide: the board picks one from the shape of the graph."
+        },
         "place": {
           "type": "object",
           "description": "Optional placement hint relative to another zone.",

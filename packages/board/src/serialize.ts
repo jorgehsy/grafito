@@ -24,6 +24,7 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
       if (z.level) l += ` level:${z.level.at}${z.level.label ? " " + q(z.level.label) : ""}`;
     }
     if (z.kind === "cycle" && z.centerLabel) l += ` center:${q(z.centerLabel)}`;
+    if (z.direction) l += ` direction:${z.direction}`;
     if (z.place) l += ` place:${z.place.relation} ${z.place.of}`;
     l += ` color:${FILL_NAMES[z.n % FILL_NAMES.length]}`;
     out.push(l);
