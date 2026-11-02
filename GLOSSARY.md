@@ -245,12 +245,12 @@ The app mode where the user and Claude design an AWS architecture together, foll
 _Avoid_: design mode, chat mode, modo arquitecto, conversation mode
 
 **Speech bubble**:
-A short comic-style balloon drawn over the board that carries what Claude says to the user in architect mode. Short, concrete and blunt; never a full explanation.
+A short comic-style balloon drawn over the board that carries what Claude says to the user in architect mode. Short, concrete and blunt; never a full explanation. One with a target (a component, group, arrow or proposal) sits beside it with a tail pointing at it; one without, or whose target is gone, is a **general bubble** in the top-right corner.
 _Avoid_: burbuja, chat message, reply, tooltip, callout (a callout is an annotation)
 
 **Bubble marker**:
-The small minimized mark a speech bubble leaves where it appeared once the next turn starts; one toggle shows or hides every past bubble.
-_Avoid_: pin, dot, badge, comment marker
+What a speech bubble shrinks to once the next turn starts: a small dot on the **timeline rail**, the slim strip just above the text box with one marker per turn (muted for a turn that said nothing). Hovering or focusing a marker shows its text, clicking it reopens the bubble, and clicking the rail itself shows or hides every past bubble.
+_Avoid_: pin, badge, comment marker
 
 **Turn**:
 One user message in architect mode (with any approvals or rejections clicked since the last one) and Claude's answer to it: one speech bubble with at most one question, plus the ops it draws.

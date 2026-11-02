@@ -10,6 +10,9 @@ import { fetchAvailableModels, usableModel } from "../../live/models";
 import type { ModelControl } from "../../live/models";
 import { t as translate, useLang, useT } from "../../i18n";
 import { ProposalToolbar } from "./ProposalToolbar";
+import { SpeechBubbles } from "./SpeechBubbles";
+import { TimelineRail } from "./TimelineRail";
+import { bubbleMarkers, initialBubbleView, openBubbles, toggleDot, toggleRail, withCurrent } from "../bubbles";
 
 /** What the panel needs from the drawn board: clicks on it, the selection outline, and where an item is on screen. */
 export interface BoardCanvas {
@@ -26,7 +29,10 @@ interface Props {
   onModelControl(c: ModelControl | null): void;
 }
 
-/** Architect mode's controls: the speech bubble and the one text box. Mounting it starts a session on a blank board. */
+/**
+ * Architect mode's controls: the speech bubbles, the timeline rail of bubble markers and the one text box.
+ * Mounting it starts a session on a blank board.
+ */
 export function ArchitectPanel({ board, canvas, onModelControl }: Props) {
   const t = useT();
   const lang = useLang();
@@ -60,6 +66,14 @@ export function ArchitectPanel({ board, canvas, onModelControl }: Props) {
   useEffect(() => { onModelControl({ model, available, onModel: setModel }); }, [model, available, onModelControl]);
   useEffect(() => () => onModelControl(null), [onModelControl]);
 
+  // Bubbles: one marker per turn from its say ops; the latest turn's bubble open, past ones open only on request.
+  const markers = useMemo(() => bubbleMarkers(state.turns), [state.turns]);
+  const current = state.turns.at(-1)?.n ?? 0;
+  const [rawView, setView] = useState(initialBubbleView);
+  const view = withCurrent(rawView, current);
+  const shown = openBubbles(markers, view);
+  const waiting = state.busy && !shown.some((m) => m.turn === current);
+
   const [typed, setTyped] = useState("");
   const send = () => { if (session.send(typed)) setTyped(""); };
   const input = useRef<HTMLInputElement>(null);
@@ -90,11 +104,13 @@ export function ArchitectPanel({ board, canvas, onModelControl }: Props) {
 
   return (
     <div className="architect" data-testid="architect-panel">
-      {(state.bubble || state.busy) && (
-        <div className={"bubble" + (state.bubble ? "" : " wait")} data-testid="speech-bubble" role="status" aria-live="polite">
-          {state.bubble ? state.bubble.text : t("architect.thinking")}
-        </div>
-      )}
+      <SpeechBubbles
+        bubbles={shown}
+        current={current}
+        waiting={waiting}
+        board={() => deps.current.board.get()}
+        screenRect={(key) => deps.current.canvas.screenRect(key)}
+      />
       {sel && (
         <ProposalToolbar
           proposal={sel.proposal}
@@ -104,6 +120,12 @@ export function ArchitectPanel({ board, canvas, onModelControl }: Props) {
         />
       )}
       {state.error && <div className="toasts"><div className="toast warn" data-testid="architect-error" role="alert">{state.error}</div></div>}
+      <TimelineRail
+        markers={markers}
+        view={view}
+        onDot={(turn) => setView((v) => toggleDot(withCurrent(v, current), turn))}
+        onRail={() => setView((v) => toggleRail(withCurrent(v, current)))}
+      />
       <form className="typebar" data-testid="architect-typebar" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <input ref={input} data-testid="architect-input" aria-label={t("architect.input.label")} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t("architect.input.placeholder")} />
         <button className="pbtn primary" type="submit" disabled={!typed.trim() || state.busy}>{t("typebar.send")}</button>
