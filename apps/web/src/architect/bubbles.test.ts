@@ -20,7 +20,8 @@ describe("bubble target", () => {
     comp("db", "P1"),
     comp("cache", "P1"),
     op.connect({ id: "c1", from: "db", to: "cache", proposal: "P1" }),
-    op.connect({ id: "c2", from: "api", to: "db" }),
+    comp("web"),
+    op.connect({ id: "c2", from: "api", to: "web" }),
   ]);
 
   it("points at a component", () => expect(resolveTarget(b, "api")).toEqual({ kind: "element", keys: ["api"] }));

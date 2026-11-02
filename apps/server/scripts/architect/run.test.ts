@@ -75,7 +75,7 @@ describe("runScenario", () => {
       [2, "choose B", "accept P2"],
       [3, "Add an SQS queue for orders.", undefined],
     ]);
-    expect(rows[0].checks).toEqual({ oneSay: { pass: true }, oneQuestion: { pass: true }, alternatives: { pass: true }, bpIds: { pass: true }, pencil: { pass: true } });
+    expect(rows[0].checks).toEqual({ oneSay: { pass: true }, oneQuestion: { pass: true }, alternatives: { pass: true }, bpIds: { pass: true }, inkToPencil: { pass: true }, pencil: { pass: true } });
     expect(rows[0].usd).toBeGreaterThan(0);
     expect(rows[1].checks).toEqual({});
     expect(rows[1].usd).toBeUndefined();
@@ -99,9 +99,9 @@ describe("runScenario", () => {
     expect(board.elements.map((e) => [e.id, e.proposal])).toEqual([["ddb", undefined], ["orders", undefined]]);
 
     const table = formatTable(rows);
-    expect(table).toContain("| rds-or-dynamo | 1 | 1 | An online store needs a database. RDS or Dynamo… | pass | pass | pass | pass | pencil pass | pass | $");
-    expect(table).toContain("| rds-or-dynamo | 1 | 2 | choose B (accept P2) | - | - | - | - | - | pass | - |");
-    expect(table).toContain("| rds-or-dynamo | 1 | 3 | Add an SQS queue for orders. | pass | FAIL | pass | pass | ink pass | FAIL | $");
+    expect(table).toContain("| rds-or-dynamo | 1 | 1 | An online store needs a database. RDS or Dynamo… | pass | pass | pass | pass | pass | pencil pass | pass | $");
+    expect(table).toContain("| rds-or-dynamo | 1 | 2 | choose B (accept P2) | - | - | - | - | - | - | pass | - |");
+    expect(table).toContain("| rds-or-dynamo | 1 | 3 | Add an SQS queue for orders. | pass | FAIL | pass | pass | pass | ink pass | FAIL | $");
     expect(table).toContain("rds-or-dynamo run 1 step 3: oneQuestion FAIL: 2 questions");
     expect(table).toContain("| rds-or-dynamo | 3 | Add an SQS queue for orders. | 0/1 | oneQuestion 1/1 | FAIL |");
     expect(table).toContain("1 of 3 steps failed.");

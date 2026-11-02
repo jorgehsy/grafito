@@ -3,7 +3,7 @@ import { applyOps, architectZoneOp, emptyBoard } from "@grafito/board";
 import { op } from "@grafito/contract";
 import type { Op } from "@grafito/contract";
 import {
-  checkAlternatives, checkAsksKeep, checkBpIds, checkBubbleOnly, checkInk, checkOneQuestion, checkOneSay, checkPencil, checkReview,
+  checkAlternatives, checkAsksKeep, checkBpIds, checkBubbleOnly, checkInk, checkInkToPencil, checkOneQuestion, checkOneSay, checkPencil, checkReview,
   checkTurn, citedBpIds, pendingCount,
 } from "./checks";
 
@@ -42,6 +42,18 @@ describe("every turn", () => {
     // Accepting P1 first closes it and its alternative, so the new pair stands alone.
     expect(checkAlternatives([op.accept({ proposal: "P1" }), propose("P3"), propose("P4", "P3")], [{ id: "P1", label: "x" }, { id: "P2", label: "y", alternativeTo: "P1" }])).toEqual({ pass: true });
     expect(checkAlternatives([op.reject({ proposal: "P2" }), propose("P3", "P1")], [{ id: "P1", label: "x" }, { id: "P2", label: "y", alternativeTo: "P1" }])).toEqual({ pass: true });
+  });
+
+  it("draws no ink arrow to pencil, on the board or drawn this turn (#63)", () => {
+    const before = boardWith([propose("P1"), comp("meta", "P1"), comp("photos", "P1")]);
+    expect(checkInkToPencil([comp("mod"), link("c10", "mod", "meta")], before)).toEqual({ pass: false, detail: "ink arrow to pencil: c10 to meta (P1)" });
+    expect(checkInkToPencil([propose("P2"), comp("q", "P2"), comp("mod"), link("c10", "mod", "q")], before)).toEqual({ pass: false, detail: "ink arrow to pencil: c10 to q (P2)" });
+    expect(checkInkToPencil([comp("mod"), link("c10", "mod", "meta", "P1")], before)).toEqual({ pass: true });
+    expect(checkInkToPencil([comp("a"), comp("b"), link("c10", "a", "b")], before)).toEqual({ pass: true });
+    // answered before it is drawn: accept inks it, reject erases it
+    expect(checkInkToPencil([op.accept({ proposal: "P1" }), comp("mod"), link("c10", "mod", "meta")], before)).toEqual({ pass: true });
+    const pair = boardWith([propose("P1"), comp("rds", "P1"), propose("P2", "P1"), comp("ddb", "P2")]);
+    expect(checkInkToPencil([op.accept({ proposal: "P2" }), comp("api"), link("c1", "api", "ddb")], pair)).toEqual({ pass: true });
   });
 
   it("cites only best-practice ids that exist in the Well-Architected digest", () => {
@@ -111,9 +123,9 @@ describe("checkTurn", () => {
     const before = boardWith([propose("P1"), propose("P2"), propose("P3")]);
     const r = checkTurn([comp("api"), say("Keep these? (REL10-BP01)"), summary], { before, expect: ["ink", "asksKeep"] });
     expect(r).toEqual({
-      oneSay: { pass: true }, oneQuestion: { pass: true }, alternatives: { pass: true }, bpIds: { pass: true },
+      oneSay: { pass: true }, oneQuestion: { pass: true }, alternatives: { pass: true }, bpIds: { pass: true }, inkToPencil: { pass: true },
       ink: { pass: true }, asksKeep: { pass: true },
     });
-    expect(Object.keys(checkTurn([say("Hi.")], { before, expect: [] }))).toEqual(["oneSay", "oneQuestion", "alternatives", "bpIds"]);
+    expect(Object.keys(checkTurn([say("Hi.")], { before, expect: [] }))).toEqual(["oneSay", "oneQuestion", "alternatives", "bpIds", "inkToPencil"]);
   });
 });

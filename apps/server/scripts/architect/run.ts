@@ -155,6 +155,7 @@ const COLUMNS: { name: CheckName; title: string }[] = [
   { name: "oneQuestion", title: "≤1 ?" },
   { name: "alternatives", title: "≤2 alts" },
   { name: "bpIds", title: "BP ids" },
+  { name: "inkToPencil", title: "No ink on pencil" },
 ];
 
 const mark = (r: TurnChecks[CheckName]) => (!r ? "-" : r.pass === null ? "n/a" : r.pass ? "pass" : "FAIL");

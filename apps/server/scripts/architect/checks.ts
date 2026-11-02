@@ -1,6 +1,6 @@
 // The architect eval's checks (#43): code rules over one turn's ops, no LLM judge. Every turn gets the first four;
 // the rest run only when the scenario step's `expect` names them.
-import { lastSay, openProposals } from "@grafito/board";
+import { alternativesOf, lastSay, openProposals, proposalOf } from "@grafito/board";
 import type { Board, Proposal } from "@grafito/board";
 import type { Op } from "@grafito/contract";
 import { serviceIdOf } from "@grafito/icons";
@@ -13,7 +13,7 @@ export interface CheckResult {
   detail?: string;
 }
 
-export const EVERY_TURN = ["oneSay", "oneQuestion", "alternatives", "bpIds"] as const;
+export const EVERY_TURN = ["oneSay", "oneQuestion", "alternatives", "bpIds", "inkToPencil"] as const;
 export type CheckName = (typeof EVERY_TURN)[number] | Expect;
 export type TurnChecks = Partial<Record<CheckName, CheckResult>>;
 
@@ -68,6 +68,30 @@ export function checkAlternatives(ops: readonly Op[], before: readonly Proposal[
     }
   }
   return PASS;
+}
+
+/**
+ * No ink arrow touches pencil (#63): a reject would erase it under the user's agreed design. Walks the turn's ops
+ * over the board it was sent with, because the board model pencils such an arrow and would hide the attempt.
+ */
+export function checkInkToPencil(ops: readonly Op[], before: Board): CheckResult {
+  const pencil = new Map<string, string>();
+  for (const x of [...before.elements, ...before.groups]) { const p = proposalOf(before, x.id); if (p) pencil.set(x.id, p); }
+  // accepting inks a proposal and erases its alternative: either way none of the set is pencil any more
+  const close = (proposal: string) => {
+    const set = alternativesOf(before, proposal);
+    for (const [id, p] of pencil) if (p === proposal || set.includes(p)) pencil.delete(id);
+  };
+  const bad: string[] = [];
+  for (const o of ops) {
+    if (o.name === "accept") close(o.input.proposal);
+    else if (o.name === "reject") { const p = o.input.proposal; for (const [id, q] of pencil) if (q === p) pencil.delete(id); }
+    else if (o.name === "connect" && !o.input.proposal) {
+      const ends = [o.input.from, o.input.to].filter((e) => pencil.has(e));
+      if (ends.length) bad.push(`${o.input.id} to ${ends.map((e) => `${e} (${pencil.get(e)})`).join(", ")}`);
+    } else if (DRAWING.has(o.name) && proposalOfOp(o)) pencil.set(drawnId(o), proposalOfOp(o)!);
+  }
+  return bad.length ? failed(`ink arrow to pencil: ${bad.join("; ")}`) : PASS;
 }
 
 /** Best-practice ids anywhere in the turn's ops, in order: the bubble, labels, the summary. */
@@ -144,6 +168,7 @@ export function checkTurn(ops: readonly Op[], ctx: { before: Board; expect: read
     oneQuestion: checkOneQuestion(ops),
     alternatives: checkAlternatives(ops, ctx.before.proposals),
     bpIds: checkBpIds(ops),
+    inkToPencil: checkInkToPencil(ops, ctx.before),
   };
   for (const e of ctx.expect) {
     if (e === "ink") out.ink = checkInk(ops, ctx.asked);
