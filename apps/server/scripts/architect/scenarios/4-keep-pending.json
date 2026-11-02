@@ -1,6 +1,6 @@
 [
   { "say": "I want to build a photo sharing app.", "expect": ["pencil"] },
-  { "say": "Users also upload videos, and they get an email when someone comments.", "expect": ["asksKeep"] },
-  { "say": "There will also be a search page to find photos by tag.", "expect": ["asksKeep"] },
-  { "say": "And an admin dashboard for moderators.", "expect": ["asksKeep"] }
+  { "say": "Users need to sign in.", "expect": ["pencil"] },
+  { "say": "Photos should load fast for users all over the world.", "expect": ["pencil"] },
+  { "say": "Moderators need to review reported photos.", "expect": ["asksKeep"] }
 ]

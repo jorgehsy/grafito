@@ -1,5 +1,5 @@
 [
-  { "say": "I'm building an online store: a web frontend and an API.", "expect": ["pencil"] },
+  { "say": "I'm building an online store.", "expect": ["pencil"] },
   { "accept": "all" },
   { "say": "Now it needs a database for orders and products. RDS or DynamoDB?", "expect": ["pencil"] },
   { "choose": 1 },
