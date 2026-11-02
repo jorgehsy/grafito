@@ -77,7 +77,7 @@ How a component is drawn: actor, client, service, database, queue, storage or ex
 _Avoid_: comp, component kind
 
 **Group**:
-An AWS boundary box inside a system zone that holds components and other groups: AWS Cloud, Region, VPC, Availability Zone or subnet. Groups nest; each component and each group has at most one parent group.
+An AWS boundary box inside a system zone that holds components and other groups: AWS Cloud, Region, VPC, Availability Zone, public or private subnet, or a generic one. Groups nest; each component and each group has at most one parent group. Arrows never join a group, and deleting one keeps what was inside it.
 _Avoid_: container (an ECS or Docker container is a component), box, boundary, zone
 
 **Node**:
@@ -167,7 +167,7 @@ Which change an op makes (`create_zone`, `add_step`, `connect`, `update_summary`
 _Avoid_: tool name (in board code), op type
 
 **Tool definition**:
-The name, description and input schema of one op as offered to Claude; the set offered depends on the enabled icon catalogs.
+The name, description and input schema of one op as offered to Claude; the set offered depends on the app mode (live mode and architect mode each have their own op set) and on the enabled icon catalogs.
 _Avoid_: herramienta, schema (alone), tool spec
 
 **Invalid op**:
@@ -245,11 +245,11 @@ The app mode where the user and Claude design an AWS architecture together, foll
 _Avoid_: design mode, chat mode, modo arquitecto, conversation mode
 
 **Speech bubble**:
-A short comic-style balloon drawn over the board that carries what Claude says to the user in architect mode. Short, concrete and blunt; never a full explanation.
+A short comic-style balloon drawn over the board that carries what Claude says to the user in architect mode. Short, concrete and blunt; never a full explanation. One with a target (a component, group, arrow or proposal) sits beside it with a tail pointing at it; one without, or whose target is gone, is a **general bubble** in the top-right corner.
 _Avoid_: burbuja, chat message, reply, tooltip, callout (a callout is an annotation)
 
 **Bubble marker**:
-The small minimized mark a speech bubble leaves where it appeared once the next turn starts; one toggle shows or hides every past bubble.
+What a speech bubble shrinks to once the next turn starts: a small round marker on the **timeline rail**, the slim strip just above the text box with one marker per turn (muted for a turn that said nothing). Hovering or focusing a marker shows its text, clicking it reopens the bubble, and clicking the rail itself shows or hides every past bubble.
 _Avoid_: pin, dot, badge, comment marker
 
 **Turn**:
@@ -257,7 +257,7 @@ One user message in architect mode (with any approvals or rejections clicked sin
 _Avoid_: turno, message, exchange, round
 
 **Proposal**:
-Something Claude draws in pencil in architect mode on its own initiative (what the user explicitly asks for goes straight to ink), waiting for the user to approve it (it turns to ink) or reject it (it is erased). Alternatives are proposals drawn side by side; choosing one erases the others.
+Something Claude draws in pencil in architect mode on its own initiative (what the user explicitly asks for goes straight to ink), waiting for the user to approve it (it turns to ink) or reject it (it is erased), by typing or with the ✓/✗ toolbar a click on it shows. Alternatives are two proposals drawn side by side (at most 2); keeping one erases the other, and clicking one keeps it. The board text tags its items `[pencil P3]` and lists the open ones under `PROPOSALS`.
 _Avoid_: propuesta, draft, suggestion, pending element
 
 **Ink**:
@@ -325,7 +325,7 @@ One run of architect mode, from start to reset: a sequence of turns and the appr
 _Avoid_: sesión de arquitecto, design session, conversation
 
 **Architect scenario**:
-A scripted architect session used to eval prompt changes: a list of steps, each a user message or a click named by meaning (accept all, reject the newest, choose alternative N), some with expectations about the turn that follows.
+A scripted architect session used to eval prompt changes: a list of steps, each a user message or a click named by meaning (accept or reject all or the newest, choose alternative A or B), some with expectations about the turn that follows.
 _Avoid_: test conversation, script, fixture
 
 **Session record**:

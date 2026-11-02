@@ -1,0 +1,24 @@
+{
+  "name": "@grafito/wellarchitected",
+  "private": true,
+  "version": "0.0.0",
+  "license": "CC-BY-SA-4.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "wa:fetch": "tsx scripts/fetch-wellarchitected.ts",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@grafito/config": "workspace:*",
+    "@types/node": "^26.6.5",
+    "eslint": "^9.39.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

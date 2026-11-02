@@ -1,4 +1,5 @@
 import { parseOp } from "@grafito/contract";
+import type { OpSet } from "@grafito/contract";
 import type { ModelEvent, Usage } from "./client";
 
 /** The subset of the Messages API stream events that the board reads. */
@@ -24,7 +25,7 @@ function isRetryable(status: unknown): boolean {
  * (a block with broken JSON is skipped, the rest go on), estimates output as chars/4 until the real figure
  * arrives, and retries once if no op has been yielded yet.
  */
-export async function* modelEvents(open: OpenStream, catalogs: readonly string[], signal: AbortSignal): AsyncGenerator<ModelEvent> {
+export async function* modelEvents(open: OpenStream, tools: { catalogs: readonly string[]; opSet: OpSet }, signal: AbortSignal): AsyncGenerator<ModelEvent> {
   // Usage known so far; output is estimated as chars/4 until the real figure arrives.
   const usage: Usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
   let streamedChars = 0;
@@ -59,7 +60,7 @@ export async function* modelEvents(open: OpenStream, catalogs: readonly string[]
         const b = blocks.get(ev.index);
         if (!b) continue;
         blocks.delete(ev.index);
-        const r = parseBlock(b.name, b.buf, catalogs);
+        const r = parseBlock(b.name, b.buf, tools);
         if (r.type === "op") ops++;
         yield r;
       } else if (ev.type === "message_delta") {
@@ -86,13 +87,13 @@ export async function* modelEvents(open: OpenStream, catalogs: readonly string[]
 }
 
 // Parses and validates a finished tool_use block. An empty buffer means {}.
-function parseBlock(name: string, json: string, catalogs: readonly string[]): ModelEvent {
+function parseBlock(name: string, json: string, tools: { catalogs: readonly string[]; opSet: OpSet }): ModelEvent {
   let input: unknown;
   try {
     input = json.trim() === "" ? {} : JSON.parse(json);
   } catch {
     return { type: "invalid", name, warning: `${name}: malformed JSON (skipped)` };
   }
-  const r = parseOp({ name, input }, catalogs);
+  const r = parseOp({ name, input }, tools.catalogs, tools.opSet);
   return r.ok ? { type: "op", op: r.op } : { type: "invalid", name, warning: r.error };
 }

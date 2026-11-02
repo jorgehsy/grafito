@@ -90,22 +90,22 @@ export function LangTiles({ value, onChange, disabled }: { value: string; onChan
 interface ViewProps {
   follow: boolean;
   onFollow(v: boolean): void;
-  showTranscript: boolean;
-  onShowTranscript(v: boolean): void;
+  /** The transcript toggle; left out where there is no transcript (architect mode). */
+  transcript?: { on: boolean; set(v: boolean): void };
 }
 
-/** Two independent toggles shaped as tiles. */
-export function ViewTiles({ follow, onFollow, showTranscript, onShowTranscript }: ViewProps) {
+/** Independent toggles shaped as tiles. */
+export function ViewTiles({ follow, onFollow, transcript }: ViewProps) {
   const t = useT();
   const toggles = [
     {
       label: t("options.view.follow"), on: follow, set: onFollow, id: undefined as string | undefined,
       thumb: <T><rect x="6" y="9" width="36" height="19" rx="3" /><path d="M17 9l2-4h10l2 4" /><circle cx="24" cy="18.5" r="5.5" /></T>,
     },
-    {
-      label: t("options.view.transcript"), on: showTranscript, set: onShowTranscript, id: "show-transcript",
+    ...(transcript ? [{
+      label: t("options.view.transcript"), on: transcript.on, set: transcript.set, id: "show-transcript" as string | undefined,
       thumb: <T><rect x="4" y="5" width="40" height="22" rx="3" /><path d="M10 16h14M28 16h10M14 21h20" /></T>,
-    },
+    }] : []),
   ];
   return (
     <div className="shapes" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>

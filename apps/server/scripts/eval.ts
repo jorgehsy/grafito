@@ -1,20 +1,30 @@
-// Eval CLI for the server. It replays saved session records against instructions to compare prompt
-// changes; only `instruction` and `baseline` without --dry call Claude, through a board handler it serves itself.
+// Eval CLI for the server. It replays saved session records against instructions, and runs architect scenarios, to
+// compare prompt changes; only `instruction`, `baseline` and `architect` without --dry call Claude, through the
+// route handlers it serves itself.
 import { fileURLToPath } from "node:url";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { config } from "dotenv";
-import express from "express";
 import { applyOps, emptyBoard, serializeBoard } from "@grafito/board";
 import type { Board } from "@grafito/board";
-import { DEFAULT_LANG, EVAL_MODEL, MODELS, costUsd, isLang, isModelId, parseOp, parseRecord } from "@grafito/contract";
-import type { Lang, Op, SessionRecord } from "@grafito/contract";
+import { ARCHITECT_DEFAULT_MODEL, DEFAULT_LANG, EVAL_MODEL, MODELS, costUsd, isLang, isModelId, parseOp, parseRecord } from "@grafito/contract";
+import type { Lang, LiveRecord, Op } from "@grafito/contract";
 import { CATALOG_IDS } from "@grafito/icons";
 import { buildClients } from "../src/claude/clients";
+import { createArchitectHandler } from "../src/routes/architect";
 import { createBoardHandler } from "../src/routes/board";
+import type { Clients } from "../src/routes/turn";
+import { DEFAULT_DIR } from "../src/sessions";
 import { languageLine } from "../src/prompt/system";
 import { buildUserText } from "../src/prompt/user-text";
+import { dryScenario, formatTable, rowFailed, runScenario, saveRecord } from "./architect/run";
+import type { StepRow } from "./architect/run";
+import { parseScenario } from "./architect/scenario";
+import type { Scenario } from "./architect/scenario";
 import { convertV1 } from "./convert-v1";
+import { readSse } from "./sse";
+import type { SseData } from "./sse";
+import { serveHandler } from "./serve";
 
 // The .env key wins over one inherited from the shell, as in the server.
 config({ override: true, path: fileURLToPath(new URL("../.env", import.meta.url)) });
@@ -30,14 +40,23 @@ Commands:
       Run each baseline instruction against each record (the eval of #5: 3 records x 2 instructions)
       and end with a table: invalid ops, missing labels, zones and cost per run.
       --json    also write the results, labels included, to a file
-  Both accept --model <id>: the model to run (default ${EVAL_MODEL}). Models: ${MODELS.map((m) => m.id).join(", ")}.
+  architect <scenario.json | dir>... [--dry] [--runs N] [--out <dir>] [--model <id>]
+      Run architect scenarios (scripted architect sessions) through POST /api/architect and end with a
+      table: one row per step and run, pass/fail per check, cost. Exits non-zero if any check fails.
+      Each run is saved as an architect session record, openable in the app (Import).
+      --dry     print the language line and the user text of each step only, without calling Claude
+      --runs N  run each scenario N times (default 1)
+      --out     where the records go (default apps/server/sessions, the app's saved sessions)
+  All three accept --model <id>: the model to run (default ${EVAL_MODEL}; ${ARCHITECT_DEFAULT_MODEL} for architect).
+      Models: ${MODELS.map((m) => m.id).join(", ")}.
       A "@subscription" model runs on your Claude plan (cost "included in plan"): no ANTHROPIC_API_KEY
       and no GRAFITO_SUBSCRIPTION needed, only a logged-in Claude Code.
       e.g. pnpm eval instruction rec.json "..." --model claude-sonnet-5-5@subscription
   convert-v1 <record.json | dir>... --out <dir>
-      Convert version 1 session records to version 2 (same file names) into <dir>.
+      Convert version 1 session records to the current version (same file names) into <dir>.
 
-Instruction and baseline runs need ANTHROPIC_API_KEY (apps/server/.env) unless the model is a plan model.`;
+Instruction and baseline take live session records (version 2 or 3); an architect record is refused.
+Instruction, baseline and architect runs need ANTHROPIC_API_KEY (apps/server/.env) unless the model is a plan model.`;
 
 /** The instructions of the recorded baseline, verbatim: they are what the user said. */
 const BASELINE_INSTRUCTIONS = ["separa esto en dos diagramas", "convierte esto en un árbol"];
@@ -71,34 +90,32 @@ function pickModel(value: string | true | undefined) {
   MODEL = value;
 }
 
+/** The adapter the model needs, alone; exits with a hint when it is not available. */
+function clientsFor(model: string): Clients {
+  const provider = MODELS.find((m) => m.id === model)!.provider;
+  const clients = buildClients({ apiKey: process.env.ANTHROPIC_API_KEY, subscription: provider === "claude-subscription" });
+  if (!clients[provider]) fail(`Missing API key: set ANTHROPIC_API_KEY in apps/server/.env, or use a plan model (--model ${model}@subscription).`);
+  return clients;
+}
+
 /** Serves the board handler in this process, with only the adapter the model needs; returns its URL. */
 async function boardUrl(): Promise<string> {
-  if (url) return url;
-  const provider = MODELS.find((m) => m.id === MODEL)!.provider;
-  const clients = buildClients({ apiKey: process.env.ANTHROPIC_API_KEY, subscription: provider === "claude-subscription" });
-  if (!clients[provider]) fail(`Missing API key: set ANTHROPIC_API_KEY in apps/server/.env, or use a plan model (--model ${MODEL}@subscription).`);
-  const app = express();
-  app.use(express.json({ limit: "10mb" }));
-  app.post("/api/board", createBoardHandler(clients));
-  const server = await new Promise<import("node:http").Server>((ok) => {
-    const s = app.listen(0, "127.0.0.1", () => ok(s));
-  });
-  server.unref();
-  url = `http://127.0.0.1:${(server.address() as import("node:net").AddressInfo).port}/api/board`;
+  url ??= (await serveHandler("/api/board", createBoardHandler(clientsFor(MODEL)))).url;
   return url;
 }
 
 const jsonFiles = (paths: string[]) =>
   paths.flatMap((p) => (statSync(p).isDirectory() ? readdirSync(p).filter((f) => f.endsWith(".json")).sort().map((f) => join(p, f)) : [p]));
 
-function loadRecord(file: string): SessionRecord {
+function loadRecord(file: string): LiveRecord {
   const parsed = parseRecord(JSON.parse(readFileSync(file, "utf8")));
   if (!parsed.ok) fail(`${file}: ${parsed.error}${parsed.outdated ? " Convert it first: pnpm eval convert-v1 <file> --out <dir>" : ""}`);
+  if (parsed.record.appMode !== "live") fail(`${file}: an architect session record; these commands replay live session records only.`);
   return parsed.record;
 }
 
 /** The board after the requests that did not fail, the first `upto` of them (failed ones count). */
-function replay(rec: SessionRecord, upto = Infinity): Board {
+function replay(rec: LiveRecord, upto = Infinity): Board {
   let board = emptyBoard();
   for (const r of rec.requests.slice(0, upto)) {
     if (r.error) continue;
@@ -110,6 +127,14 @@ function replay(rec: SessionRecord, upto = Infinity): Board {
     board = applyOps(board, ops).board;
   }
   return board;
+}
+
+function loadScenario(file: string): Scenario {
+  let json: unknown;
+  try { json = JSON.parse(readFileSync(file, "utf8")); } catch (e) { fail(`${file}: ${(e as Error).message}`); }
+  const parsed = parseScenario(json, basename(file, ".json"));
+  if (!parsed.ok) fail(`${file}: ${parsed.error}`);
+  return parsed.scenario;
 }
 
 const labelsOf = (b: Board) => ({
@@ -132,7 +157,7 @@ interface RunResult {
 }
 
 /** One instruction against one record. Without `dry` this calls the Claude API through the server. */
-async function run(rec: SessionRecord, name: string, instruction: string, opts: { dry: boolean; upto?: number }): Promise<RunResult | null> {
+async function run(rec: LiveRecord, name: string, instruction: string, opts: { dry: boolean; upto?: number }): Promise<RunResult | null> {
   const board = replay(rec, opts.upto);
   const summary = board.summary || rec.summary || "";
   const original = serializeBoard(board);
@@ -155,25 +180,15 @@ async function run(rec: SessionRecord, name: string, instruction: string, opts: 
   });
   if (!res.ok || !res.body) fail(`HTTP ${res.status}`);
 
-  // Simple SSE parsing: blocks separated by a blank line.
   const received: Op[] = [];
   const warnings: string[] = [];
   let invalidOps = 0;
-  let done: any = null;
-  let buf = "";
-  const handle = (chunk: string) => {
-    let event = "message";
-    let data = "";
-    for (const line of chunk.split("\n")) {
-      if (line.startsWith("event: ")) event = line.slice(7);
-      else if (line.startsWith("data: ")) data += line.slice(6);
-    }
-    if (!data) return;
-    const d = JSON.parse(data);
+  let done = null as SseData | null;
+  await readSse(res.body, (event, d) => {
     if (event === "op") {
       if (d.invalid) {
         invalidOps++;
-        warnings.push(d.warning);
+        warnings.push(d.warning ?? `${d.name}: invalid`);
       } else {
         const p = parseOp(d, []);
         if (p.ok) received.push(p.op);
@@ -185,22 +200,12 @@ async function run(rec: SessionRecord, name: string, instruction: string, opts: 
       }
     } else if (event === "error") warnings.push(`ERROR: ${d.message}`);
     else if (event === "done") done = d;
-  };
-  const decoder = new TextDecoder();
-  for await (const part of res.body as any) {
-    buf += decoder.decode(part, { stream: true });
-    let i: number;
-    while ((i = buf.indexOf("\n\n")) >= 0) {
-      handle(buf.slice(0, i));
-      buf = buf.slice(i + 2);
-    }
-  }
-  if (buf.trim()) handle(buf);
+  });
 
   const applied = applyOps(board, received);
   const final = applied.board;
   warnings.push(...applied.warnings.map((w) => `apply: ${w}`));
-  const usd = done ? costUsd(MODEL, done.usage) : null;
+  const usd = done?.usage ? costUsd(MODEL, done.usage) : null;
 
   console.log("\n--- WARNINGS ---");
   console.log(warnings.length ? warnings.join("\n") : "(none)");
@@ -278,6 +283,34 @@ if (command === "instruction") {
   else {
     printTable(results);
     if (typeof values["--json"] === "string") writeFileSync(values["--json"], JSON.stringify(results, null, 2) + "\n");
+  }
+} else if (command === "architect") {
+  const { positional, values } = parseArgs(args, { "--dry": false, "--runs": true, "--out": true, "--model": true });
+  if (!positional.length) fail(USAGE);
+  MODEL = ARCHITECT_DEFAULT_MODEL;
+  pickModel(values["--model"]);
+  const runs = values["--runs"] === undefined ? 1 : Number(values["--runs"]);
+  if (!Number.isInteger(runs) || runs < 1) fail(`--runs must be a whole number of at least 1, got ${String(values["--runs"])}`);
+  const out = typeof values["--out"] === "string" ? resolve(values["--out"]) : DEFAULT_DIR;
+  const scenarios = jsonFiles(positional).map(loadScenario);
+  if (values["--dry"]) {
+    for (const sc of scenarios) console.log(dryScenario(sc) + "\n");
+    const turns = scenarios.reduce((a, sc) => a + sc.steps.filter((s) => "say" in s).length, 0);
+    console.log(`(dry run: ${turns * runs} turns not sent, model ${MODEL})`);
+  } else {
+    const architect = await serveHandler("/api/architect", createArchitectHandler(clientsFor(MODEL)));
+    const rows: StepRow[] = [];
+    for (const sc of scenarios) {
+      for (let run = 1; run <= runs; run++) {
+        console.log(`===== ${sc.name} run ${run}`);
+        const r = await runScenario(sc, run, { url: architect.url, model: MODEL });
+        rows.push(...r.rows);
+        console.log(`saved ${saveRecord(r.record, out)}`);
+      }
+    }
+    console.log(`\n--- RESULTS (${MODEL}) ---`);
+    console.log(formatTable(rows));
+    if (rows.some(rowFailed)) process.exitCode = 1;
   }
 } else if (command === "convert-v1") {
   const { positional, values } = parseArgs(args, { "--out": true });

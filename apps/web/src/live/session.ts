@@ -2,8 +2,8 @@
 // transcript, the session record (snapshot / restore / undo replay) and autosave to storage and the server.
 import type { Board } from "@grafito/board";
 import { serializeBoard } from "@grafito/board";
-import type { Op, RecordRequest, SessionRecord, Usage } from "@grafito/contract";
-import { addUsage, costUsd, parseOp, parseRecord, PROMPT_VERSION, zeroUsage } from "@grafito/contract";
+import type { LiveRecord, Op, RecordRequest, Usage } from "@grafito/contract";
+import { addUsage, costUsd, parseOp, parseRecord, PROMPT_VERSION, RECORD_VERSION, zeroUsage } from "@grafito/contract";
 import { CATALOG_IDS } from "@grafito/icons";
 import { createScheduler } from "./scheduler";
 import type { RequestMode } from "./scheduler";
@@ -11,6 +11,7 @@ import { splitInstruction } from "./instruction";
 import { createGrouper } from "./speech/grouper";
 import { streamBoard } from "./sse";
 import type { UsageInfo } from "./sse";
+import { RECORD_KEYS } from "../storage";
 import type { Store } from "../storage";
 import { t } from "../i18n";
 
@@ -68,7 +69,7 @@ export interface LiveSessionState {
   canUndo: boolean;
   medianVoiceFirstMs: number | null;
   /** A session left in storage by an earlier visit; offered until this session sends its first request. */
-  unclosed: SessionRecord | null;
+  unclosed: LiveRecord | null;
   savedAt: number | null;
   /** The last problem saving the session or reading the stored one; "" if none. */
   warning: string;
@@ -83,16 +84,16 @@ export interface LiveSession {
   reset(): void;
   /** Rebuilds the board without the last applied instruction. Returns false if there is none. */
   undoLastInstruction(): boolean;
-  snapshot(): SessionRecord;
+  snapshot(): LiveRecord;
   /** Replaces this session with the record and replays its ops; numbering continues after its last request. */
-  restore(rec: SessionRecord): void;
+  restore(rec: LiveRecord): void;
   /** Calls `fn` now and on every change; returns the unsubscribe function. */
   subscribe(fn: (s: LiveSessionState) => void): () => void;
 }
 
-export const RECORD_KEY = "grafito.sessionRecord";
+export const RECORD_KEY = RECORD_KEYS.live;
 export const AUTOSAVE_MS = 10_000;
-const SAVE_AFTER_REQUEST_MS = 300;
+export const SAVE_AFTER_REQUEST_MS = 300;
 
 const newSessionId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
@@ -130,12 +131,12 @@ function entryFromRequest(r: RecordRequest): LogEntry {
   };
 }
 
-function readStored(storage: Store): { unclosed: SessionRecord | null; warning: string } {
+function readStored(storage: Store): { unclosed: LiveRecord | null; warning: string } {
   const raw = storage.get(RECORD_KEY);
   if (!raw) return { unclosed: null, warning: "" };
   let p;
   try { p = parseRecord(JSON.parse(raw)); } catch { return { unclosed: null, warning: "" }; }
-  if (p.ok) return { unclosed: p.record.requests.length ? p.record : null, warning: "" };
+  if (p.ok) return { unclosed: p.record.appMode === "live" && p.record.requests.length ? p.record : null, warning: "" };
   if (p.outdated) storage.remove(RECORD_KEY);
   return { unclosed: null, warning: p.outdated ? t("record.outdated") : "" };
 }
@@ -266,10 +267,10 @@ export function createLiveSession(d: LiveSessionDeps): LiveSession {
 
   const halt = () => { epoch++; grouper.cancel(); scheduler.stop(); abort?.abort(); abort = null; current = null; busy = false; };
 
-  function snapshot(): SessionRecord {
+  function snapshot(): LiveRecord {
     const s = d.settings.get();
     return {
-      version: 2, id, startedAt, updatedAt: Date.now(), model: s.model, shape: s.shape, speechLang: s.speechLang,
+      version: RECORD_VERSION, appMode: "live", id, startedAt, updatedAt: Date.now(), model: s.model, shape: s.shape, speechLang: s.speechLang,
       requests: entries.map((e) => ({
         n: e.id, model: e.model, promptVersion: e.promptVersion, batch: e.batch, mode: e.mode, ...(e.undone ? { undone: true } : {}),
         startedAt: e.startedAt, firstOpMs: e.firstOpMs, voiceFirstMs: e.voiceFirstMs, totalMs: e.totalMs,

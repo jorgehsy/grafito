@@ -31,6 +31,7 @@
 - **Saves itself.** Each session is saved to `apps/server/sessions/`. You can restore, import and export (JSON and SVG).
 - **Visible cost.** Shows the tokens and the dollar cost of each request.
 - **AWS icons.** Turn on the catalog in Options → Icons and Claude puts the official icon (Lambda, S3, Cognito... 40 services) next to boxes that are AWS services.
+- **Architect mode.** Design an AWS architecture with Claude: you type, it draws, asks and pushes back, following the AWS Well-Architected Framework.
 - **Script mode.** Demos that need no Claude and cost nothing, to see how it works.
 
 ## Language
@@ -91,6 +92,19 @@ Only the local server reads the key. It never reaches the browser.
 - **Demo at no cost:** open **http://localhost:5173/?mode=demo** and pick a demo. To play one right away: `/?mode=demo&demo=architecture&auto=1&speed=2`.
 - **Move around:** mouse wheel = zoom, drag = pan.
 
+### Architect mode
+
+Design an AWS architecture together with Claude. It draws, asks and pushes back like a senior architect would, following the AWS Well-Architected Framework.
+
+- **Enter:** press the compass button in the toolbar (next to live and demo), or open **http://localhost:5173/?mode=architect**. You start on a blank board with one system zone.
+- **Talk by text:** there is one text box at the bottom. Say what you want to build and press Enter. What you ask for is drawn in ink.
+- **Pencil proposals:** what Claude adds on its own is drawn in pencil (grey and sketchy), with a question. Type *"yes"* or *"no"*, or click the sketch and press ✓ or ✗. When the choice depends on you, Claude draws two alternatives side by side: answer *"A"* or *"B"*, or click the one you want.
+- **Speech bubbles:** Claude answers in a short bubble that points at what it talks about. Past bubbles shrink to dots on the timeline rail above the text box: hover one to read it, click it to reopen it.
+- **Saves itself:** architect mode has its own autosave, apart from live mode, so one never overwrites the other. Switching modes wipes the board without asking; come back and press **Restore** to get the design back, pending pencil included. Export and import work too, and a file reopens in the mode it was saved in.
+- **Review:** when nothing big is left open, Claude offers a Well-Architected review, one gap at a time. Its advice uses a digest of the framework in `packages/wellarchitected/`, adapted from AWS documentation under CC BY-SA 4.0 (see [NOTICE.md](packages/wellarchitected/NOTICE.md)).
+
+Architect turns use Sonnet by default and follow the same key rules as live mode. If you change the architect prompt, run the scripted sessions first: `pnpm --filter @grafito/server eval architect scripts/architect/scenarios` (add `--dry` to see what would be sent without calling Claude).
+
 ### Use your Claude subscription (local only)
 
 You can run Claude on your own Claude plan instead of the API. It is for your own machine: Anthropic does not allow offering claude.ai login to other people, so never host this for others.
@@ -136,6 +150,7 @@ pnpm dev                                         # web on :5173, server on :8787
 pnpm turbo run typecheck lint test build         # what CI runs
 pnpm --filter @grafito/server eval instruction <record.json> "<instruction>" [--dry]  # replay a saved session against an instruction
 pnpm --filter @grafito/server eval baseline <dir> [--dry]  # the prompt regression eval: 2 instructions per record
+pnpm --filter @grafito/server eval architect scripts/architect/scenarios [--dry] [--runs N]  # architect mode's scripted sessions, checked turn by turn
 pnpm --filter @grafito/icons icons:aws <zip>     # reinstall the AWS icons from the official package
 ```
 
@@ -148,6 +163,7 @@ pnpm --filter @grafito/icons icons:aws <zip>     # reinstall the AWS icons from 
 | `packages/contract` | The browser/server contract. Ops and their tool definitions, op validation, pricing. |
 | `packages/board` | The board engine, no DOM. Model (`applyOps`), layout, routing, render tree, animation queue, controller, board text for the prompt. |
 | `packages/icons` | Icon catalogs. AWS curated list, SVGs, NOTICE, fetch script. |
+| `packages/wellarchitected` | The Well-Architected digest for architect mode. Pillar, question and best-practice titles, NOTICE, fetch script. |
 | `packages/config` | Shared tsconfig bases and the ESLint flat config. |
 
 Demo scripts live in `apps/web/src/demos/`.
@@ -179,7 +195,7 @@ Welcome! Open an *issue* with what you found or what you would like. If you send
 
 ## License
 
-[MIT](LICENSE) © 2026 Jorge Simoes, except the icons in `packages/icons/src/aws/` (see [NOTICE.md](packages/icons/src/aws/NOTICE.md)).
+[MIT](LICENSE) © 2026 Jorge Simoes, except the icons in `packages/icons/src/aws/` (see [NOTICE.md](packages/icons/src/aws/NOTICE.md)) and the Well-Architected digest in `packages/wellarchitected/`, adapted from AWS documentation under CC BY-SA 4.0 (see [NOTICE.md](packages/wellarchitected/NOTICE.md)).
 
 Amazon Web Services, AWS and the related service icons are trademarks of Amazon.com, Inc. or its affiliates. Grafito is not affiliated with or endorsed by AWS.
 

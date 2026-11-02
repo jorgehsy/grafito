@@ -18,6 +18,7 @@ const params: ClaudeParams = {
   system: [{ text: "board prompt", cache: true }, { text: "language line" }],
   userText: "NEW SPOKEN FRAGMENT: hello",
   catalogs: [],
+  opSet: "board",
 };
 
 const P = "mcp__grafito__";
@@ -52,9 +53,9 @@ function fakeQuery(...scripts: (readonly Step[] | "hang")[]): FakeQuery {
   return Object.assign(fn, { calls });
 }
 
-async function collect(q: QueryFn, env: NodeJS.ProcessEnv = {}, signal = new AbortController().signal): Promise<ModelEvent[]> {
+async function collect(q: QueryFn, env: NodeJS.ProcessEnv = {}, signal = new AbortController().signal, p: ClaudeParams = params): Promise<ModelEvent[]> {
   const out: ModelEvent[] = [];
-  for await (const e of subscriptionClient({ query: q, env }).stream(params, signal)) out.push(e);
+  for await (const e of subscriptionClient({ query: q, env }).stream(p, signal)) out.push(e);
   return out;
 }
 
@@ -101,6 +102,32 @@ describe("subscriptionClient", () => {
     expect(o).toMatchObject({ tools: [], settingSources: [], strictMcpConfig: true, maxTurns: 1, includePartialMessages: true, effort: "low", permissionMode: "dontAsk" });
     expect(o.allowedTools).toEqual(toolDefs([]).map((t) => P + t.name));
     expect(Object.keys(o.mcpServers ?? {})).toEqual(["grafito"]);
+  });
+
+  it("live turns run with thinking disabled", async () => {
+    const q = fakeQuery([ok]);
+    await collect(q);
+    expect(q.calls[0].thinking).toEqual({ type: "disabled" });
+  });
+
+  it("architect turns: architect tools, one turn, adaptive thinking left on, their own output limit", async () => {
+    const architect: ClaudeParams = { ...params, model: "claude-sonnet-5-5@subscription", maxTokens: 16000, effort: "medium", opSet: "architect", adaptiveThinking: true };
+    const q = fakeQuery([ev(start()), ...toolBlock(0, P + "say", JSON.stringify({ text: "Where do users sign in?" })).map(ev), ...stop("end_turn", 9).map(ev), ok]);
+    const out = await collect(q, {}, undefined, architect);
+    const o = q.calls[0];
+    expect(o).not.toHaveProperty("thinking");
+    expect(o).toMatchObject({ model: "claude-sonnet-5-5", maxTurns: 1, effort: "medium", env: { CLAUDE_CODE_MAX_OUTPUT_TOKENS: "16000" } });
+    expect(o.allowedTools).toEqual(toolDefs([], "architect").map((t) => P + t.name));
+    expect(out.find((e) => e.type === "op")).toEqual({ type: "op", op: { name: "say", input: { text: "Where do users sign in?" } } });
+
+    const server = o.mcpServers!.grafito as { instance: { connect(t: unknown): Promise<void> } };
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await server.instance.connect(a);
+    const client = new Client({ name: "test", version: "1" });
+    await client.connect(b);
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name)).toEqual(toolDefs([], "architect").map((t) => t.name));
+    await client.close();
   });
 
   it("serves the toolDefs schemas as they are, and every call answers ok", async () => {

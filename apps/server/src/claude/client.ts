@@ -1,6 +1,6 @@
-import type { Op } from "@grafito/contract";
+import type { Op, OpSet } from "@grafito/contract";
 
-/** Token usage of one board request, in the order the SSE payloads carry it. */
+/** Token usage of one request, in the order the SSE payloads carry it. */
 export interface Usage {
   input_tokens: number;
   output_tokens: number;
@@ -14,7 +14,7 @@ export interface SystemBlock {
   cache?: boolean;
 }
 
-/** One board request to Claude. The tools sent, and the ops accepted, follow `catalogs`. */
+/** One request to Claude. The tools sent, and the ops accepted, follow `catalogs` and `opSet`. */
 export interface ClaudeParams {
   model: string;
   maxTokens: number;
@@ -22,10 +22,16 @@ export interface ClaudeParams {
   system: readonly SystemBlock[];
   userText: string;
   catalogs: readonly string[];
+  opSet: OpSet;
+  /**
+   * Leave thinking at the model's default (adaptive). Without it the subscription adapter turns thinking
+   * off, as live mode always has; the API adapter never sends a thinking setting either way.
+   */
+  adaptiveThinking?: boolean;
 }
 
 /**
- * What a board request yields, in order:
+ * What a request yields, in order:
  * - `op`: a finished tool block that parsed as a valid op.
  * - `invalid`: a finished tool block that was skipped (malformed JSON or not a valid op).
  * - `usage`: usage so far; `estimated` while the real output count is not known yet.

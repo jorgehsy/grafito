@@ -1,5 +1,5 @@
 import type { Board, Zone } from "../model";
-import { derivedConnections } from "../model";
+import { alternativesOf, derivedConnections } from "../model";
 import { layoutCycle } from "./cycle";
 import { layoutElkWithEmph } from "./elk";
 import { HEADER, PAD, ZONE_GAP, labelRect, overlaps, rectBottom, rectRight, union } from "./geometry";
@@ -16,22 +16,40 @@ const COMPARE_TITLE_H = 40;
 const cache = new Map<string, ZoneLocal>();
 export const clearLayoutCache = () => cache.clear();
 
+/**
+ * Moves the elements (or arrows) of proposals that are alternatives of each other next to each other, where the first
+ * of them is, so the layered layout (which keeps the model order of nodes and edges) draws them side by side.
+ */
+export function alternativesTogether<T extends { proposal?: string }>(board: Board, items: T[]): T[] {
+  const first = new Map<string, number>();
+  const rank = items.map((e, i) => {
+    const set = e.proposal ? alternativesOf(board, e.proposal) : [];
+    if (set.length < 2) return i;
+    if (!first.has(set[0])) first.set(set[0], i);
+    return first.get(set[0])!;
+  });
+  return items.map((e, i) => ({ e, i })).sort((a, b) => rank[a.i] - rank[b.i] || a.i - b.i).map((x) => x.e);
+}
+
 export async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
-  const elements = board.elements.filter((e) => e.zone === zone.id);
+  const own = board.elements.filter((e) => e.zone === zone.id);
+  const elements = zone.kind === "system" && board.proposals.length ? alternativesTogether(board, own) : own;
   const ids = new Set(elements.map((e) => e.id));
-  const connections =
+  const linked =
     zone.kind === "flow" || zone.kind === "system"
       ? [...derivedConnections(board), ...board.connections].filter((c) => ids.has(c.from) && ids.has(c.to))
       : [];
+  const connections = zone.kind === "system" && board.proposals.length ? alternativesTogether(board, linked) : linked;
   const circled = board.emphasis.filter((m) => m.style === "circle" && ids.has(m.target)).map((m) => m.target);
-  const key = JSON.stringify([zone.kind, zone.title, zone.leftTitle, zone.rightTitle, zone.minLabel, zone.maxLabel, zone.centerLabel, elements, connections, circled]);
+  const groups = zone.kind === "system" ? board.groups.filter((g) => g.zone === zone.id) : [];
+  const key = JSON.stringify([zone.kind, zone.title, zone.leftTitle, zone.rightTitle, zone.minLabel, zone.maxLabel, zone.centerLabel, elements, connections, circled, groups]);
   let content = cache.get(key);
   if (!content) {
     if (zone.kind === "scale") content = layoutScale(zone, elements);
     else if (zone.kind === "cycle") content = layoutCycle(zone, elements);
     else if (zone.kind === "timeline") content = layoutTimeline(zone, elements);
-    else if (!elements.length) content = { w: 0, h: 0, elements: {}, connections: {} };
-    else if (zone.kind === "flow" || zone.kind === "system") content = await layoutElkWithEmph(zone, elements, connections, circled);
+    else if (!elements.length && !groups.length) content = { w: 0, h: 0, elements: {}, connections: {} };
+    else if (zone.kind === "flow" || zone.kind === "system") content = await layoutElkWithEmph(zone, elements, connections, circled, groups);
     else if (zone.kind === "mindmap") content = layoutMindmap(elements);
     else if (zone.kind === "tree") content = layoutTree(elements);
     else content = layoutStack(zone, elements);
@@ -39,7 +57,7 @@ export async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
     cache.set(key, content);
   }
   // normalize: content starts at (0,0)
-  const all = [...Object.values(content.elements), ...Object.values(content.labels ?? {}), ...(content.scale ? [content.scale.bar] : [])];
+  const all = [...Object.values(content.elements), ...Object.values(content.groups ?? {}), ...Object.values(content.labels ?? {}), ...(content.scale ? [content.scale.bar] : [])];
   const box = union(all);
   const connectionPts = Object.values(content.connections).flatMap((e) => e.pts);
   const minX = Math.min(box.x, ...connectionPts.map((p) => p.x)), minY = Math.min(box.y, ...connectionPts.map((p) => p.y));
@@ -63,6 +81,7 @@ export async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
   if (content.labels) res.labels = Object.fromEntries(Object.entries(content.labels).map(([id, r]) => [id, { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h }]));
   if (content.scale) res.scale = { ...content.scale, bar: { ...content.scale.bar, x: content.scale.bar.x + ox, y: content.scale.bar.y + oy } };
   for (const [id, r] of Object.entries(content.elements)) res.elements[id] = { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h };
+  if (content.groups) res.groups = Object.fromEntries(Object.entries(content.groups).map(([id, r]) => [id, { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h }]));
   for (const [id, e] of Object.entries(content.connections))
     res.connections[id] = { kind: e.kind, pts: e.pts.map(sh), label: e.label ? { ...e.label, ...sh(e.label) } : undefined };
   return res;

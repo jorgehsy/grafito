@@ -39,10 +39,13 @@ CURRENT BOARD: (empty board)
 FRAGMENT: "The customer places the order on the website and the API stores it in the database."
 Calls: create_zone{id:"app",kind:"system",title:"Orders"}; add_component{zone:"app",id:"customer",label:"Customer",type:"actor"}; add_component{zone:"app",id:"web",label:"Website",type:"client"}; add_component{zone:"app",id:"api",label:"API",type:"service"}; add_component{zone:"app",id:"db",label:"Database",type:"database"}; connect{id:"c1",from:"customer",to:"web"}; connect{id:"c2",from:"web",to:"api"}; connect{id:"c3",from:"api",to:"db",label:"stores order"}; update_summary{text:"The customer orders on the website; the API stores the order in the database."}`;
 
+/** The catalog's service ids with their synonyms, as the prompt lists them. */
+export const serviceList = (catalog: IconCatalog): string =>
+  catalog.services.map((s) => (s.synonyms?.length ? `${s.id} (also: ${s.synonyms.join(", ")})` : s.id)).join("; ");
+
 // Extra prompt block per enabled catalog. The service list comes from the catalog registry.
 function catalogPromptBlock(catalog: IconCatalog): string {
-  const serviceList = catalog.services.map((s) => (s.synonyms?.length ? `${s.id} (also: ${s.synonyms.join(", ")})` : s.id)).join("; ");
-  return `${catalog.label} service icons: add_step, add_decision and add_component accept service, and set_service puts it on or changes it (or removes it with an empty service) on any element already drawn, e.g. "that API is actually API Gateway" or "give the API box the API Gateway icon". Valid ids: ${serviceList}.
+  return `${catalog.label} service icons: add_step, add_decision and add_component accept service, and set_service puts it on or changes it (or removes it with an empty service) on any element already drawn, e.g. "that API is actually API Gateway" or "give the API box the API Gateway icon". Valid ids: ${serviceList(catalog)}.
 - Set service ONLY if the speaker names the service ("Lambda", "an S3 bucket") or there is no doubt. If you only infer it ("a serverless function"), do not set it.
 - Generic words ("a database", "a queue", "a server") get no icon. There are only service icons, never resource icons.
 - An element with service needs no icon.`;

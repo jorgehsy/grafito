@@ -61,8 +61,10 @@ export class Engine implements Sink, Executor {
   paused = false;
   follow = true;
   onFollowChange?: (f: boolean) => void;
+  /** A click (not a drag) on the board: the key of the pencil item under it, or null for ink or empty paper. */
+  onPick?: (key: string | null) => void;
 
-  private layers: Record<"zone" | "under" | "connection" | "element" | "ann", SVGGElement>;
+  private layers: Record<"zone" | "group" | "under" | "connection" | "element" | "ann", SVGGElement>;
   private pen: SVGGElement;
   private clock = 0;
   private lastReal = 0;
@@ -79,10 +81,11 @@ export class Engine implements Sink, Executor {
   private raf = 0;
   private ro: ResizeObserver;
   private cleanup: (() => void)[] = [];
+  private selected = new Set<string>();
 
   constructor(private svg: SVGSVGElement) {
     const mk = () => { const g = document.createElementNS(NS, "g"); svg.appendChild(g); return g; };
-    this.layers = { zone: mk(), under: mk(), connection: mk(), element: mk(), ann: mk() };
+    this.layers = { zone: mk(), group: mk(), under: mk(), connection: mk(), element: mk(), ann: mk() };
     this.pen = this.makePen();
     svg.appendChild(this.pen);
     this.ro = new ResizeObserver(() => this.measureView());
@@ -120,10 +123,11 @@ export class Engine implements Sink, Executor {
     if (!t || this.shown.has(key)) return;
     const vis = buildVisual(t, t.geom);
     const layer = this.layerOf(t);
-    layer.appendChild(vis.g);
+    this.insert(layer, t, vis.g);
     measure(vis);
     const s: Shown = { item: t, geom: t.geom, vis, layer, busy: true };
     this.shown.set(key, s);
+    this.tag(s);
     this.highlight(s);
     this.setFocus(t.geom);
     this.lastActive = performance.now();
@@ -159,6 +163,7 @@ export class Engine implements Sink, Executor {
     s.layer.replaceChild(vis.g, s.vis.g);
     s.vis = vis;
     s.item = { ...t, geom: s.geom };
+    this.tag(s);
     this.highlight(s);
     if (!instant) {
       hideText(vis);
@@ -170,6 +175,50 @@ export class Engine implements Sink, Executor {
     s.busy = false;
   }
 
+  /**
+   * A proposal kept: the ink look is drawn over the pencil stroke by stroke, then its fills, stamp and text fade in
+   * while the pencil fades out. Nothing is struck out: the content is the same.
+   */
+  async ink(key: string, speed: number) {
+    const s = this.shown.get(key);
+    const t = this.target.map.get(key);
+    if (!s || !t || !!s.item.data.pencil === !!t.data.pencil) return;
+    s.busy = true;
+    const item: RenderItem = { ...s.item, data: { ...s.item.data, pencil: t.data.pencil } };
+    const vis = buildVisual(item, s.geom);
+    const old = s.vis;
+    // the fading pencil is no longer clickable
+    delete old.g.dataset.pencil;
+    delete old.g.dataset.selected;
+    s.layer.insertBefore(vis.g, old.g.nextSibling);
+    measure(vis);
+    s.vis = vis;
+    s.item = item;
+    this.tag(s);
+    try {
+      if (isFinite(speed)) {
+        const sp = speed * this.userSpeed;
+        this.setFocus(s.geom);
+        this.lastActive = performance.now();
+        hideForDraw(vis);
+        hideStamp(vis);
+        await this.drawStrokes(s, sp);
+        this.hidePen();
+        await this.frame(320 / sp, (p) => {
+          old.g.style.opacity = String(1 - p);
+          for (const f of vis.fills) f.style.opacity = String(p * parseFloat(f.getAttribute("opacity") ?? "1"));
+          for (const st of vis.stamps ?? []) st.style.opacity = String(p);
+          for (const r of vis.texts) for (const c of r.chars) c.setAttribute("fill-opacity", String(p));
+        });
+        for (const st of vis.stamps ?? []) st.style.opacity = "";
+      }
+    } finally {
+      showAll(vis);
+      old.g.remove();
+      s.busy = false;
+    }
+  }
+
   async remove(keys: string[], speed: number) {
     const list = keys.map((k) => this.shown.get(k)).filter((x): x is Shown => !!x);
     for (const s of list) { s.busy = true; s.tween = undefined; }
@@ -177,7 +226,8 @@ export class Engine implements Sink, Executor {
       const sp = speed * this.userSpeed;
       await this.frame(300 / sp, (p) => {
         for (const s of list) {
-          s.vis.g.style.opacity = String(1 - p);
+          // a pencil item starts from its own see-through look
+          s.vis.g.style.opacity = String((1 - p) * parseFloat(s.vis.g.getAttribute("opacity") ?? "1"));
           if (s.vis.translates) {
             const k = 1 - 0.35 * p, cx = s.geom.w / 2, cy = s.geom.h / 2;
             s.vis.g.setAttribute("transform", `translate(${s.geom.x + cx * (1 - k)} ${s.geom.y + cy * (1 - k)}) scale(${k})`);
@@ -186,6 +236,17 @@ export class Engine implements Sink, Executor {
       });
     }
     for (const [k, s] of [...this.shown]) if (list.includes(s)) { s.vis.g.remove(); this.shown.delete(k); }
+  }
+
+  /** Marks these items as selected (the outline the stylesheet gives `[data-selected]`); [] clears it. */
+  select(keys: readonly string[]) {
+    this.selected = new Set(keys);
+    for (const s of this.shown.values()) this.tag(s);
+  }
+
+  /** Where an item is on screen (client pixels, after pan and zoom); null if it is not drawn. */
+  screenRect(key: string): DOMRect | null {
+    return this.shown.get(key)?.vis.g.getBoundingClientRect() ?? null;
   }
 
   reset() {
@@ -279,6 +340,7 @@ export class Engine implements Sink, Executor {
       s.layer.replaceChild(vis.g, s.vis.g);
       s.vis = vis;
       s.item = item;
+      this.tag(s);
     }
     s.geom = g;
     s.item = { ...s.item, geom: g, hue };
@@ -338,6 +400,14 @@ export class Engine implements Sink, Executor {
     await this.frame(300 / sp, () => {});
   }
 
+  /** The data attributes hit-testing and the selection outline read. */
+  private tag(s: Shown) {
+    const d = s.vis.g.dataset;
+    d.key = s.item.key;
+    if (s.item.data.pencil) d.pencil = ""; else delete d.pencil;
+    if (this.selected.has(s.item.key)) d.selected = ""; else delete d.selected;
+  }
+
   private highlight(s: Shown) {
     const g = s.vis.g;
     let node: SVGElement;
@@ -350,8 +420,9 @@ export class Engine implements Sink, Executor {
       const r = document.createElementNS(NS, "rect");
       const gm = s.geom;
       const local = s.vis.translates;
-      const w = kind === "zone" ? Math.min(gm.w, (s.item.data.title?.length ?? 4) * 14 + 56) : gm.w;
-      const h = kind === "zone" ? 52 : gm.h;
+      const header = kind === "zone" || kind === "group";
+      const w = header ? Math.min(gm.w, (s.item.data.title?.length ?? 4) * 14 + 56) : gm.w;
+      const h = header ? 52 : gm.h;
       r.setAttribute("x", String((local ? 0 : gm.x) - 8)); r.setAttribute("y", String((local ? 0 : gm.y) - 8));
       r.setAttribute("width", String(w + 16)); r.setAttribute("height", String(h + 16)); r.setAttribute("rx", "16");
       r.setAttribute("fill", "#ffe066");
@@ -381,8 +452,17 @@ export class Engine implements Sink, Executor {
     this.pen.setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
   }
 
+  /** Groups go under every group nested deeper, so a box never covers the boxes inside it. */
+  private insert(layer: SVGGElement, item: RenderItem, g: SVGGElement) {
+    if (item.kind !== "group") { layer.appendChild(g); return; }
+    const depth = item.data.depth ?? 0;
+    const deeper = [...layer.children].find((c) => Number((c as SVGGElement).dataset.depth) > depth);
+    layer.insertBefore(g, deeper ?? null);
+  }
+
   private layerOf(i: RenderItem) {
     if (i.under) return this.layers.under;
+    if (i.kind === "group") return this.layers.group;
     return i.kind === "zone" ? this.layers.zone : i.kind === "connection" ? this.layers.connection : i.kind === "element" ? this.layers.element : this.layers.ann;
   }
   private setFocus(g: Geom) {
@@ -421,14 +501,26 @@ export class Engine implements Sink, Executor {
       this.manual();
     };
     let drag: { x: number; y: number } | null = null;
-    const down = (e: PointerEvent) => { drag = { x: e.clientX, y: e.clientY }; svg.setPointerCapture(e.pointerId); };
+    // A press that moves less than this is a click, not a pan.
+    let press: { x: number; y: number; key: string | null } | null = null;
+    const down = (e: PointerEvent) => {
+      // Read before the capture: from then on the svg is the target. Ink is never picked.
+      const hit = (e.target as Element).closest?.("[data-key]");
+      press = { x: e.clientX, y: e.clientY, key: hit && hit.hasAttribute("data-pencil") ? hit.getAttribute("data-key") : null };
+      drag = { x: e.clientX, y: e.clientY };
+      svg.setPointerCapture(e.pointerId);
+    };
     const move = (e: PointerEvent) => {
       if (!drag) return;
       this.cam = { ...this.cam, cx: this.cam.cx - (e.clientX - drag.x) / this.cam.scale, cy: this.cam.cy - (e.clientY - drag.y) / this.cam.scale };
       drag = { x: e.clientX, y: e.clientY };
       this.manual();
     };
-    const up = () => { drag = null; };
+    const up = (e: PointerEvent) => {
+      drag = null;
+      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) this.onPick?.(press.key);
+      press = null;
+    };
     svg.addEventListener("wheel", onWheel, { passive: false });
     svg.addEventListener("pointerdown", down);
     svg.addEventListener("pointermove", move);

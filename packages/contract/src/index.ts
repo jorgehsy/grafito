@@ -1,11 +1,13 @@
-export { ZONE_KINDS, op } from "./ops";
-export type { ComponentType, EmphasisStyle, MarkTone, Op, OpInputs, OpName, TextField, ZoneKind } from "./ops";
+export { GROUP_KINDS, ZONE_KINDS, op } from "./ops";
+export type { ComponentType, EmphasisStyle, GroupKind, MarkTone, Op, OpInputs, OpName, OpSet, TextField, ZoneKind } from "./ops";
+export { MAX_CLICKS, ProposalClickSchema, parseClicks } from "./clicks";
+export type { ProposalClick } from "./clicks";
 export { normalizeCatalogs, parseOp, toolDefs } from "./parse";
 export type { ParsedOp, ToolDef } from "./parse";
-export { DEFAULT_MODEL, EVAL_MODEL, MODELS, isModelId, priceOf } from "./models";
+export { ARCHITECT_DEFAULT_MODEL, DEFAULT_MODEL, EVAL_MODEL, MODELS, fallbackModel, isModelId, priceOf } from "./models";
 export type { ModelInfo, Price, Provider } from "./models";
 export * from "./pricing";
 export { DEFAULT_LANG, LANGS, isLang, languageName } from "./lang";
 export type { Lang } from "./lang";
-export { OUTDATED_RECORD, PROMPT_VERSION, parseRecord } from "./record";
-export type { ParsedRecord, RecordRequest, SessionRecord } from "./record";
+export { ARCHITECT_PROMPT_VERSION, OUTDATED_RECORD, PROMPT_VERSION, RECORD_VERSION, parseRecord } from "./record";
+export type { AppMode, ArchitectRecord, LiveRecord, ParsedRecord, RecordClick, RecordRequest, RecordTurn, SessionRecord, TimelineEntry } from "./record";

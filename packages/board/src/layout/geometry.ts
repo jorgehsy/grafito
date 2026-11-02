@@ -1,4 +1,4 @@
-import type { Element } from "../model";
+import type { Element, Group } from "../model";
 import type { Pt, Rect } from "./types";
 
 export const FONT = 20;
@@ -18,6 +18,20 @@ export const MARK_LABEL_LH = 27;
 export const MARK_NOTE_LH = 22;
 export const MARK_GAP = 14;
 export const TL_LANE_H = 44;
+/** AWS group box: corner icon square, header (icon + label) height, inner padding, label font. */
+export const GROUP_ICON = 26;
+export const GROUP_HEAD = 42;
+export const GROUP_PAD = 20;
+export const GROUP_LABEL_SIZE = 19;
+const GROUP_LABEL_CW = 9.8;
+const GROUP_MIN = { w: 220, h: 130 };
+
+/** Width of a group's header strip: icon, gap, label. */
+export const groupHeaderW = (label: string) => 8 + GROUP_ICON + 10 + [...label].length * GROUP_LABEL_CW + 14;
+/** Smallest box of a group: what an empty group gets, and the floor for one with content. */
+export const groupMinSize = (g: Group) => ({ w: Math.max(GROUP_MIN.w, Math.ceil(groupHeaderW(g.label))), h: GROUP_MIN.h });
+/** The header strip of a group laid out at `r` (kept clear of arrow labels). */
+export const groupHeaderRect = (r: Rect, label: string): Rect => ({ x: r.x, y: r.y, w: Math.min(r.w, groupHeaderW(label)), h: GROUP_HEAD });
 
 export function wrapText(text: string, max: number): string[] {
   const words = text.trim().split(/\s+/);

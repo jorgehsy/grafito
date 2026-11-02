@@ -3,7 +3,7 @@ import express from "express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createHealthHandler } from "./health";
-import type { Clients } from "./board";
+import type { Clients } from "./turn";
 import { fakeClaude } from "../claude/fake";
 
 let server: Server | undefined;

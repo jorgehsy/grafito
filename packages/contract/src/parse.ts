@@ -1,8 +1,8 @@
 // The two borders of an op: what Claude is shown (toolDefs) and what is accepted back (parseOp).
-// Both come from the same schemas in ops.ts, one cached set per catalog combination.
+// Both come from the same schemas in ops.ts, one cached set per op set and catalog combination.
 import { z } from "zod";
 import { catalogServiceIds } from "@grafito/icons";
-import { inputSchemas, type Op, type OpName } from "./ops";
+import { inputSchemas, type Op, type OpName, type OpSet } from "./ops";
 
 /** Sorted and deduplicated, so ["a"] and ["a","a"] share a cache entry. */
 export function normalizeCatalogs(catalogs: readonly string[]): string[] {
@@ -25,12 +25,12 @@ interface CatalogSet {
 }
 const sets = new Map<string, CatalogSet>();
 
-function setFor(catalogs: readonly string[]): CatalogSet {
-  const key = normalizeCatalogs(catalogs).join(",");
+function setFor(catalogs: readonly string[], opSet: OpSet): CatalogSet {
+  const key = `${opSet}:${normalizeCatalogs(catalogs).join(",")}`;
   let set = sets.get(key);
   if (!set) {
     const serviceIds = catalogServiceIds(catalogs);
-    const defs = inputSchemas(serviceIds);
+    const defs = inputSchemas(serviceIds, opSet);
     set = {
       tools: defs.map((d) => ({
         name: d.name,
@@ -69,20 +69,20 @@ function tidy(node: unknown): unknown {
   return out;
 }
 
-/** The tools Claude is offered for these catalogs (catalogs off = `[]`). */
-export function toolDefs(catalogs: readonly string[]): ToolDef[] {
-  return setFor(catalogs).tools;
+/** The tools Claude is offered for these catalogs (catalogs off = `[]`) in this op set. */
+export function toolDefs(catalogs: readonly string[], opSet: OpSet = "board"): ToolDef[] {
+  return setFor(catalogs, opSet).tools;
 }
 
 /**
- * Checks that `x` is a valid op for these catalogs: `{name, input}` with a known name and an input
- * matching that tool's schema. The error starts with the op name, ready to show as a warning.
+ * Checks that `x` is a valid op for these catalogs and op set: `{name, input}` with a name the set offers
+ * and an input matching that tool's schema. The error starts with the op name, ready to show as a warning.
  */
-export function parseOp(x: unknown, catalogs: readonly string[]): ParsedOp {
+export function parseOp(x: unknown, catalogs: readonly string[], opSet: OpSet = "board"): ParsedOp {
   if (!x || typeof x !== "object") return { ok: false, error: "?: malformed operation" };
   const { name, input } = x as { name?: unknown; input?: unknown };
   if (typeof name !== "string") return { ok: false, error: "?: malformed operation" };
-  const schema = setFor(catalogs).schemas.get(name);
+  const schema = setFor(catalogs, opSet).schemas.get(name);
   if (!schema) return { ok: false, error: `${name}: unknown tool "${name}"` };
   if (!input || typeof input !== "object" || Array.isArray(input)) return { ok: false, error: `${name}: input is not an object` };
   const r = schema.safeParse(input);

@@ -11,6 +11,8 @@ export interface ConnectionGeom {
 export interface BoardLayout {
   zones: Record<string, Rect>;
   elements: Record<string, Rect>;
+  /** AWS groups (architect mode): one box per group, nested boxes contain their children. */
+  groups: Record<string, Rect>;
   connections: Record<string, ConnectionGeom>;
   callouts: Record<string, { box: Rect; lines: string[]; arrow: ConnectionGeom }>;
   /** compare: absolute x of each zone's divider line */
@@ -35,6 +37,8 @@ export interface ZoneLocal {
   w: number;
   h: number;
   elements: Record<string, Rect>;
+  /** system with groups: the box of each group */
+  groups?: Record<string, Rect>;
   connections: Record<string, ConnectionGeom>;
   /** compare: x of the divider line */
   divider?: number;

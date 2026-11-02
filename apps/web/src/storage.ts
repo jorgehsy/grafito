@@ -22,6 +22,9 @@ export function memoryStore(init: Record<string, string> = {}): Store {
   return createStore(() => ({ getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v), removeItem: (k) => void m.delete(k) }));
 }
 
+/** The autosave slot of each app mode, so one mode never overwrites the other's session. Live keeps its original key. */
+export const RECORD_KEYS = { live: "grafito.sessionRecord", architect: "grafito.sessionRecord.architect" } as const;
+
 export const browserStore: Store = createStore(() => (typeof localStorage === "undefined" ? null : localStorage));
 
 /** A boolean preference stored as "1" / "0". */

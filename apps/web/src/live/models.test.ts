@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MODEL } from "@grafito/contract";
+import { ARCHITECT_DEFAULT_MODEL, DEFAULT_MODEL } from "@grafito/contract";
 import { planOnly, totalCost, usableModel, visibleModels } from "./models";
 
 const API = ["claude-sonnet-5-5", "claude-haiku-5-5"];
@@ -22,6 +22,15 @@ describe("usable model", () => {
     expect(usableModel("gone", null)).toBe(DEFAULT_MODEL);
   });
   it("falls back to the first offered when the default is not", () => expect(usableModel(API[0], PLAN)).toBe(PLAN[0]));
+  it("falls back to the mode's own default when given", () => {
+    expect(usableModel("gone", API, ARCHITECT_DEFAULT_MODEL)).toBe("claude-sonnet-5-5");
+    expect(usableModel(API[0], PLAN, ARCHITECT_DEFAULT_MODEL)).toBe(PLAN[0]);
+  });
+  it("never falls back from a plan model to its API twin (ADR 0004)", () => {
+    expect(usableModel(PLAN[0], API, ARCHITECT_DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
+    expect(usableModel(PLAN[0], null, ARCHITECT_DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
+    expect(usableModel(PLAN[1], API, ARCHITECT_DEFAULT_MODEL)).toBe(ARCHITECT_DEFAULT_MODEL);
+  });
 });
 
 describe("cost display", () => {

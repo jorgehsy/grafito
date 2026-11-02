@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 config({ override: true, path: fileURLToPath(new URL("../.env", import.meta.url)) });
 import express from "express";
 import { buildClients } from "./claude/clients";
+import { createArchitectHandler } from "./routes/architect";
 import { createBoardHandler } from "./routes/board";
 import { createHealthHandler } from "./routes/health";
 import { createSessionsHandlers } from "./sessions";
@@ -13,6 +14,7 @@ app.use(express.json({ limit: "10mb" }));
 // The subscription adapter is opt-in: it runs on the owner's Claude plan, not on the API key.
 const clients = buildClients({ apiKey: process.env.ANTHROPIC_API_KEY, subscription: process.env.GRAFITO_SUBSCRIPTION === "1" });
 app.post("/api/board", createBoardHandler(clients));
+app.post("/api/architect", createArchitectHandler(clients));
 const sessions = createSessionsHandlers();
 app.post("/api/sessions", sessions.save);
 app.get("/api/sessions", sessions.list);

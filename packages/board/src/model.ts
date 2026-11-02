@@ -1,6 +1,7 @@
 // Pure board model. No React, no coordinates.
 import { qualifyService } from "@grafito/icons";
-import type { ComponentType, EmphasisStyle, MarkTone, Op, ZoneKind } from "@grafito/contract";
+import type { ComponentType, EmphasisStyle, GroupKind, MarkTone, Op, ZoneKind } from "@grafito/contract";
+import { ARCHITECT_ZONE_ID } from "./architect-zone";
 
 export interface Zone {
   id: string;
@@ -28,6 +29,10 @@ export interface Element {
   /** Service icon prefixed with its catalog (`aws:lambda`). Independent of `icon`. */
   service?: string;
   comp?: ComponentType;
+  /** component: id of the group it sits in (architect mode). */
+  group?: string;
+  /** Id of the open proposal it was drawn under: pencil. None = ink. */
+  proposal?: string;
   after?: string;
   parent?: string;
   column?: "left" | "right";
@@ -39,6 +44,17 @@ export interface Element {
   note?: string;
   tone?: MarkTone;
 }
+/** An AWS group (architect mode): a box in a system zone holding components and other groups. */
+export interface Group {
+  id: string;
+  zone: string;
+  kind: GroupKind;
+  label: string;
+  /** Id of the group it sits in; none = the top of the zone. */
+  parent?: string;
+  /** Id of the open proposal it was drawn under: pencil. None = ink. */
+  proposal?: string;
+}
 export interface Connection {
   id: string;
   from: string;
@@ -46,6 +62,18 @@ export interface Connection {
   label?: string;
   style: "solid" | "dashed";
   both: boolean;
+  /** Id of the open proposal it was drawn under: pencil. None = ink. */
+  proposal?: string;
+}
+/**
+ * Something Claude adds on its own initiative (architect mode), drawn in pencil until the user keeps it (accept:
+ * ink) or turns it down (reject: erased). Only open proposals are kept; what was drawn under one carries its id.
+ */
+export interface Proposal {
+  id: string;
+  label: string;
+  /** The open proposal this one is the other choice to; the two are drawn side by side and only one is kept. */
+  alternativeTo?: string;
 }
 export interface Emphasis { target: string; style: EmphasisStyle }
 export interface Question { target: string; text?: string }
@@ -54,16 +82,20 @@ export interface Callout { id: string; target: string; text: string }
 export interface Board {
   zones: Zone[];
   elements: Element[];
+  /** Groups as a flat list; `parent` makes the tree. */
+  groups: Group[];
   connections: Connection[];
   emphasis: Emphasis[];
   questions: Question[];
   callouts: Callout[];
+  /** Open proposals, in the order they were opened. */
+  proposals: Proposal[];
   summary: string;
   zoneCounter: number;
 }
 
 export const emptyBoard = (): Board => ({
-  zones: [], elements: [], connections: [], emphasis: [], questions: [], callouts: [], summary: "", zoneCounter: 0,
+  zones: [], elements: [], groups: [], connections: [], emphasis: [], questions: [], callouts: [], proposals: [], summary: "", zoneCounter: 0,
 });
 
 export interface ApplyResult { board: Board; warnings: string[] }
@@ -74,8 +106,10 @@ const ELEMENT_ZONE: Record<ElementType, ZoneKind[]> = {
 
 export const findZone = (b: Board, id: string) => b.zones.find((z) => z.id === id);
 export const findElement = (b: Board, id: string) => b.elements.find((e) => e.id === id);
+export const findGroup = (b: Board, id: string) => b.groups.find((g) => g.id === id);
+export const findProposal = (b: Board, id: string) => b.proposals.find((p) => p.id === id);
 export const idTaken = (b: Board, id: string) =>
-  !!findZone(b, id) || !!findElement(b, id) || b.connections.some((c) => c.id === id) || b.callouts.some((c) => c.id === id);
+  !!findZone(b, id) || !!findElement(b, id) || !!findGroup(b, id) || b.connections.some((c) => c.id === id) || b.callouts.some((c) => c.id === id) || !!findProposal(b, id);
 const isTarget = (b: Board, id: string) => !!findZone(b, id) || !!findElement(b, id) || b.connections.some((c) => c.id === id);
 
 /** Implicit connections (after / parent) as regular connections with id "auto:<element>". */
@@ -87,6 +121,89 @@ export function derivedConnections(b: Board): Connection[] {
     if (from && findElement(b, from)) out.push({ id: `auto:${e.id}`, from, to: e.id, style: "solid", both: false });
   }
   return out;
+}
+
+/** The zone a top-level group goes in: the architect zone, else the first system zone. */
+function groupZone(b: Board): Zone | undefined {
+  const system = b.zones.filter((z) => z.kind === "system");
+  return system.find((z) => z.id === ARCHITECT_ZONE_ID) ?? system[0];
+}
+
+/** True if `id` is `group` or one of the groups inside it. */
+function isInside(b: Board, id: string, group: string): boolean {
+  for (let g: string | undefined = id, n = 0; g && n <= b.groups.length; n++) {
+    if (g === group) return true;
+    g = findGroup(b, g)?.parent;
+  }
+  return false;
+}
+
+/** At most this many proposals are alternatives of each other. */
+export const MAX_ALTERNATIVES = 2;
+
+/**
+ * The open proposals that are alternatives of each other with `id` (linked by alternativeTo either way, also
+ * through another one), `id` included, in the order they were opened. [] if `id` is not open.
+ */
+export function alternativesOf(b: Board, id: string): string[] {
+  if (!findProposal(b, id)) return [];
+  const set = new Set([id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const p of b.proposals) {
+      const linked = set.has(p.id) ? p.alternativeTo : p.alternativeTo && set.has(p.alternativeTo) ? p.id : undefined;
+      if (linked && findProposal(b, linked) && !set.has(linked)) { set.add(linked); grew = true; }
+    }
+  }
+  return b.proposals.filter((p) => set.has(p.id)).map((p) => p.id);
+}
+
+/** The open proposals in order, each with its alternatives (itself included; [] when it has none). */
+export function openProposals(b: Board): { id: string; label: string; alternatives: string[] }[] {
+  return b.proposals.map((p) => {
+    const set = alternativesOf(b, p.id);
+    return { id: p.id, label: p.label, alternatives: set.length > 1 ? set : [] };
+  });
+}
+
+/** The open proposal a component, group or connection was drawn under; undefined for ink or an unknown id. */
+export function proposalOf(b: Board, id: string): string | undefined {
+  const x = findElement(b, id) ?? findGroup(b, id) ?? b.connections.find((c) => c.id === id);
+  return x?.proposal && findProposal(b, x.proposal) ? x.proposal : undefined;
+}
+
+/** Ids of everything drawn under a proposal: groups, components, then connections. */
+export function proposalItems(b: Board, proposal: string): string[] {
+  return [...b.groups, ...b.elements, ...b.connections].filter((x) => x.proposal === proposal).map((x) => x.id);
+}
+
+/** Erases everything drawn under these proposals. Ink inside an erased group moves up to the group's own parent. */
+function eraseProposals(b: Board, ids: Set<string>) {
+  if (!ids.size) return;
+  const under = (x: { proposal?: string }) => !!x.proposal && ids.has(x.proposal);
+  const goneGroups = new Map(b.groups.filter(under).map((g) => [g.id, g]));
+  const lift = (g: string | undefined) => {
+    for (let n = 0; g && goneGroups.has(g) && n <= b.groups.length; n++) g = goneGroups.get(g)!.parent;
+    return g;
+  };
+  const gone = new Set<string>([...goneGroups.keys()]);
+  for (const e of b.elements) if (under(e)) gone.add(e.id);
+  for (const c of b.connections) if (under(c)) gone.add(c.id);
+  b.groups = b.groups.filter((g) => !goneGroups.has(g.id));
+  b.elements = b.elements.filter((e) => !gone.has(e.id));
+  for (const g of b.groups) if (g.parent && goneGroups.has(g.parent)) { const up = lift(g.parent); if (up) g.parent = up; else delete g.parent; }
+  for (const e of b.elements) {
+    if (e.group && goneGroups.has(e.group)) { const up = lift(e.group); if (up) e.group = up; else delete e.group; }
+    if (e.after && gone.has(e.after)) e.after = undefined;
+    if (e.parent && gone.has(e.parent)) e.parent = undefined;
+  }
+  removeRefs(b, gone);
+}
+
+/** Closes these proposals; an open one that was their alternative stands on its own. */
+function closeProposals(b: Board, ids: Set<string>) {
+  b.proposals = b.proposals.filter((p) => !ids.has(p.id));
+  for (const p of b.proposals) if (p.alternativeTo && ids.has(p.alternativeTo)) delete p.alternativeTo;
 }
 
 function clone(b: Board): Board {
@@ -121,6 +238,9 @@ export function applyOp(board: Board, op: Op): ApplyResult {
   const i = op.input as unknown as Record<string, any>;
 
   const needNew = (v: string) => (idTaken(b, v) ? `id '${v}' already exists` : null);
+  // A drawing op under a proposal that is not open is not drawn: ink means the user agreed, so it is never the fallback.
+  const notOpen = i.proposal !== undefined && !findProposal(b, i.proposal) ? `proposal '${i.proposal}' is not open; not drawn` : null;
+  const proposal: { proposal?: string } = i.proposal !== undefined ? { proposal: i.proposal } : {};
 
   switch (op.name) {
     case "create_zone": {
@@ -146,7 +266,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
     case "add_node":
     case "add_item": {
       const type: ElementType = { add_step: "step", add_decision: "decision", add_component: "component", add_node: "node", add_item: "item" }[op.name] as ElementType;
-      const e = needNew(i.id);
+      const e = needNew(i.id) ?? notOpen;
       if (e) return bad(e);
       const zone = findZone(b, i.zone);
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
@@ -174,6 +294,12 @@ export function applyOp(board: Board, op: Op): ApplyResult {
         else element.parent = p.id;
       }
       if (type === "item" && zone.kind === "compare") element.column = i.column === "right" ? "right" : "left";
+      if (type === "component" && i.parent !== undefined) {
+        const g = findGroup(b, i.parent);
+        if (!g || g.zone !== zone.id) warnings.push(`add_component: parent '${i.parent}' is not a group of the zone; ignored`);
+        else element.group = g.id;
+      }
+      Object.assign(element, proposal);
       b.elements.push(element);
       return { board: b, warnings };
     }
@@ -249,13 +375,14 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       return { board: b, warnings };
     }
     case "connect": {
-      const e = needNew(i.id);
+      const e = needNew(i.id) ?? notOpen;
       if (e) return bad(e);
+      for (const end of [i.from, i.to]) if (findGroup(b, end)) return bad(`'${end}' is a group; arrows join components only`);
       if (!findElement(b, i.from)) return bad(`source '${i.from}' does not exist`);
       if (!findElement(b, i.to)) return bad(`target '${i.to}' does not exist`);
       b.connections.push({
         id: i.id, from: i.from, to: i.to, label: str(i.label) ? i.label : undefined,
-        style: i.style === "dashed" ? "dashed" : "solid", both: !!i.both_ways,
+        style: i.style === "dashed" ? "dashed" : "solid", both: !!i.both_ways, ...proposal,
       });
       return { board: b, warnings };
     }
@@ -283,6 +410,8 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (z) { z.title = i.label; return { board: b, warnings }; }
       const element = findElement(b, i.id);
       if (element) { element.label = i.label; return { board: b, warnings }; }
+      const g = findGroup(b, i.id);
+      if (g) { g.label = i.label; return { board: b, warnings }; }
       const c = b.connections.find((x) => x.id === i.id);
       if (c) { c.label = i.label; return { board: b, warnings }; }
       const co = b.callouts.find((x) => x.id === i.id);
@@ -339,6 +468,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
         for (const e of b.elements) if (e.zone === i.id) gone.add(e.id);
         b.zones = b.zones.filter((z) => z.id !== i.id);
         b.elements = b.elements.filter((e) => e.zone !== i.id);
+        b.groups = b.groups.filter((g) => g.zone !== i.id);
         // other zones that were placed relative to this one lose their hint
         for (const z of b.zones) if (z.place?.of === i.id) z.place = undefined;
       } else if (findElement(b, i.id)) {
@@ -349,6 +479,13 @@ export function applyOp(board: Board, op: Op): ApplyResult {
           if (e.after === i.id) e.after = undefined;
           if (e.parent === i.id) e.parent = element.parent; // children move up a level
         }
+      } else if (findGroup(b, i.id)) {
+        // what was inside moves up to the group's own parent: nothing disappears unless it is named
+        const up = findGroup(b, i.id)!.parent;
+        gone.add(i.id);
+        b.groups = b.groups.filter((g) => g.id !== i.id);
+        for (const g of b.groups) if (g.parent === i.id) g.parent = up;
+        for (const e of b.elements) if (e.group === i.id) e.group = up;
       } else if (b.connections.some((c) => c.id === i.id) || b.callouts.some((c) => c.id === i.id)) {
         gone.add(i.id);
       } else return bad(`id '${i.id}' does not exist`);
@@ -363,6 +500,7 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!ELEMENT_ZONE[element.type].includes(zone.kind)) return bad(`a ${element.type} does not fit in a ${zone.kind} zone`);
       if (element.zone === zone.id) return bad("already in that zone");
       element.zone = zone.id;
+      element.group = undefined;
       element.after = undefined;
       element.parent = undefined;
       for (const o of b.elements) {
@@ -370,6 +508,60 @@ export function applyOp(board: Board, op: Op): ApplyResult {
         if (o.parent === element.id && o.zone !== zone.id) o.parent = undefined;
       }
       if (zone.kind === "compare" && !element.column) element.column = "left";
+      return { board: b, warnings };
+    }
+    case "add_group": {
+      const e = needNew(i.id) ?? notOpen;
+      if (e) return bad(e);
+      let parent: Group | undefined;
+      if (i.parent !== undefined) {
+        parent = findGroup(b, i.parent);
+        if (!parent) warnings.push(`add_group: parent '${i.parent}' is not a group; drawn at the top of the zone`);
+      }
+      const zone = parent ? findZone(b, parent.zone) : groupZone(b);
+      if (!zone) return bad("there is no system zone to draw the group in");
+      b.groups.push({ id: i.id, zone: zone.id, kind: i.kind, label: i.label, ...(parent ? { parent: parent.id } : {}), ...proposal });
+      return { board: b, warnings };
+    }
+    case "set_parent": {
+      const g = findGroup(b, i.id);
+      const element = g ? undefined : findElement(b, i.id);
+      if (!g && !element) return bad(`id '${i.id}' does not exist`);
+      if (element && element.type !== "component") return bad(`'${i.id}' is a ${element.type}; only components and groups go in a group`);
+      const zoneId = g ? g.zone : element!.zone;
+      if (i.parent === null) {
+        if (g) delete g.parent; else delete element!.group;
+        return { board: b, warnings };
+      }
+      const parent = findGroup(b, i.parent);
+      if (!parent) return bad(`parent '${i.parent}' is not a group`);
+      if (parent.zone !== zoneId) return bad(`group '${i.parent}' is in another zone`);
+      if (g && isInside(b, parent.id, g.id)) return bad(`cannot put '${g.id}' inside itself or a group it contains`);
+      if (g) g.parent = parent.id; else element!.group = parent.id;
+      return { board: b, warnings };
+    }
+    case "propose": {
+      const e = needNew(i.id);
+      if (e) return bad(e);
+      const p: Proposal = { id: i.id, label: i.label };
+      const other = i.alternative_to;
+      if (other !== undefined) {
+        if (!findProposal(b, other)) warnings.push(`propose: '${other}' is not an open proposal; ${i.id} opens on its own`);
+        else if (alternativesOf(b, other).length >= MAX_ALTERNATIVES) warnings.push(`propose: '${other}' already has an alternative (at most ${MAX_ALTERNATIVES} side by side); ${i.id} opens on its own`);
+        else p.alternativeTo = other;
+      }
+      b.proposals.push(p);
+      return { board: b, warnings };
+    }
+    case "accept":
+    case "reject": {
+      const id: string = i.proposal;
+      if (!findProposal(b, id)) return bad(`proposal '${id}' is not open`);
+      // accepting keeps this one in ink and erases its alternatives; rejecting erases only this one
+      const erased = op.name === "accept" ? alternativesOf(b, id).filter((x) => x !== id) : [id];
+      if (op.name === "accept") for (const x of [...b.elements, ...b.groups, ...b.connections]) if (x.proposal === id) delete x.proposal;
+      eraseProposals(b, new Set(erased));
+      closeProposals(b, new Set([id, ...erased]));
       return { board: b, warnings };
     }
     case "update_summary": {

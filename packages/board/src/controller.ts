@@ -1,7 +1,7 @@
 // Glues model + layout + diff + queue. Ops are applied to the model immediately (in series);
 // the animation trails behind through the queue.
 import { applyOp, emptyBoard } from "./model";
-import type { Board } from "./model";
+import type { ApplyResult, Board } from "./model";
 import type { Op } from "@grafito/contract";
 import { computeLayout } from "./layout";
 import type { BoardLayout, Rect } from "./layout";
@@ -28,12 +28,13 @@ export class BoardController {
     this.queue = new AnimationQueue(sink);
   }
 
-  submit(ops: Op[]): Promise<void> {
+  /** `apply` is the mode's apply step: `applyOp`, or `applyArchitectOp` in architect mode. */
+  submit(ops: Op[], apply: (board: Board, op: Op) => ApplyResult = applyOp): Promise<void> {
     const epoch = this.epoch;
     this.chain = this.chain.then(async () => {
       for (const o of ops) {
         if (epoch !== this.epoch) return;
-        const r = applyOp(this.board, o);
+        const r = apply(this.board, o);
         if (r.warnings.length) this.onWarnings?.(r.warnings);
         if (r.board === this.board) continue;
         const lay = await computeLayout(r.board);

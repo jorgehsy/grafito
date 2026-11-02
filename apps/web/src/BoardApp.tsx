@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BoardController } from "@grafito/board";
+import { BoardController, applyArchitectOp } from "@grafito/board";
 import { Player } from "@grafito/board";
 import type { Subtitle } from "@grafito/board";
 import { DEMOS } from "./demos";
 import { Engine } from "./render/engine";
 import { LivePanel } from "./live/ui/LivePanel";
+import { ArchitectPanel } from "./architect/ui/ArchitectPanel";
+import type { ArchitectRecordControl } from "./architect/ui/ArchitectPanel";
+import type { ArchitectRecord } from "@grafito/contract";
+import type { ModelControl } from "./live/models";
 import { useT } from "./i18n";
 import { readFlag, writeFlag } from "./storage";
 import { IconChevron, IconMicOff, IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
 
 type Status = "idle" | "playing" | "paused" | "done";
-type Mode = "demo" | "live";
+type Mode = "demo" | "live" | "architect";
 const TRANSCRIPT_KEY = "grafito.transcript";
 
-const urlMode = (): Mode | null => { const m = new URLSearchParams(location.search).get("mode"); return m === "live" || m === "demo" ? m : null; };
+const urlMode = (): Mode | null => { const m = new URLSearchParams(location.search).get("mode"); return m === "live" || m === "demo" || m === "architect" ? m : null; };
 
 export function BoardApp() {
   const t = useT();
@@ -34,8 +38,15 @@ export function BoardApp() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [summary, setSummary] = useState("");
   // Without ?mode= in the URL the default depends on whether the server has an API key: live if so, demo if not.
+  // ?mode=architect opens architect mode straight away, without waiting on that probe.
   const [mode, setMode] = useState<Mode | null>(urlMode);
+  // The architect panel starts its session on mount, which needs the controller made by the effect below.
+  const [ready, setReady] = useState(false);
   const [mute, setMute] = useState<{ muted: boolean; toggle(): void } | null>(null);
+  const [architectModel, setArchitectModel] = useState<ModelControl | null>(null);
+  const [architectSession, setArchitectSession] = useState<ArchitectRecordControl | null>(null);
+  // An imported architect record waiting for the architect panel to mount and reopen it.
+  const [architectSeed, setArchitectSeed] = useState<ArchitectRecord | null>(null);
   const [showTranscript, setShowTranscript] = useState(() => readFlag(TRANSCRIPT_KEY, true));
 
   const setStatus = (s: Status) => { status.current = s; setSt(s); };
@@ -49,6 +60,7 @@ export function BoardApp() {
     c.onWarnings = (w) => setWarnings((p) => [...p, ...w].slice(-6));
     c.onBoard = (b) => setSummary(b.summary);
     ctrl.current = c;
+    setReady(true);
     (window as any).__grafito = { engine: e, controller: c };
     let last = performance.now();
     let raf = 0;
@@ -117,6 +129,13 @@ export function BoardApp() {
 
   const locked = st === "playing" || st === "paused";
   const changeMode = (m: Mode) => { if (m === mode) return; resetAll(); setStatus("idle"); setMode(m); };
+  const openArchitect = (rec: ArchitectRecord) => {
+    if (mode === "architect" && architectSession) return architectSession.restore(rec);
+    setArchitectSeed(rec);
+    changeMode("architect");
+  };
+  // The panel read the seed when it mounted (its effects run before this one).
+  useEffect(() => { if (mode === "architect" && architectSeed) setArchitectSeed(null); }, [mode, architectSeed]);
   const queued = backlog.pending;
 
   return (
@@ -130,6 +149,7 @@ export function BoardApp() {
         <Logo />
         <span className="word">grafito</span>
         {mode === "live" && <span className="board">{t("app.liveBadge")}</span>}
+        {mode === "architect" && <span className="board">{t("app.architectBadge")}</span>}
         {mode === "demo" && (
           <div className="demobar" role="group" aria-label={t("app.demoBar")}>
             <select aria-label={t("app.demoBar")} value={demoId} disabled={locked} onChange={(e) => setDemoId(e.target.value)}>
@@ -154,7 +174,7 @@ export function BoardApp() {
         exportSvg={() => engine.current?.exportSvg() ?? null}
         onSubtitle={setSub}
         onClear={() => { resetAll(); }}
-        active={mode === "live"}
+        mode={mode}
         onMode={changeMode}
         modeLocked={locked}
         follow={follow}
@@ -164,13 +184,30 @@ export function BoardApp() {
         showTranscript={showTranscript}
         onShowTranscript={setShowTranscript}
         onMuteControl={setMute}
+        modelControl={architectModel}
+        architect={architectSession}
+        onOpenArchitect={openArchitect}
       />
 
-      <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} title={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} onClick={() => setShowTranscript((v) => !v)}>
-        <IconChevron up={!showTranscript} />
-      </button>
+      {mode === "architect" && ready && (
+        <ArchitectPanel
+          board={{ get: () => ctrl.current!.board, submit: (ops) => ctrl.current!.submit(ops, applyArchitectOp), clear: resetAll }}
+          canvas={{
+            onPick: (fn) => { if (engine.current) engine.current.onPick = fn ?? undefined; },
+            select: (keys) => engine.current?.select(keys),
+            screenRect: (key) => engine.current?.screenRect(key) ?? null,
+          }}
+          onModelControl={setArchitectModel}
+          onRecordControl={setArchitectSession}
+          initialRecord={architectSeed}
+        />
+      )}
 
-      <div className="subtitles" data-testid="subtitles" role="status" ref={subRef} hidden={!showTranscript}>
+      {mode !== "architect" && <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} title={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} onClick={() => setShowTranscript((v) => !v)}>
+        <IconChevron up={!showTranscript} />
+      </button>}
+
+      <div className="subtitles" data-testid="subtitles" role="status" ref={subRef} hidden={!showTranscript || mode === "architect"}>
         <span className="wv"><IconWave /></span>
         <div className="txt">
           {!sub.spoken.length && !sub.current ? (

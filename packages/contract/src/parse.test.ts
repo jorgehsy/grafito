@@ -52,6 +52,58 @@ describe("toolDefs: what Claude sees", () => {
   });
 });
 
+describe("toolDefs: the architect op set", () => {
+  it("architect, catalogs off", async () => {
+    await expect(JSON.stringify(toolDefs([], "architect"), null, 2) + "\n").toMatchFileSnapshot("./__snapshots__/tools.architect.off.json");
+  });
+  it("architect, AWS catalog on", async () => {
+    await expect(JSON.stringify(toolDefs(["aws"], "architect"), null, 2) + "\n").toMatchFileSnapshot("./__snapshots__/tools.architect.aws.json");
+  });
+  it("keeps the component, connection, label, delete and summary ops, adds say, the group and proposal ops, and drops every zone op", () => {
+    const own = ["say", "add_group", "set_parent", "propose", "accept", "reject"];
+    expect(toolDefs([], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", ...own, "update_summary"]);
+    expect(toolDefs(["aws"], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", ...own, "set_service", "update_summary"]);
+  });
+  it("kept ops have the board set's inputs; add_component also takes a parent group, the drawing ops a proposal", () => {
+    const board = new Map(toolDefs(["aws"]).map((t) => [t.name, t]));
+    const proposal = { type: "string", minLength: 1, description: expect.stringContaining("pencil") };
+    for (const t of toolDefs(["aws"], "architect")) {
+      const b = board.get(t.name);
+      if (!b) continue;
+      if (t.name === "add_component") {
+        const { parent, proposal: p, ...rest } = t.input_schema.properties;
+        expect(parent).toEqual({ type: "string", minLength: 1, description: expect.stringContaining("group") });
+        expect(p).toEqual(proposal);
+        expect({ ...t.input_schema, properties: rest }).toEqual(b.input_schema);
+      } else if (t.name === "connect") {
+        const { proposal: p, ...rest } = t.input_schema.properties;
+        expect(p).toEqual(proposal);
+        expect({ ...t.input_schema, properties: rest }).toEqual(b.input_schema);
+      } else expect(t.input_schema).toEqual(b.input_schema);
+    }
+    expect(board.get("add_component")!.input_schema.properties).not.toHaveProperty("parent");
+    expect(board.get("connect")!.input_schema.properties).not.toHaveProperty("proposal");
+  });
+  it("proposals only add: only add_component, add_group and connect take a proposal", () => {
+    const withProposal = toolDefs(["aws"], "architect").filter((t) => "proposal" in t.input_schema.properties).map((t) => t.name);
+    expect(withProposal).toEqual(["add_component", "connect", "add_group", "accept", "reject"]);
+    for (const name of ["accept", "reject"]) expect(toolDefs(["aws"], "architect").find((t) => t.name === name)!.input_schema.required).toEqual(["proposal"]);
+  });
+  it("delete says what it may delete: components, groups and connections, never the system zone", () => {
+    const del = toolDefs([], "architect").find((t) => t.name === "delete")!.description;
+    expect(del).toMatch(/^Deletes a component, group or connection\. Never the system zone/);
+  });
+  it("a say may point at an element, a group or a proposal", () => {
+    const say = toolDefs([], "architect").find((t) => t.name === "say")!;
+    expect((say.input_schema.properties.target as { description: string }).description).toMatch(/^Id of the element, group or proposal/);
+  });
+  it("the board set never shows architect ops and stays the default", () => {
+    for (const name of ["say", "add_group", "set_parent", "propose", "accept", "reject"]) expect(toolDefs(["aws"]).map((t) => t.name)).not.toContain(name);
+    expect(toolDefs([], "board")).toBe(toolDefs([]));
+    expect(toolDefs([], "architect")).toBe(toolDefs([], "architect"));
+  });
+});
+
 describe("parseOp: the shape of an op", () => {
   it("returns the typed op", () => {
     expect(parseOp({ name: "delete", input: { id: "a" } }, [])).toEqual({ ok: true, op: { name: "delete", input: { id: "a" } } });
@@ -144,5 +196,85 @@ describe("parseOp: catalogs", () => {
     expect(ok("set_service", { id: "a", service: "s3" }, on)).toBe(true);
     expect(ok("set_service", { id: "a", service: "" }, on)).toBe(true);
     expect(ok("set_service", { id: "a", service: "made-up" }, on)).toBe(false);
+  });
+});
+
+describe("parseOp: op sets", () => {
+  const arch = (name: string, input: unknown, catalogs: readonly string[] = []) => parseOp({ name, input }, catalogs, "architect");
+  it("say: text required, target optional, nothing else", () => {
+    expect(arch("say", { text: "How do users sign in?" })).toEqual({ ok: true, op: { name: "say", input: { text: "How do users sign in?" } } });
+    expect(arch("say", { text: "Done.", target: "bucket" }).ok).toBe(true);
+    expect(arch("say", { text: " " }).ok).toBe(false);
+    expect(arch("say", {}).ok).toBe(false);
+    expect(arch("say", { text: "x", target: "" }).ok).toBe(false);
+    expect(arch("say", { text: "x", tone: "loud" }).ok).toBe(false);
+  });
+  it("say is unknown in live mode; zone ops are unknown in architect mode", () => {
+    expect(error("say", { text: "hi" })).toBe('say: unknown tool "say"');
+    for (const name of ["create_zone", "add_step", "move_to_zone", "add_callout", "mark_question"]) {
+      const r = arch(name, {});
+      expect(r.ok ? null : r.error).toBe(`${name}: unknown tool "${name}"`);
+    }
+  });
+  it("add_group: id, a known kind and a label; parent optional", () => {
+    expect(arch("add_group", { id: "vpc", kind: "vpc", label: "VPC" })).toEqual({ ok: true, op: { name: "add_group", input: { id: "vpc", kind: "vpc", label: "VPC" } } });
+    for (const kind of ["aws_cloud", "region", "vpc", "availability_zone", "public_subnet", "private_subnet", "generic"])
+      expect(arch("add_group", { id: "g", kind, label: "G", parent: "vpc" }).ok).toBe(true);
+    expect(error("add_group", { id: "g", kind: "vpc", label: "G" })).toBe('add_group: unknown tool "add_group"');
+    const r = arch("add_group", { id: "g", kind: "security_group", label: "SG" });
+    expect(r.ok ? null : r.error).toMatch(/^add_group: .*\(at \/kind\)$/);
+    expect(arch("add_group", { id: "g", kind: "vpc", label: " " }).ok).toBe(false);
+    expect(arch("add_group", { id: "g", kind: "vpc", label: "G", parent: "" }).ok).toBe(false);
+    expect(arch("add_group", { id: "g", kind: "vpc", label: "G", zone: "system" }).ok).toBe(false);
+  });
+  it("set_parent: a group id or null, never missing or blank", () => {
+    expect(arch("set_parent", { id: "db", parent: "az1" }).ok).toBe(true);
+    expect(arch("set_parent", { id: "db", parent: null })).toEqual({ ok: true, op: { name: "set_parent", input: { id: "db", parent: null } } });
+    expect(arch("set_parent", { id: "db" }).ok).toBe(false);
+    expect(arch("set_parent", { id: "db", parent: " " }).ok).toBe(false);
+    expect(arch("set_parent", { id: "", parent: null }).ok).toBe(false);
+    expect(error("set_parent", { id: "db", parent: null })).toBe('set_parent: unknown tool "set_parent"');
+  });
+  it("add_component takes a parent group only in architect mode", () => {
+    expect(arch("add_component", { zone: "system", id: "db", label: "DB", type: "database", parent: "az1" }).ok).toBe(true);
+    expect(arch("add_component", { zone: "system", id: "db", label: "DB", type: "database", parent: "" }).ok).toBe(false);
+    expect(ok("add_component", { zone: "system", id: "db", label: "DB", type: "database", parent: "az1" })).toBe(false);
+  });
+  it("propose: id and label, alternative_to optional", () => {
+    expect(arch("propose", { id: "P1", label: "Static site" })).toEqual({ ok: true, op: { name: "propose", input: { id: "P1", label: "Static site" } } });
+    expect(arch("propose", { id: "P2", label: "DynamoDB", alternative_to: "P1" }).ok).toBe(true);
+    expect(arch("propose", { id: "P1" }).ok).toBe(false);
+    expect(arch("propose", { id: "P1", label: " " }).ok).toBe(false);
+    expect(arch("propose", { id: "P2", label: "X", alternative_to: "" }).ok).toBe(false);
+    expect(error("propose", { id: "P1", label: "Static site" })).toBe('propose: unknown tool "propose"');
+  });
+  it("accept and reject name one proposal", () => {
+    for (const name of ["accept", "reject"]) {
+      expect(arch(name, { proposal: "P1" })).toEqual({ ok: true, op: { name, input: { proposal: "P1" } } });
+      expect(arch(name, {}).ok).toBe(false);
+      expect(arch(name, { proposal: "" }).ok).toBe(false);
+      expect(arch(name, { proposal: "P1", id: "x" }).ok).toBe(false);
+      expect(error(name, { proposal: "P1" })).toBe(`${name}: unknown tool "${name}"`);
+    }
+  });
+  it("the drawing ops take a proposal only in architect mode; changes and deletes never do", () => {
+    const comp = { zone: "system", id: "cdn", label: "CDN", type: "service", proposal: "P1" };
+    expect(arch("add_component", comp).ok).toBe(true);
+    expect(arch("add_group", { id: "vpc", kind: "vpc", label: "VPC", proposal: "P1" }).ok).toBe(true);
+    expect(arch("connect", { id: "c1", from: "a", to: "b", proposal: "P1" }).ok).toBe(true);
+    expect(arch("connect", { id: "c1", from: "a", to: "a", proposal: "P1" }).ok).toBe(false);
+    expect(arch("connect", { id: "c1", from: "a", to: "b", proposal: "" }).ok).toBe(false);
+    expect(ok("add_component", comp)).toBe(false);
+    expect(ok("connect", { id: "c1", from: "a", to: "b", proposal: "P1" })).toBe(false);
+    for (const [name, input] of [["delete", { id: "a" }], ["update_label", { id: "a", label: "A" }], ["set_parent", { id: "a", parent: null }]] as const)
+      expect(arch(name, { ...input, proposal: "P1" }).ok).toBe(false);
+    expect(arch("set_service", { id: "a", service: "s3", proposal: "P1" }, ["aws"]).ok).toBe(false);
+  });
+  it("kept ops validate as in live mode; set_service only with a catalog on", () => {
+    expect(arch("add_component", { zone: "system", id: "b", label: "Bucket", type: "storage", service: "s3" }, ["aws"]).ok).toBe(true);
+    expect(arch("add_component", { zone: "system", id: "b", label: "Bucket", type: "storage", service: "s3" }).ok).toBe(false);
+    expect(arch("set_service", { id: "b", service: "s3" }, ["aws"]).ok).toBe(true);
+    expect(arch("set_service", { id: "b", service: "s3" }).ok).toBe(false);
+    expect(arch("update_summary", { text: "An S3 bucket." }).ok).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { t } from "../i18n";
 import { parseOp } from "@grafito/contract";
-import type { Op } from "@grafito/contract";
+import type { Op, OpSet } from "@grafito/contract";
 import type { Usage } from "@grafito/contract";
 
 export interface SseEvent { event: string; data: any }
@@ -41,15 +41,30 @@ export interface BoardHandlers {
   onError(message: string): void;
 }
 
-export async function streamBoard(
+export function streamBoard(
   body: { delta: string; summary: string; board: string; model: string; shape?: string; mode?: "content" | "instruction"; catalogs?: string[]; lang?: string },
+  h: BoardHandlers,
+  signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
+) {
+  return streamOps("/api/board", body, "board", h, signal, fetchImpl);
+}
+
+/**
+ * Posts `body` to an endpoint that answers with ops over SSE and hands each event to `h`. Every op is
+ * parsed again for `body.catalogs` and `opSet`; one that fails becomes a warning.
+ */
+export async function streamOps<B extends { catalogs?: string[] }>(
+  url: string,
+  body: B,
+  opSet: OpSet,
   h: BoardHandlers,
   signal?: AbortSignal,
   fetchImpl: typeof fetch = fetch,
 ) {
   let res: Response;
   try {
-    res = await fetchImpl("/api/board", {
+    res = await fetchImpl(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -70,7 +85,7 @@ export async function streamBoard(
       for (const { event, data } of parser.push(dec.decode(value, { stream: true }))) {
         if (event === "op") {
           // The server already checked it; parsing again makes the browser trust only what it can type.
-          const p = data.invalid ? null : parseOp(data, body.catalogs ?? []);
+          const p = data.invalid ? null : parseOp(data, body.catalogs ?? [], opSet);
           if (!p) h.onInvalid(data.warning);
           else if (p.ok) h.onOp(p.op);
           else h.onInvalid(p.error);

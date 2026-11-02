@@ -48,6 +48,7 @@ describe("AnimationQueue", () => {
     const exec: Executor = {
       draw: (k) => hold("draw " + k),
       update: (k) => hold("update " + k),
+      ink: (k) => hold("ink " + k),
       remove: (ks) => hold("delete " + ks.join(",")),
       move: (k) => { events.push("move " + k); },
     };
@@ -70,8 +71,19 @@ describe("AnimationQueue", () => {
     expect(q.pending).toBe(0);
   });
 
+  it("runs an ink task through the executor, in order", async () => {
+    const { events, releases, q } = setup();
+    q.push({ sequential: [{ kind: "delete", keys: ["alt"] }, { kind: "ink", key: "a" }], moves: [] });
+    await flush();
+    releases[0]();
+    await flush();
+    expect(events).toEqual(["start delete alt", "end delete alt", "start ink a"]);
+    releases[1]();
+    await q.whenIdle();
+  });
+
   it("speeds up with the queue and goes instant above 12", async () => {
-    const exec: Executor = { draw: async () => {}, update: async () => {}, remove: async () => {}, move() {} };
+    const exec: Executor = { draw: async () => {}, update: async () => {}, ink: async () => {}, remove: async () => {}, move() {} };
     const q = new AnimationQueue(exec);
     const tasks: SeqTask[] = Array.from({ length: 16 }, (_, i) => ({ kind: "draw", key: "k" + i }));
     q.push({ sequential: tasks, moves: [] });

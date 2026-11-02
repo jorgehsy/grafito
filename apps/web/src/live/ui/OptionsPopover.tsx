@@ -23,9 +23,11 @@ interface Props {
   onFollow(v: boolean): void;
   showTranscript: boolean;
   onShowTranscript(v: boolean): void;
+  /** Architect mode: no shape or transcript there, so those tiles are hidden. */
+  architect?: boolean;
 }
 
-export function OptionsPopover({ open, anchor, onClose, model, availableModels, onModel, shape, onShape, catalogs, onCatalogs, langLocked, follow, onFollow, showTranscript, onShowTranscript }: Props) {
+export function OptionsPopover({ open, anchor, onClose, model, availableModels, onModel, shape, onShape, catalogs, onCatalogs, langLocked, follow, onFollow, showTranscript, onShowTranscript, architect = false }: Props) {
   const t = useT();
   const lang = useLang();
   const ref = useRef<HTMLDivElement>(null);
@@ -50,10 +52,12 @@ export function OptionsPopover({ open, anchor, onClose, model, availableModels, 
         {t("options.model")}
         <ModelTiles value={model} onChange={onModel} available={availableModels} />
       </div>
-      <div className="field">
-        {t("options.shape")}
-        <ShapeGallery value={shape} onChange={onShape} />
-      </div>
+      {!architect && (
+        <div className="field">
+          {t("options.shape")}
+          <ShapeGallery value={shape} onChange={onShape} />
+        </div>
+      )}
       <div className="field">
         {t("options.icons")}
         <CatalogTiles value={catalogs} onChange={onCatalogs} />
@@ -64,7 +68,7 @@ export function OptionsPopover({ open, anchor, onClose, model, availableModels, 
       </div>
       <div className="field">
         {t("options.view")}
-        <ViewTiles follow={follow} onFollow={onFollow} showTranscript={showTranscript} onShowTranscript={onShowTranscript} />
+        <ViewTiles follow={follow} onFollow={onFollow} transcript={architect ? undefined : { on: showTranscript, set: onShowTranscript }} />
       </div>
     </div>
   );

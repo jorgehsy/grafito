@@ -8,3 +8,4 @@ export * from "./camera";
 export * from "./player";
 export * from "./serialize";
 export * from "./palette";
+export * from "./architect";

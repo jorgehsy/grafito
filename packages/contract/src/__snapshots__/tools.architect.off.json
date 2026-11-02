@@ -1,0 +1,342 @@
+[
+  {
+    "name": "add_component",
+    "description": "Adds a component to the system zone. type: actor = person (stick figure); client = browser or phone; service = service box; database = cylinder; queue = queue or pipe; storage = bucket or folder; external = dotted cloud of a third party. 'parent' puts it inside a group.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "zone": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of a system zone."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier."
+        },
+        "label": {
+          "type": "string",
+          "description": "Short name."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "actor",
+            "client",
+            "service",
+            "database",
+            "queue",
+            "storage",
+            "external"
+          ]
+        },
+        "icon": {
+          "type": "string",
+          "description": "Optional emoji."
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the group it sits in (optional; without it, outside every group)."
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal this belongs to (see propose); it is drawn in pencil. Leave it out for what the user asked for: that is drawn in ink."
+        }
+      },
+      "required": [
+        "zone",
+        "id",
+        "label",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "connect",
+    "description": "Draws an arrow between two components. Arrows join components only, never a group.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier of the connection."
+        },
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the source element."
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the target element."
+        },
+        "label": {
+          "type": "string",
+          "description": "Short text over the arrow."
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "solid",
+            "dashed"
+          ],
+          "description": "dashed = optional, asynchronous or weak relation."
+        },
+        "both_ways": {
+          "type": "boolean",
+          "description": "Arrow with a head at both ends."
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal this belongs to (see propose); it is drawn in pencil. Leave it out for what the user asked for: that is drawn in ink."
+        }
+      },
+      "required": [
+        "id",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "update_label",
+    "description": "Changes the text of a component, group or connection.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id to change."
+        },
+        "label": {
+          "type": "string",
+          "description": "New text."
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "delete",
+    "description": "Deletes a component, group or connection. Never the system zone: it stays for the whole session. Deleting a component removes its arrows; deleting a group keeps what was inside it, moved up to the group's own parent.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id to delete."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "say",
+    "description": "Speaks to the user in a speech bubble over the board. Exactly one per turn, even when nothing is drawn; if you send more than one, only the last is shown.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "What you tell the user: about 25 words, concrete, at most one question."
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the element, group or proposal the bubble is about (optional; without it the bubble comes from a corner)."
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "add_group",
+    "description": "Draws an AWS group: a labelled box that holds components and other groups (AWS Cloud > Region > VPC > Availability Zone > subnet). The parent group must already exist. Put components in it with add_component's 'parent'. An empty group is drawn at a minimum size.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "aws_cloud",
+            "region",
+            "vpc",
+            "availability_zone",
+            "public_subnet",
+            "private_subnet",
+            "generic"
+          ],
+          "description": "aws_cloud = the AWS Cloud around everything on AWS; region = an AWS Region; vpc = a VPC; availability_zone = one Availability Zone; public_subnet = a subnet reachable from the internet; private_subnet = a subnet with no route from the internet; generic = any other boundary (an on-premises network, an account)."
+        },
+        "label": {
+          "type": "string",
+          "description": "Short label, e.g. 'VPC' or 'us-east-1a'."
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the group it sits in (optional; without it, at the top of the zone)."
+        },
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal this belongs to (see propose); it is drawn in pencil. Leave it out for what the user asked for: that is drawn in ink."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "set_parent",
+    "description": "Moves a component or group into another group, or out of every group with parent null. A group cannot go inside itself or inside a group it contains.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the component or group to move."
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Id of the group to move it into; null takes it out of every group."
+        }
+      },
+      "required": [
+        "id",
+        "parent"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "propose",
+    "description": "Opens a proposal: something you add on your own initiative, drawn in pencil until the user keeps it. Call it before the add_component, add_group and connect calls that carry its id in 'proposal'. 'alternative_to' makes it the other choice to an open proposal, drawn beside it; the user keeps one of the two.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier of the proposal, e.g. 'P1'."
+        },
+        "label": {
+          "type": "string",
+          "description": "What it is, in 1 to 4 words, e.g. 'Static site'."
+        },
+        "alternative_to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of an open proposal this one is the other choice to (optional; at most 2 side by side)."
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "accept",
+    "description": "Keeps an open proposal: everything drawn under it turns to ink. Accepting one of two alternatives erases the other.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal the user keeps."
+        }
+      },
+      "required": [
+        "proposal"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "reject",
+    "description": "Turns down an open proposal: everything drawn under it is erased, with the arrows that touch it.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "proposal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the open proposal the user turns down."
+        }
+      },
+      "required": [
+        "proposal"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "update_summary",
+    "description": "Updates the one or two sentence summary of everything said so far.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Summary."
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  }
+]
