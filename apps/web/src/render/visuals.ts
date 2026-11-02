@@ -343,6 +343,7 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
       ? `M${pts[0].x} ${pts[0].y} C${pts[1].x} ${pts[1].y} ${pts[2].x} ${pts[2].y} ${pts[3].x} ${pts[3].y}`
       : roundedPoly(pts);
     b.rough("path", "line", [d], { roughness: cross ? 0.7 : 1.0, bowing: 0.8 }, { stroke: color, width: wd, dash });
+    if (pencil) b.v.g.appendChild(svgEl("path", { d, fill: "none", stroke: "transparent", "stroke-width": 16, "pointer-events": "stroke", "data-hit": "" }));
     const n = pts.length;
     const tipFrom = geom.curve ? pts[2] : pts[n - 2];
     arrowHead(b, "head", pts[n - 1], tipFrom.x === pts[n - 1].x && tipFrom.y === pts[n - 1].y ? pts[0] : tipFrom, color, wd);
@@ -372,6 +373,8 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
   }
 
   addServiceIcon(b.v, item, geom);
+  // Pencil has no fill, so a clickable area of its own lets a click inside the outline select it.
+  if (pencil && (item.kind === "element" || item.kind === "group")) b.v.g.insertBefore(svgEl("rect", { x: 0, y: 0, width: w, height: h, fill: "transparent", "data-hit": "" }), b.v.g.firstChild);
   if (pencil) {
     b.v.g.setAttribute("opacity", String(PENCIL_LOOK.opacity));
     for (const st of b.v.stamps ?? []) { st.setAttribute("opacity", String(PENCIL_LOOK.stampOpacity)); st.style.filter = "grayscale(1)"; }

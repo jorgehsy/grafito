@@ -61,6 +61,8 @@ export class Engine implements Sink, Executor {
   paused = false;
   follow = true;
   onFollowChange?: (f: boolean) => void;
+  /** A click (not a drag) on the board: the key of the pencil item under it, or null for ink or empty paper. */
+  onPick?: (key: string | null) => void;
 
   private layers: Record<"zone" | "group" | "under" | "connection" | "element" | "ann", SVGGElement>;
   private pen: SVGGElement;
@@ -79,6 +81,7 @@ export class Engine implements Sink, Executor {
   private raf = 0;
   private ro: ResizeObserver;
   private cleanup: (() => void)[] = [];
+  private selected = new Set<string>();
 
   constructor(private svg: SVGSVGElement) {
     const mk = () => { const g = document.createElementNS(NS, "g"); svg.appendChild(g); return g; };
@@ -124,6 +127,7 @@ export class Engine implements Sink, Executor {
     measure(vis);
     const s: Shown = { item: t, geom: t.geom, vis, layer, busy: true };
     this.shown.set(key, s);
+    this.tag(s);
     this.highlight(s);
     this.setFocus(t.geom);
     this.lastActive = performance.now();
@@ -159,6 +163,7 @@ export class Engine implements Sink, Executor {
     s.layer.replaceChild(vis.g, s.vis.g);
     s.vis = vis;
     s.item = { ...t, geom: s.geom };
+    this.tag(s);
     this.highlight(s);
     if (!instant) {
       hideText(vis);
@@ -182,10 +187,14 @@ export class Engine implements Sink, Executor {
     const item: RenderItem = { ...s.item, data: { ...s.item.data, pencil: t.data.pencil } };
     const vis = buildVisual(item, s.geom);
     const old = s.vis;
+    // the fading pencil is no longer clickable
+    delete old.g.dataset.pencil;
+    delete old.g.dataset.selected;
     s.layer.insertBefore(vis.g, old.g.nextSibling);
     measure(vis);
     s.vis = vis;
     s.item = item;
+    this.tag(s);
     try {
       if (isFinite(speed)) {
         const sp = speed * this.userSpeed;
@@ -227,6 +236,17 @@ export class Engine implements Sink, Executor {
       });
     }
     for (const [k, s] of [...this.shown]) if (list.includes(s)) { s.vis.g.remove(); this.shown.delete(k); }
+  }
+
+  /** Marks these items as selected (the outline the stylesheet gives `[data-selected]`); [] clears it. */
+  select(keys: readonly string[]) {
+    this.selected = new Set(keys);
+    for (const s of this.shown.values()) this.tag(s);
+  }
+
+  /** Where an item is on screen (client pixels, after pan and zoom); null if it is not drawn. */
+  screenRect(key: string): DOMRect | null {
+    return this.shown.get(key)?.vis.g.getBoundingClientRect() ?? null;
   }
 
   reset() {
@@ -320,6 +340,7 @@ export class Engine implements Sink, Executor {
       s.layer.replaceChild(vis.g, s.vis.g);
       s.vis = vis;
       s.item = item;
+      this.tag(s);
     }
     s.geom = g;
     s.item = { ...s.item, geom: g, hue };
@@ -377,6 +398,14 @@ export class Engine implements Sink, Executor {
       lines.forEach((l) => { const len = l.getTotalLength(); l.style.strokeDasharray = String(len); l.style.strokeDashoffset = String(len * (1 - t)); });
     });
     await this.frame(300 / sp, () => {});
+  }
+
+  /** The data attributes hit-testing and the selection outline read. */
+  private tag(s: Shown) {
+    const d = s.vis.g.dataset;
+    d.key = s.item.key;
+    if (s.item.data.pencil) d.pencil = ""; else delete d.pencil;
+    if (this.selected.has(s.item.key)) d.selected = ""; else delete d.selected;
   }
 
   private highlight(s: Shown) {
@@ -472,14 +501,26 @@ export class Engine implements Sink, Executor {
       this.manual();
     };
     let drag: { x: number; y: number } | null = null;
-    const down = (e: PointerEvent) => { drag = { x: e.clientX, y: e.clientY }; svg.setPointerCapture(e.pointerId); };
+    // A press that moves less than this is a click, not a pan.
+    let press: { x: number; y: number; key: string | null } | null = null;
+    const down = (e: PointerEvent) => {
+      // Read before the capture: from then on the svg is the target. Ink is never picked.
+      const hit = (e.target as Element).closest?.("[data-key]");
+      press = { x: e.clientX, y: e.clientY, key: hit && hit.hasAttribute("data-pencil") ? hit.getAttribute("data-key") : null };
+      drag = { x: e.clientX, y: e.clientY };
+      svg.setPointerCapture(e.pointerId);
+    };
     const move = (e: PointerEvent) => {
       if (!drag) return;
       this.cam = { ...this.cam, cx: this.cam.cx - (e.clientX - drag.x) / this.cam.scale, cy: this.cam.cy - (e.clientY - drag.y) / this.cam.scale };
       drag = { x: e.clientX, y: e.clientY };
       this.manual();
     };
-    const up = () => { drag = null; };
+    const up = (e: PointerEvent) => {
+      drag = null;
+      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) this.onPick?.(press.key);
+      press = null;
+    };
     svg.addEventListener("wheel", onWheel, { passive: false });
     svg.addEventListener("pointerdown", down);
     svg.addEventListener("pointermove", move);

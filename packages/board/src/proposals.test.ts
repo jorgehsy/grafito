@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { op } from "@grafito/contract";
 import type { Op } from "@grafito/contract";
 import { ARCHITECT_ZONE_ID, architectZoneOp } from "./architect";
-import { alternativesOf, applyOp, applyOps, emptyBoard, openProposals } from "./model";
+import { alternativesOf, applyOp, applyOps, emptyBoard, openProposals, proposalItems, proposalOf } from "./model";
 import type { Board } from "./model";
 import { serializeBoard } from "./serialize";
 import { computeLayout } from "./layout";
@@ -102,6 +102,22 @@ describe("proposals: propose", () => {
       { id: "P3", label: "Key-value", alternatives: ["P2", "P3"] },
       { id: "P4", label: "Cache", alternatives: [] },
     ]);
+  });
+});
+
+describe("proposals: what a click finds", () => {
+  it("proposalOf names the open proposal an item was drawn under; ink and unknown ids have none", () => {
+    const b = run([comp("api", "service"), conn("c9", "api", "dns")], staticSite());
+    expect(["dns", "c1", "c2"].map((id) => proposalOf(b, id))).toEqual(["P1", "P1", "P1"]);
+    expect(["api", "c9", "nope", "P1", "system"].map((id) => proposalOf(b, id))).toEqual([undefined, undefined, undefined, undefined, undefined]);
+    expect(proposalOf(run([op.accept({ proposal: "P1" })], b), "dns")).toBeUndefined();
+  });
+
+  it("proposalItems lists everything drawn under it: groups, components, connections", () => {
+    const b = run([op.propose({ id: "P9", label: "Net" }), op.add_group({ id: "vpc", kind: "vpc", label: "VPC", proposal: "P9" })], twoDatabases());
+    expect(proposalItems(b, "P2")).toEqual(["rds", "c1"]);
+    expect(proposalItems(b, "P9")).toEqual(["vpc"]);
+    expect(proposalItems(b, "P7")).toEqual([]);
   });
 });
 

@@ -10,7 +10,7 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
 describe("architect system prompt", () => {
   it("prompt and tools are byte for byte the reviewed version", () => {
-    expect(sha(ARCHITECT_SYSTEM_PROMPT)).toBe("75d06455c312f670955d078223b1883c9437d6848323ae57bb11e64f3b51bb29");
+    expect(sha(ARCHITECT_SYSTEM_PROMPT)).toBe("19b1a7d4368c572df63a100bd3d170afdc4568bcac7011845f00a092fff561ed");
     expect(sha(WELL_ARCHITECTED_DIGEST)).toBe("832d66dfb0b386561a47bbc433cfe764bb9e1a64e86d3c34a133c2e1a4a363be");
     expect(sha(JSON.stringify(toolDefs([], "architect")))).toBe("b0b629ca41e4000ceb22e616e74a3ef6d982b1fe3a3b12e6f351d6f15c7115c1");
     // Architect turns stamp ARCHITECT_PROMPT_VERSION: from the session record slice on, bump it whenever these hashes change.
@@ -31,9 +31,9 @@ describe("architect system prompt", () => {
       expect(ARCHITECT_SYSTEM_PROMPT).toMatch(rule);
   });
 
-  it("numbers its rules 1 to 15 in order, once each", () => {
+  it("numbers its rules 1 to 16 in order, once each", () => {
     const numbers = [...ARCHITECT_SYSTEM_PROMPT.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
-    expect(numbers).toEqual(Array.from({ length: 15 }, (_, k) => k + 1));
+    expect(numbers).toEqual(Array.from({ length: 16 }, (_, k) => k + 1));
     expect(ARCHITECT_SYSTEM_PROMPT).toMatch(/pillar review \(rule 10\)/);
     expect(ARCHITECT_SYSTEM_PROMPT).toMatch(/^10\. An end\./m);
   });
@@ -61,6 +61,17 @@ describe("architect system prompt", () => {
       /After a reject you may ask again in other words, offer one other option as a new proposal, or move on/,
       /say the change you suggest in the bubble and draw nothing\. If the user agrees, change the ink directly/,
       /accept and reject, then drawing ops \(each propose before the ops that carry its id\)/,
+    ])
+      expect(ARCHITECT_SYSTEM_PROMPT).toMatch(rule);
+  });
+
+  it("explains clicks: already applied, never re-sent, acknowledged briefly", () => {
+    for (const rule of [
+      /USER CLICKS SINCE LAST TURN when the user clicked \(rule 16\)/,
+      /^16\. Clicks\./m,
+      /"accept P3", "reject P4"; choosing one of two alternatives is an accept/,
+      /They are already applied: CURRENT BOARD shows the result\. Never send accept or reject for them\./,
+      /Acknowledge them in a few words in the say/,
     ])
       expect(ARCHITECT_SYSTEM_PROMPT).toMatch(rule);
   });
@@ -123,6 +134,13 @@ describe("architect user text", () => {
     expect(buildArchitectUserText({ board: "ZONES\n- system", summary: "s", recent, text: "add an S3 bucket" })).toBe(
       "CURRENT BOARD:\nZONES\n- system\n\nSUMMARY SO FAR:\ns\n\nRECENT TURNS:\nUSER: ask 2\nYOUR BUBBLE: bubble 2\nUSER: ask 3\nYOUR BUBBLE: bubble 3\nUSER: ask 4\nYOUR BUBBLE: (none)\n\nUSER MESSAGE:\nadd an S3 bucket",
     );
+  });
+  it("lists the clicks since the last turn, in order, before the message; no section without clicks", () => {
+    const actions = [{ type: "accept", proposal: "P3" }, { type: "reject", proposal: "P4" }] as const;
+    expect(buildArchitectUserText({ board: "B", summary: "s", actions, text: "next" })).toBe(
+      "CURRENT BOARD:\nB\n\nSUMMARY SO FAR:\ns\n\nRECENT TURNS:\n(none)\n\nUSER CLICKS SINCE LAST TURN:\n- accept P3\n- reject P4\n\nUSER MESSAGE:\nnext",
+    );
+    expect(buildArchitectUserText({ actions: [], text: "hi" })).not.toContain("CLICKS");
   });
   it("says so when there is nothing yet", () => {
     expect(buildArchitectUserText({ text: "hi" })).toBe("CURRENT BOARD:\n(empty board)\n\nSUMMARY SO FAR:\n(empty)\n\nRECENT TURNS:\n(none)\n\nUSER MESSAGE:\nhi");

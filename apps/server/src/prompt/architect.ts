@@ -1,14 +1,14 @@
 import { ARCHITECT_ZONE_ID } from "@grafito/board";
 import { CATALOGS } from "@grafito/icons";
 import type { IconCatalog } from "@grafito/icons";
-import type { Lang } from "@grafito/contract";
+import type { ArchitectAction, Lang } from "@grafito/contract";
 import { renderWellArchitectedDigest } from "@grafito/wellarchitected";
 import type { SystemBlock } from "../claude/client";
 import { languageLine, serviceList } from "./system";
 
 export const ARCHITECT_SYSTEM_PROMPT = `You are an AWS solutions architect designing a system together with the user on a shared whiteboard. The user types messages; you answer only through tool calls: drawing ops that change the board, and one say, the speech bubble the user reads. You never write text outside the tools. You do not give coordinates: the board lays itself out.
 
-You receive: CURRENT BOARD (what is drawn so far), SUMMARY SO FAR (your own running notes), RECENT TURNS (the last user messages and your bubbles, oldest first) and the USER MESSAGE.
+You receive: CURRENT BOARD (what is drawn so far), SUMMARY SO FAR (your own running notes), RECENT TURNS (the last user messages and your bubbles, oldest first), USER CLICKS SINCE LAST TURN when the user clicked (rule 16) and the USER MESSAGE.
 
 The board:
 - Everything goes in the one system zone, id "${ARCHITECT_ZONE_ID}", which the app made. Never try to create zones: add_component always uses zone "${ARCHITECT_ZONE_ID}".
@@ -44,6 +44,7 @@ How you work:
 13. Unanswered proposals stay until the user answers; do not ask about them again, move on. When 3 or more proposals are open (two alternatives count as one), the turn's question is whether to keep them ("Keep these?").
 14. The user answers in the text box. Yes, ok, approve or similar: accept the proposal your last bubble asked about (all open ones if it asked about all). No or reject: reject it. A or B: accept that alternative. An answer that also asks for something more gets both. After a reject you may ask again in other words, offer one other option as a new proposal, or move on; never draw the same thing again.
 15. Changing ink: say the change you suggest in the bubble and draw nothing. If the user agrees, change the ink directly with update_label, delete, set_parent or new ink.
+16. Clicks. The user can also answer a proposal by clicking it: USER CLICKS SINCE LAST TURN lists those answers in order ("accept P3", "reject P4"; choosing one of two alternatives is an accept). They are already applied: CURRENT BOARD shows the result. Never send accept or reject for them. Acknowledge them in a few words in the say ("Kept the CDN."), then answer the message; a click reject counts as a no (rule 14).
 
 Make all the calls in a single response, in this order: accept and reject, then drawing ops (each propose before the ops that carry its id), then say, then update_summary. ALWAYS finish with update_summary: 1 to 2 sentences on the design so far, plus what you asked and any point where you already pushed back.
 
@@ -82,11 +83,12 @@ export interface RecentTurn {
 /** How many past turns are sent word for word. */
 export const RECENT_TURNS = 3;
 
-/** User text of one architect turn. The headers are named in the system prompt. */
-export function buildArchitectUserText(a: { board?: unknown; summary?: unknown; recent?: readonly RecentTurn[]; text: string }): string {
+/** User text of one architect turn. The headers are named in the system prompt; the clicks section only when there are clicks. */
+export function buildArchitectUserText(a: { board?: unknown; summary?: unknown; recent?: readonly RecentTurn[]; actions?: readonly ArchitectAction[]; text: string }): string {
   const boardText = typeof a.board === "string" && a.board.trim() ? a.board : "(empty board)";
   const summary = typeof a.summary === "string" && a.summary.trim() ? a.summary : "(empty)";
   const recent = (a.recent ?? []).slice(-RECENT_TURNS);
   const turns = recent.length ? recent.map((r) => `USER: ${r.text}\nYOUR BUBBLE: ${r.bubble || "(none)"}`).join("\n") : "(none)";
-  return `CURRENT BOARD:\n${boardText}\n\nSUMMARY SO FAR:\n${summary}\n\nRECENT TURNS:\n${turns}\n\nUSER MESSAGE:\n${a.text}`;
+  const clicks = a.actions?.length ? `USER CLICKS SINCE LAST TURN:\n${a.actions.map((x) => `- ${x.type} ${x.proposal}`).join("\n")}\n\n` : "";
+  return `CURRENT BOARD:\n${boardText}\n\nSUMMARY SO FAR:\n${summary}\n\nRECENT TURNS:\n${turns}\n\n${clicks}USER MESSAGE:\n${a.text}`;
 }

@@ -42,6 +42,7 @@ async function post(client: ClaudeClient | null | Clients, body: unknown): Promi
   return parseSse(await res.text());
 }
 
+const BAD_ACTIONS = "Invalid actions: expected a list of {type: accept | reject, proposal}";
 const names = (evs: Ev[]) => evs.map((e) => e.event).filter((n) => n !== "usage");
 const ops = (evs: Ev[]) => evs.filter((e) => e.event === "op").map((e) => e.data);
 
@@ -151,6 +152,17 @@ describe("POST /api/architect", () => {
     expect(evs.at(-1)!.data).toMatchObject({ model: "claude-sonnet-5-5@subscription" });
   });
 
+  it("shows Claude the clicks since the last turn; none and absent are the same", async () => {
+    const fake = fakeClaude([s3Turn]);
+    await post(fake, { text: "and a queue", actions: [{ type: "accept", proposal: "P3" }, { type: "reject", proposal: "P4" }] });
+    expect(fake.calls[0].params.userText).toContain("USER CLICKS SINCE LAST TURN:\n- accept P3\n- reject P4\n\nUSER MESSAGE:\nand a queue");
+    for (const body of [{ text: "hi", actions: [] }, { text: "hi" }]) {
+      const f = fakeClaude([s3Turn]);
+      await post(f, body);
+      expect(f.calls[0].params.userText).not.toContain("CLICKS");
+    }
+  });
+
   it("rejects bad requests with an SSE error and never calls Claude", async () => {
     const cases: [ClaudeClient | null, unknown, string][] = [
       [null, { text: "hi" }, "Missing API key in .env"],
@@ -158,6 +170,10 @@ describe("POST /api/architect", () => {
       [fakeClaude([]), { text: "  " }, "The text is empty"],
       [fakeClaude([]), { text: "hi", recent: "x" }, "Invalid recent: expected a list of {text, bubble}"],
       [fakeClaude([]), { text: "hi", recent: [{ bubble: "b" }] }, "Invalid recent: expected a list of {text, bubble}"],
+      [fakeClaude([]), { text: "hi", actions: { type: "accept", proposal: "P1" } }, BAD_ACTIONS],
+      [fakeClaude([]), { text: "hi", actions: [{ type: "choose", proposal: "P1" }] }, BAD_ACTIONS],
+      [fakeClaude([]), { text: "hi", actions: [{ type: "reject", proposal: "" }] }, BAD_ACTIONS],
+      [fakeClaude([]), { actions: [{ type: "accept", proposal: "P1" }] }, "The text is empty"],
       [fakeClaude([]), { text: "hi", catalogs: ["made-up"] }, 'Invalid catalog: "made-up"'],
     ];
     for (const [client, body, message] of cases) {

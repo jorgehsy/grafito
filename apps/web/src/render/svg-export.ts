@@ -17,6 +17,9 @@ export function standaloneSvg(src: SVGSVGElement): string {
       if (v) target.style.setProperty(p, v);
     }
   });
+  // clickable areas and selection marks are for the screen only
+  clone.querySelectorAll("[data-hit]").forEach((el) => el.remove());
+  clone.querySelectorAll("[data-selected]").forEach((el) => el.removeAttribute("data-selected"));
   const r = src.getBoundingClientRect();
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.setAttribute("width", String(Math.round(r.width)));

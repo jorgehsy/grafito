@@ -257,7 +257,7 @@ One user message in architect mode (with any approvals or rejections clicked sin
 _Avoid_: turno, message, exchange, round
 
 **Proposal**:
-Something Claude draws in pencil in architect mode on its own initiative (what the user explicitly asks for goes straight to ink), waiting for the user to approve it (it turns to ink) or reject it (it is erased). Alternatives are two proposals drawn side by side (at most 2); keeping one erases the other. The board text tags its items `[pencil P3]` and lists the open ones under `PROPOSALS`.
+Something Claude draws in pencil in architect mode on its own initiative (what the user explicitly asks for goes straight to ink), waiting for the user to approve it (it turns to ink) or reject it (it is erased), by typing or with the ✓/✗ toolbar a click on it shows. Alternatives are two proposals drawn side by side (at most 2); keeping one erases the other, and clicking one keeps it. The board text tags its items `[pencil P3]` and lists the open ones under `PROPOSALS`.
 _Avoid_: propuesta, draft, suggestion, pending element
 
 **Ink**:

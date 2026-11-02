@@ -1,8 +1,9 @@
 // The architect session: one run of architect mode on a board that starts blank with the app-made system zone.
 // Each typed message is one turn: POST /api/architect, drawing ops onto the board, the `say` into the speech bubble.
-import { architectZoneOp, serializeBoard } from "@grafito/board";
+// A click on a proposal (✓, ✗, or choosing an alternative) applies at once and rides along with the next turn.
+import { alternativesOf, architectZoneOp, findProposal, proposalOf, serializeBoard } from "@grafito/board";
 import type { Board } from "@grafito/board";
-import type { Op, Usage } from "@grafito/contract";
+import type { ArchitectAction, Op, Usage } from "@grafito/contract";
 import { ARCHITECT_PROMPT_VERSION, costUsd, zeroUsage } from "@grafito/contract";
 import { streamOps } from "../live/sse";
 import type { UsageInfo } from "../live/sse";
@@ -36,6 +37,11 @@ export interface ArchitectTurn {
   done: boolean;
 }
 
+/** One click on a proposal, with its time. Choosing an alternative is an accept: the other one is erased. */
+export interface ArchitectClick extends ArchitectAction {
+  at: number;
+}
+
 export interface ArchitectSettings {
   model: string;
   /** Enabled icon catalogs. */
@@ -60,6 +66,8 @@ export interface ArchitectSessionState {
   bubble: Bubble | null;
   /** The latest turn's error; "" if none. */
   error: string;
+  /** Clicks since the last turn was sent, in order: the next turn's `actions`. */
+  clicks: ArchitectClick[];
 }
 
 export interface ArchitectSession {
@@ -67,6 +75,11 @@ export interface ArchitectSession {
   start(): void;
   /** Sends a typed message as a turn. Returns false, sending nothing, if it is blank or a turn is in flight. */
   send(text: string): boolean;
+  /**
+   * Accepts or rejects an open proposal by click: applied to the board at once, with no Claude call, and queued for
+   * the next turn. Returns false, doing nothing, if the proposal is not open or a click already settled it.
+   */
+  decide(type: ArchitectAction["type"], proposal: string): boolean;
   /** Cancels the turn in flight; the session stays usable. */
   stop(): void;
   /** Calls `fn` now and on every change; returns the unsubscribe function. */
@@ -77,9 +90,23 @@ export interface ArchitectSession {
 export const recentTurns = (turns: readonly ArchitectTurn[]): { text: string; bubble: string }[] =>
   turns.filter((x) => x.done).slice(-RECENT_TURNS).map((x) => ({ text: x.text, bubble: x.bubble?.text ?? "" }));
 
+/**
+ * What a click on a board item does: nothing on ink or paper; on one of two alternatives it chooses that one at
+ * once (#36: an alternative is chosen by clicking it); on any other pencil item it selects its proposal for ✓/✗.
+ */
+export function pickProposal(board: Board, key: string | null): { do: "none" } | { do: "select" | "choose"; proposal: string } {
+  const proposal = key ? proposalOf(board, key) : undefined;
+  if (!proposal) return { do: "none" };
+  return { do: alternativesOf(board, proposal).length > 1 ? "choose" : "select", proposal };
+}
+
+/** The clicks as the request's `actions`: type and proposal, in order. */
+export const clickActions = (clicks: readonly ArchitectClick[]): ArchitectAction[] => clicks.map(({ type, proposal }) => ({ type, proposal }));
+
 export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSession {
   const fetchImpl = d.fetchImpl ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
   let turns: ArchitectTurn[] = [];
+  let clicks: ArchitectClick[] = [];
   let busy = false;
   let abort: AbortController | null = null;
   // Bumped by start and stop, so a turn still finishing does not touch the new state.
@@ -88,7 +115,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
 
   const state = (): ArchitectSessionState => {
     const last = turns.at(-1);
-    return { turns: [...turns], busy, bubble: last?.bubble ?? null, error: last?.error ?? "" };
+    return { turns: [...turns], busy, bubble: last?.bubble ?? null, error: last?.error ?? "", clicks: [...clicks] };
   };
   const emit = () => { const s = state(); listeners.forEach((f) => f(s)); };
 
@@ -97,6 +124,9 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     const { model, catalogs, lang } = d.settings.get();
     const board = d.board.get();
     const recent = recentTurns(turns);
+    // Sent once: a click made while this turn is in flight waits for the next one.
+    const actions = clickActions(clicks);
+    clicks = [];
     const turn: ArchitectTurn = {
       n: turns.length + 1, text, model, promptVersion: ARCHITECT_PROMPT_VERSION, startedAt: Date.now(), totalMs: null,
       ops: [], bubble: null, warnings: [], usage: zeroUsage(), costUsd: 0, done: false,
@@ -113,7 +143,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     let last: Promise<void> = Promise.resolve();
     await streamOps(
       "/api/architect",
-      { text, board: serializeBoard(board, { catalog: catalogs.length > 0 }), summary: board.summary, recent, model, lang, catalogs },
+      { text, board: serializeBoard(board, { catalog: catalogs.length > 0 }), summary: board.summary, recent, actions, model, lang, catalogs },
       "architect",
       {
         onOp(o) {
@@ -147,6 +177,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     start() {
       halt();
       turns = [];
+      clicks = [];
       d.board.clear();
       void d.board.submit([architectZoneOp(d.zoneTitle())]);
       emit();
@@ -155,6 +186,16 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
       const s = text.trim();
       if (!s || busy) return false;
       void run(s);
+      return true;
+    },
+    decide(type, proposal) {
+      const board = d.board.get();
+      // The board lags the ops still being applied, so a click already queued also counts as settling it.
+      const settled = clicks.some((c) => c.proposal === proposal || (c.type === "accept" && alternativesOf(board, c.proposal).includes(proposal)));
+      if (!findProposal(board, proposal) || settled) return false;
+      clicks = [...clicks, { type, proposal, at: Date.now() }];
+      void d.board.submit([{ name: type, input: { proposal } }]);
+      emit();
       return true;
     },
     stop() { halt(); emit(); },

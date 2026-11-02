@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ARCHITECT_ZONE_ID, applyOps, emptyBoard } from "@grafito/board";
 import type { Board } from "@grafito/board";
 import { ARCHITECT_PROMPT_VERSION, op } from "@grafito/contract";
-import { createArchitectSession, recentTurns } from "./session";
+import type { Op } from "@grafito/contract";
+import { createArchitectSession, pickProposal, recentTurns } from "./session";
 import type { ArchitectSession, ArchitectSessionState, ArchitectSettings } from "./session";
 
 const ev = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -24,7 +25,7 @@ const say = (text: string, target?: string) => ev("op", { name: "say", input: ta
 const open: ArchitectSession[] = [];
 afterEach(() => { open.splice(0).forEach((s) => s.stop()); });
 
-function harness(respond: (i: number) => string[] = () => [done], settings: Partial<ArchitectSettings> = {}) {
+function harness(respond: (i: number) => string[] = () => [done], settings: Partial<ArchitectSettings> = {}, lag?: Op[][]) {
   let board: Board = emptyBoard();
   const requests: { url: string; body: Record<string, unknown> }[] = [];
   const fetchImpl = (async (url: string, init: RequestInit) => {
@@ -33,7 +34,8 @@ function harness(respond: (i: number) => string[] = () => [done], settings: Part
     return sse(respond(requests.length - 1));
   }) as unknown as typeof fetch;
   const session = createArchitectSession({
-    board: { get: () => board, submit: async (ops) => { board = applyOps(board, ops).board; }, clear: () => { board = emptyBoard(); } },
+    // With `lag`, submitted ops wait there until the test applies them, like the controller's layout step.
+    board: { get: () => board, submit: async (ops) => { if (lag) lag.push(ops); else board = applyOps(board, ops).board; }, clear: () => { board = emptyBoard(); } },
     settings: { get: () => ({ model: "claude-sonnet-5-5", catalogs: ["aws"], lang: "es-CL", ...settings }) },
     zoneTitle: () => "Architecture",
     fetchImpl,
@@ -42,7 +44,8 @@ function harness(respond: (i: number) => string[] = () => [done], settings: Part
   let state!: ArchitectSessionState;
   session.subscribe((s) => (state = s));
   session.start();
-  return { session, requests, board: () => board, state: () => state };
+  const flush = () => { for (const ops of lag?.splice(0) ?? []) board = applyOps(board, ops).board; };
+  return { session, requests, board: () => board, state: () => state, flush };
 }
 const settled = (h: ReturnType<typeof harness>, n: number) => until(() => h.state().turns.length === n && !h.state().busy);
 
@@ -52,7 +55,7 @@ describe("architect session: start", () => {
     await tick();
     expect(h.board().zones).toEqual([expect.objectContaining({ id: ARCHITECT_ZONE_ID, kind: "system", title: "Architecture" })]);
     expect(h.board().elements).toEqual([]);
-    expect(h.state()).toEqual({ turns: [], busy: false, bubble: null, error: "" });
+    expect(h.state()).toEqual({ turns: [], busy: false, bubble: null, error: "", clicks: [] });
   });
 });
 
@@ -65,7 +68,7 @@ describe("architect session: a turn", () => {
     expect(h.requests).toHaveLength(1);
     const { url, body } = h.requests[0];
     expect(url).toBe("/api/architect");
-    expect(body).toEqual({ text: "add an S3 bucket", board: expect.stringContaining("system [system]"), summary: "", recent: [], model: "claude-sonnet-5-5", lang: "es-CL", catalogs: ["aws"] });
+    expect(body).toEqual({ text: "add an S3 bucket", board: expect.stringContaining("system [system]"), summary: "", recent: [], actions: [], model: "claude-sonnet-5-5", lang: "es-CL", catalogs: ["aws"] });
     expect(h.state().turns[0]).toMatchObject({ n: 1, text: "add an S3 bucket", model: "claude-sonnet-5-5", promptVersion: ARCHITECT_PROMPT_VERSION, done: true, totalMs: 20, usage });
   });
 
@@ -185,6 +188,133 @@ describe("architect session: proposals", () => {
     expect(h.requests[3].body.board).toContain('PROPOSALS\n- P2 "Relational" (A; alternative to P3)\n- P3 "Key-value" (B; alternative to P2)');
     expect(h.board().elements.map((e) => e.id)).toEqual(["ddb"]);
     expect(h.board().proposals).toEqual([]);
+  });
+});
+
+describe("architect session: clicks", () => {
+  const opEv = (name: string, input: unknown) => ev("op", { name, input });
+  const comp = (id: string, proposal: string) => opEv("add_component", { zone: ARCHITECT_ZONE_ID, id, label: id, type: "service", proposal });
+  /** P1 on its own; P2 and P3 alternatives of each other. */
+  const three = [
+    opEv("propose", { id: "P1", label: "CDN" }), comp("cdn", "P1"),
+    opEv("propose", { id: "P2", label: "Relational" }), comp("rds", "P2"),
+    opEv("propose", { id: "P3", label: "Key-value", alternative_to: "P2" }), comp("ddb", "P3"),
+    say("CDN? And A or B?"),
+    done,
+  ];
+  const pencil = (b: Board) => b.elements.filter((e) => e.proposal).map((e) => e.id);
+
+  async function drawn(respond: (i: number) => string[] = (i) => (i === 0 ? three : [say("Noted."), done]), lag?: Op[][]) {
+    const h = harness(respond, {}, lag);
+    await tick();
+    h.session.send("build it");
+    await settled(h, 1);
+    h.flush();
+    return h;
+  }
+
+  it("✓ inks and ✗ erases at once, with no request; the clicks queue in order with their time", async () => {
+    const h = await drawn();
+    const before = Date.now();
+    expect(h.session.decide("accept", "P1")).toBe(true);
+    expect(h.session.decide("reject", "P2")).toBe(true);
+    await tick();
+    expect(h.requests).toHaveLength(1);
+    expect(h.board().elements.map((e) => [e.id, e.proposal ?? null])).toEqual([["cdn", null], ["ddb", "P3"]]);
+    expect(h.board().proposals.map((p) => p.id)).toEqual(["P3"]);
+    expect(h.state().clicks).toEqual([{ type: "accept", proposal: "P1", at: expect.any(Number) }, { type: "reject", proposal: "P2", at: expect.any(Number) }]);
+    expect(h.state().clicks[0].at).toBeGreaterThanOrEqual(before);
+  });
+
+  it("sends the clicks as the next turn's actions, then clears them; a turn without clicks sends []", async () => {
+    const h = await drawn();
+    h.session.decide("accept", "P1");
+    h.session.decide("reject", "P2");
+    h.session.send("now a queue");
+    expect(h.state().clicks).toEqual([]);
+    await settled(h, 2);
+    expect(h.requests[0].body.actions).toEqual([]);
+    expect(h.requests[1].body.actions).toEqual([{ type: "accept", proposal: "P1" }, { type: "reject", proposal: "P2" }]);
+    // the board sent is the one after the clicks
+    expect(h.requests[1].body.board).not.toContain("[pencil P1]");
+    h.session.send("and more");
+    await settled(h, 3);
+    expect(h.requests[2].body.actions).toEqual([]);
+  });
+
+  it("a click alone is not a turn: nothing is sent until the user types", async () => {
+    const h = await drawn();
+    h.session.decide("accept", "P1");
+    expect(h.session.send("  ")).toBe(false);
+    await tick();
+    expect(h.requests).toHaveLength(1);
+    expect(h.state().clicks).toHaveLength(1);
+  });
+
+  it("choosing an alternative is an accept: it is inked and the other one erased", async () => {
+    const h = await drawn();
+    expect(h.session.decide("accept", "P3")).toBe(true);
+    await tick();
+    expect(h.board().elements.map((e) => e.id)).toEqual(["cdn", "ddb"]);
+    expect(pencil(h.board())).toEqual(["cdn"]);
+    expect(h.board().proposals.map((p) => p.id)).toEqual(["P1"]);
+    expect(h.state().clicks.map(({ type, proposal }) => ({ type, proposal }))).toEqual([{ type: "accept", proposal: "P3" }]);
+  });
+
+  it("a click on a closed or unknown proposal is ignored", async () => {
+    const h = await drawn();
+    h.session.decide("accept", "P3");
+    await tick();
+    expect(h.session.decide("reject", "P2")).toBe(false);
+    expect(h.session.decide("accept", "P3")).toBe(false);
+    expect(h.session.decide("accept", "P9")).toBe(false);
+    expect(h.state().clicks).toHaveLength(1);
+  });
+
+  it("while the board still lags, a second click on the same proposal or on the erased alternative is ignored", async () => {
+    const lag: Op[][] = [];
+    const h = await drawn(undefined, lag);
+    expect(h.session.decide("accept", "P2")).toBe(true);
+    expect(h.board().proposals).toHaveLength(3);
+    expect(h.session.decide("reject", "P2")).toBe(false);
+    expect(h.session.decide("accept", "P3")).toBe(false);
+    expect(h.session.decide("reject", "P1")).toBe(true);
+    expect(lag).toEqual([[op.accept({ proposal: "P2" })], [op.reject({ proposal: "P1" })]]);
+    h.flush();
+    expect(h.board().elements.map((e) => e.id)).toEqual(["rds"]);
+  });
+
+  it("a click while a turn is in flight waits for the next turn", async () => {
+    const h = await drawn();
+    h.session.send("second");
+    expect(h.state().busy).toBe(true);
+    h.session.decide("reject", "P1");
+    await settled(h, 2);
+    expect(h.requests[1].body.actions).toEqual([]);
+    expect(h.state().clicks.map((c) => c.proposal)).toEqual(["P1"]);
+    h.session.send("third");
+    await settled(h, 3);
+    expect(h.requests[2].body.actions).toEqual([{ type: "reject", proposal: "P1" }]);
+  });
+
+  it("a click on the board selects a lone proposal, chooses an alternative at once, and ignores ink and paper", async () => {
+    const h = await drawn((i) => (i === 0 ? [ev("op", bucket), ...three] : [done]));
+    const b = h.board();
+    expect(pickProposal(b, "cdn")).toEqual({ do: "select", proposal: "P1" });
+    expect(pickProposal(b, "ddb")).toEqual({ do: "choose", proposal: "P3" });
+    expect(pickProposal(b, "rds")).toEqual({ do: "choose", proposal: "P2" });
+    for (const key of ["bucket", ARCHITECT_ZONE_ID, "nope", null]) expect(pickProposal(b, key)).toEqual({ do: "none" });
+    // once its sibling is gone, the one left is a lone proposal again
+    h.session.decide("reject", "P2");
+    await tick();
+    expect(pickProposal(h.board(), "ddb")).toEqual({ do: "select", proposal: "P3" });
+  });
+
+  it("starting over drops the queued clicks", async () => {
+    const h = await drawn();
+    h.session.decide("accept", "P1");
+    h.session.start();
+    expect(h.state().clicks).toEqual([]);
   });
 });
 

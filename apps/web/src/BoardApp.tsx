@@ -176,7 +176,15 @@ export function BoardApp() {
       />
 
       {mode === "architect" && ready && (
-        <ArchitectPanel board={{ get: () => ctrl.current!.board, submit: (ops) => ctrl.current!.submit(ops), clear: resetAll }} onModelControl={setArchitectModel} />
+        <ArchitectPanel
+          board={{ get: () => ctrl.current!.board, submit: (ops) => ctrl.current!.submit(ops), clear: resetAll }}
+          canvas={{
+            onPick: (fn) => { if (engine.current) engine.current.onPick = fn ?? undefined; },
+            select: (keys) => engine.current?.select(keys),
+            screenRect: (key) => engine.current?.screenRect(key) ?? null,
+          }}
+          onModelControl={setArchitectModel}
+        />
       )}
 
       {mode !== "architect" && <button className={"notch" + (showTranscript ? "" : " off")} data-testid="transcript-toggle" aria-pressed={showTranscript} aria-label={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} title={showTranscript ? t("app.transcript.hide") : t("app.transcript.show")} onClick={() => setShowTranscript((v) => !v)}>

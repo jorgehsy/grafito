@@ -121,3 +121,13 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 /* architect mode: the speech bubble, from the top-right corner until it can point at its target */
 .bubble { position: fixed; top: 16px; right: 20px; max-width: 340px; padding: 12px 16px; background: #fff; border: 2px solid var(--grafito); border-radius: 18px; box-shadow: var(--sombra); font-family: 'Kalam', cursive; font-size: 18px; line-height: 1.35; color: var(--grafito); z-index: 9; }
 .bubble.wait { color: var(--humo); border-color: var(--goma); }
+
+/* architect mode: pencil is clickable; the selected proposal gets a dashed outline and a small ✓/✗ toolbar */
+.canvas2 svg [data-pencil] { cursor: pointer; }
+.canvas2 svg [data-selected] { filter: drop-shadow(0 0 1.5px var(--pizarra)) drop-shadow(0 0 6px rgba(62,94,140,0.45)); }
+.decide { position: fixed; display: flex; gap: 4px; padding: 3px; background: #fff; border: 1px solid var(--hueso); border-radius: 16px; box-shadow: var(--sombra); z-index: 8; animation: decide-pop .15s both; }
+.decide button { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--grafito); background: #fff; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; font-family: inherit; }
+.decide button:hover { background: var(--papel); }
+.decide .ok { color: #2F7D4F; }
+.decide .no { color: #D1453B; }
+@keyframes decide-pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }

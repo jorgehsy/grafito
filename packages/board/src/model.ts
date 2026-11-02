@@ -166,6 +166,17 @@ export function openProposals(b: Board): { id: string; label: string; alternativ
   });
 }
 
+/** The open proposal a component, group or connection was drawn under; undefined for ink or an unknown id. */
+export function proposalOf(b: Board, id: string): string | undefined {
+  const x = findElement(b, id) ?? findGroup(b, id) ?? b.connections.find((c) => c.id === id);
+  return x?.proposal && findProposal(b, x.proposal) ? x.proposal : undefined;
+}
+
+/** Ids of everything drawn under a proposal: groups, components, then connections. */
+export function proposalItems(b: Board, proposal: string): string[] {
+  return [...b.groups, ...b.elements, ...b.connections].filter((x) => x.proposal === proposal).map((x) => x.id);
+}
+
 /** Erases everything drawn under these proposals. Ink inside an erased group moves up to the group's own parent. */
 function eraseProposals(b: Board, ids: Set<string>) {
   if (!ids.size) return;
