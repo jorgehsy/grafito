@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BoardController } from "@grafito/board";
+import { BoardController, applyArchitectOp } from "@grafito/board";
 import { Player } from "@grafito/board";
 import type { Subtitle } from "@grafito/board";
 import { DEMOS } from "./demos";
@@ -191,7 +191,7 @@ export function BoardApp() {
 
       {mode === "architect" && ready && (
         <ArchitectPanel
-          board={{ get: () => ctrl.current!.board, submit: (ops) => ctrl.current!.submit(ops), clear: resetAll }}
+          board={{ get: () => ctrl.current!.board, submit: (ops) => ctrl.current!.submit(ops, applyArchitectOp), clear: resetAll }}
           canvas={{
             onPick: (fn) => { if (engine.current) engine.current.onPick = fn ?? undefined; },
             select: (keys) => engine.current?.select(keys),

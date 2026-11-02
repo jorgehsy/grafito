@@ -3,14 +3,26 @@
 import { op, parseOp } from "@grafito/contract";
 import type { Op, RecordClick, RecordTurn, TimelineEntry } from "@grafito/contract";
 import { CATALOG_IDS } from "@grafito/icons";
-import { applyOp, emptyBoard } from "./model";
-import type { Board } from "./model";
+import { applyOp, emptyBoard, findZone } from "./model";
+import type { ApplyResult, Board } from "./model";
 
 /** Id of the one system zone of an architect board; Claude's `add_component` names it as its zone. */
 export const ARCHITECT_ZONE_ID = "system";
 
 /** The op that makes the system zone when architect mode starts. `title` is in the app's language. */
 export const architectZoneOp = (title: string): Op => op.create_zone({ id: ARCHITECT_ZONE_ID, kind: "system", title });
+
+/**
+ * `applyOp` for an architect board, which every architect path uses: the browser, the replay and so the eval. Its
+ * one extra rule: the system zone is the app's, so `delete` never takes it (nothing would make it again, and
+ * every later add would fail).
+ */
+export function applyArchitectOp(board: Board, o: Op): ApplyResult {
+  if (o.name === "delete" && findZone(board, o.input.id)) {
+    return { board, warnings: [`delete: '${o.input.id}' is the system zone; delete deletes components, groups and connections`] };
+  }
+  return applyOp(board, o);
+}
 
 /** What a turn's speech bubble says: the last `say` wins; null if the turn has none. */
 export function lastSay(ops: readonly Op[]): { text: string; target?: string } | null {
@@ -55,7 +67,7 @@ export function replayArchitect(timeline: readonly TimelineEntry[], zoneTitle: s
   const warnings: string[] = [];
   let pending: RecordClick[] = [];
   const apply = (o: Op) => {
-    const r = applyOp(board, o);
+    const r = applyArchitectOp(board, o);
     board = r.board;
     warnings.push(...r.warnings);
     boardOps.push(o);
