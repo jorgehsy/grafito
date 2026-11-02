@@ -10,7 +10,7 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
 describe("architect system prompt", () => {
   it("prompt and tools are byte for byte the reviewed version", () => {
-    expect(sha(ARCHITECT_SYSTEM_PROMPT)).toBe("85883ca4a8b4638b2f9b945629de14d49a84a528afa99a44bdf0d425493046f0");
+    expect(sha(ARCHITECT_SYSTEM_PROMPT)).toBe("5515823360c832e90290b86fa18b347c3060fa678debd7daa7fdb3d9ca7427ea");
     expect(sha(WELL_ARCHITECTED_DIGEST)).toBe("832d66dfb0b386561a47bbc433cfe764bb9e1a64e86d3c34a133c2e1a4a363be");
     expect(sha(JSON.stringify(toolDefs([], "architect")))).toBe("5bf988abc9745e8567ad86d5fa38fefd529220f18f1464480f98727c39d0055d");
   });
@@ -22,6 +22,7 @@ describe("architect system prompt", () => {
       1: "2f330fb826cb88a9a072e9155337218230fd700465bdcb378e7ddf7329e8120d",
       2: "d76b6d52bdd388574b410eaa3a4d286ddc5036c4847233b11f50f8582d12d787",
       3: "b6ecc8bf578bc83dd48e556dcef54a7dbe7cae004900f69a1e7dca901819571b",
+      4: "a4fae2c85aa8b0a9022e716ab4c824e7f6f2e9dac0d415676879c1e42d9d7576",
     };
     const userText = buildArchitectUserText({ board: "B", summary: "s", recent: [{ text: "t", bubble: "b" }], actions: [{ type: "accept", proposal: "P1" }], text: "next" });
     const all = [ARCHITECT_SYSTEM_PROMPT, WELL_ARCHITECTED_DIGEST, JSON.stringify(toolDefs([], "architect")), JSON.stringify(toolDefs(["aws"], "architect")), userText];
@@ -38,7 +39,7 @@ describe("architect system prompt", () => {
   });
 
   it("one question mark per bubble, and an X-or-Y ask is drawn as two alternatives", () => {
-    expect(ARCHITECT_SYSTEM_PROMPT).toContain("It is one sentence with one question mark: never add a second, follow-up question");
+    expect(ARCHITECT_SYSTEM_PROMPT).toContain("It is one sentence with one question mark, and the bubble ends at that question mark: never add a second, follow-up question, not even a short yes/no one");
     expect(ARCHITECT_SYSTEM_PROMPT).toContain("at most one question mark in the whole text");
     expect(ARCHITECT_SYSTEM_PROMPT).toContain("always draw both as alternatives, say in one sentence when each fits, and ask A or B");
   });
