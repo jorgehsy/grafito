@@ -4,6 +4,8 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 
 ## Unreleased
 
+## v0.2.0-alpha.9 · 2026-11-11
+
 - **A new interface.** The controls are now dark graphite instruments on the paper; what comes and goes (options, notices, dialogs) is a white slip; handwriting is only Claude's voice and the board.
   - The three modes are tabs by the logo, and the one you are in shows its name. The microphone moved next to the text box: talk or type in the same place.
   - The stats panel is a drawer on the right and the board moves over for it instead of being covered. It shows in live mode only. The captions stay hidden until something is said.
@@ -32,6 +34,7 @@ The full notes for each version are in [Releases](https://github.com/jorgehsy/gr
 - **Replay a saved session.** "Open a session" in demo mode (or dropping the `.json` on the bar) plays an exported session like a demo, with no Claude calls: each request is a chapter, its text is the subtitle and its ops are drawn in order. Live and architect records both work; undone instructions are left out, and an architect replay does not show Claude's speech bubbles.
 - New demo with hand drawing: `?mode=demo&demo=sketch`. Strokes appear as if drawn with the pen, pulse while they are read, and give way to the clean diagram.
 - `?auto=1` now plays the demo named by `?demo=` (it used to play the first one).
+- For contributors: `pnpm e2e` drives the app in a browser with Playwright (modes, ink, a room with two people) and never calls Claude; CI runs it. Lint warnings are capped at their current count in every package. `CODING_STANDARDS.md` lists what reviewers check by hand.
 
 ## v0.2.0-alpha.8 · 2026-11-02
 
