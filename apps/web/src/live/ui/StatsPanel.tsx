@@ -44,13 +44,14 @@ export function StatsPanel({ session: { entries, current, totals, busy, medianVo
           <div key={e.id} className={"logrow" + (e.error ? " err" : "")}>
             <div>
               <time>{hhmm(e.startedAt)}</time> <b>#{e.id}</b>{" "}
-              {e.mode === "instruction" && <span className="tag"><IconWand /> {t("stats.instruction")}</span>}{" "}
+              {e.mode === "instruction" && <span className="tag"><IconWand /> {t("stats.instruction")}</span>}
+              {e.mode === "sketch" && <span className="tag"><IconWand /> {t("draw.statsTag")}</span>}{" "}
               {e.model.replace("claude-", "")} · “{e.batch.length > 60 ? e.batch.slice(0, 60) + "…" : e.batch}”
             </div>
             <div className="dim">
               {t("stats.timings", { firstOp: e.firstOpMs ?? "—", voice: e.voiceFirstMs ?? "—", total: e.totalMs ?? "…", ops: e.ops, input: e.usage.input_tokens, cache: e.usage.cache_read_input_tokens, output: (e.usageEstimated ? "≈" : "") + e.usage.output_tokens, cost: e.costUsd === null ? t("cost.included") : fmtUsd(e.costUsd) })}
             </div>
-            {e.mode === "instruction" && (e.undone ? <div className="dim">{t("stats.undone")}</div> : e.done && !e.error && <div className="dim">{t("stats.applied", { count: e.ops })}</div>)}
+            {e.mode !== "content" && (e.undone ? <div className="dim">{t("stats.undone")}</div> : e.done && !e.error && <div className="dim">{t("stats.applied", { count: e.ops })}</div>)}
             {e.warnings.map((w, i) => <div key={i} className="lwarn">{w}</div>)}
             {e.error && <div className="lwarn">{e.error}</div>}
           </div>

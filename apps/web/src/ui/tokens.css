@@ -1,0 +1,82 @@
+/*
+ * The design system. Three materials, one rule each:
+ *   graphite  the instruments that stay on the desk (rail, dock, modes, presence, console, stats): dark, solid
+ *   slip      what comes and goes (popovers, toasts, dialogs): a white slip of paper
+ *   pencil    Claude's voice and the board itself: handwriting, never used for controls
+ * Components read the --s-* surface variables, so the same button works on graphite and on a slip.
+ */
+:root {
+  /* paper and ink (the board draws with these too) */
+  --papel: #F5F3EE; --hueso: #E3E0D8; --goma: #B3B2B0; --humo: #7A7A80; --grafito: #2A2A2E;
+  --pizarra: #3E5E8C; --pizarra-claro: #EEF2F8; --pizarra-luz: #A9C3E6;
+  --lapiz: #FFD43B; --rojo: #D1453B; --rojo-luz: #F0A59E; --verde: #2F7D4F;
+  --mina: #26262A; --mina-2: #33333A;
+
+  /* type */
+  --ui: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mano: 'Kalam', 'Patrick Hand', cursive;
+
+  /* shape */
+  --r-chip: 9px; --r-ctl: 12px; --r-slip: 16px; --r-inst: 20px; --r-pill: 999px;
+  --lift: 0 1px 0 rgba(255,255,255,.06) inset, 0 1px 2px rgba(20,20,24,.3), 0 14px 32px -12px rgba(20,20,24,.45);
+  --sombra: 0 1px 2px rgba(42,42,46,.08), 0 12px 32px -10px rgba(42,42,46,.22);
+
+  /* motion: three speeds, two curves */
+  --t1: 120ms; --t2: 220ms; --t3: 460ms;
+  --e-out: cubic-bezier(.2,.8,.2,1); --e-spring: cubic-bezier(.3,1.45,.5,1);
+
+  /* the surface a control sits on: a slip by default */
+  --s-bg: #fff; --s-ink: var(--grafito); --s-dim: var(--humo); --s-line: var(--hueso);
+  --s-hover: rgba(42,42,46,.07); --s-on-bg: var(--grafito); --s-on-ink: var(--papel);
+  --s-acc: var(--pizarra); --s-acc-bg: var(--pizarra-claro);
+}
+
+/* graphite: every instrument takes this block */
+.toolbar, .modes, .dd-row, .presence .bar, .stats, .typebar, .subtitles, .trail, .room-feed, .inst {
+  --s-bg: var(--mina); --s-ink: #EDEBE6; --s-dim: #A3A2A8; --s-line: rgba(255,255,255,.11);
+  --s-hover: rgba(255,255,255,.09); --s-on-bg: #EDEBE6; --s-on-ink: var(--mina);
+  --s-acc: var(--pizarra-luz); --s-acc-bg: rgba(169,195,230,.16);
+  background: var(--s-bg); color: var(--s-ink); border: 1px solid rgba(255,255,255,.05); box-shadow: var(--lift);
+}
+/* a slip nested in an instrument goes back to paper */
+.popover, .toast, .presence .pop, .room-join .card, .slip {
+  --s-bg: #fff; --s-ink: var(--grafito); --s-dim: var(--humo); --s-line: var(--hueso);
+  --s-hover: rgba(42,42,46,.07); --s-on-bg: var(--grafito); --s-on-ink: var(--papel);
+  --s-acc: var(--pizarra); --s-acc-bg: var(--pizarra-claro);
+  background: var(--s-bg); color: var(--s-ink); border: 1px solid var(--s-line); border-radius: var(--r-slip); box-shadow: var(--sombra);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; font-family: var(--ui); background: var(--papel); color: var(--grafito); -webkit-font-smoothing: antialiased; }
+button, select, input, textarea { font-family: inherit; }
+:focus-visible { outline: 2px solid var(--s-acc); outline-offset: 2px; }
+.stats, .stats b, time, kbd, .spd { font-variant-numeric: tabular-nums; }
+
+/* primitives */
+.tb { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--s-ink); cursor: pointer; transition: background var(--t1), color var(--t1), transform var(--t1) var(--e-out); }
+.tb:hover:not(:disabled) { background: var(--s-hover); }
+.tb:active:not(:disabled) { transform: scale(.92); }
+.tb.on { background: var(--s-on-bg); color: var(--s-on-ink); }
+.tb.on:hover:not(:disabled) { background: var(--s-on-bg); filter: brightness(1.08); }
+.tb:disabled { opacity: .32; cursor: default; }
+.tb.sm { width: 36px; height: 36px; border-radius: 10px; }
+
+.pbtn { font-size: 13px; font-weight: 500; padding: 7px 13px; border: 1px solid var(--s-line); border-radius: var(--r-ctl); background: transparent; color: var(--s-ink); cursor: pointer; transition: background var(--t1), transform var(--t1) var(--e-out), opacity var(--t1); }
+.pbtn:hover:not(:disabled) { background: var(--s-hover); }
+.pbtn:active:not(:disabled) { transform: scale(.97); }
+.pbtn.primary { background: var(--s-on-bg); color: var(--s-on-ink); border-color: var(--s-on-bg); }
+.pbtn.primary:hover:not(:disabled) { background: var(--s-on-bg); filter: brightness(1.12); }
+.pbtn:disabled { opacity: .4; cursor: default; }
+
+/* entrances: the element's own centring uses `translate`, so these transforms never fight it */
+@keyframes in-up { from { opacity: 0; transform: translateY(14px); } }
+@keyframes in-down { from { opacity: 0; transform: translateY(-14px); } }
+@keyframes in-left { from { opacity: 0; transform: translateX(-14px); } }
+@keyframes in-right { from { opacity: 0; transform: translateX(14px); } }
+@keyframes pop { from { opacity: 0; transform: scale(.94) translateY(-4px); } }
+@keyframes halo { 0% { box-shadow: 0 0 0 0 rgba(255,212,59,.55); } 100% { box-shadow: 0 0 0 12px rgba(255,212,59,0); } }
+@keyframes turn { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}

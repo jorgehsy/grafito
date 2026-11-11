@@ -29,9 +29,9 @@ export const IconRestart = () => <Svg><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5
 
 export function Logo() {
   return (
-    <svg width="28" height="24" viewBox="0 0 120 100" aria-hidden="true" style={{ overflow: "visible" }}>
-      <circle cx="22" cy="28" r="9" fill="#2A2A2E" />
-      <path d="M22 28 C 22 62, 60 74, 70 46 C 77 26, 50 14, 44 40 C 38 66, 70 96, 112 68" fill="none" stroke="#2A2A2E" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
+    <svg className="logo" width="28" height="24" viewBox="0 0 120 100" aria-hidden="true" style={{ overflow: "visible" }}>
+      <circle className="tip" cx="22" cy="28" r="9" fill="#2A2A2E" />
+      <path d="M22 28 C 22 62, 60 74, 70 46 C 77 26, 50 14, 44 40 C 38 66, 70 96, 112 68" className="line" pathLength={1} fill="none" stroke="#2A2A2E" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

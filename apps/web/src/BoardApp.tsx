@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BoardController, applyArchitectOp } from "@grafito/board";
-import { Player } from "@grafito/board";
 import type { Subtitle } from "@grafito/board";
-import { DEMOS } from "./demos";
+import { useScript } from "./script/useScript";
+import { ScriptPlayer } from "./script/ScriptPlayer";
 import { Engine } from "./render/engine";
 import { LivePanel } from "./live/ui/LivePanel";
 import { ArchitectPanel } from "./architect/ui/ArchitectPanel";
@@ -11,9 +11,17 @@ import type { ArchitectRecord } from "@grafito/contract";
 import type { ModelControl } from "./live/models";
 import { useT } from "./i18n";
 import { readFlag, writeFlag } from "./storage";
-import { IconChevron, IconMicOff, IconPause, IconPlay, IconRestart, IconWave, Logo } from "./ui/icons";
+import { IconChevron, IconMicOff, IconWave, Logo } from "./ui/icons";
+import { createLocalSketchStore } from "./sketch/store";
+import type { SketchStore } from "./sketch/store";
+import { StartHint } from "./sketch/DrawDock";
+import { leaveRoomUrl, roomIdFromUrl } from "./room/start";
+import { useRoom } from "./room/ui/useRoom";
+import type { RoomCanvas } from "./room/ui/useRoom";
+import { JoinDialog } from "./room/ui/JoinDialog";
+import { createRoomSession } from "./room/session";
+import type { SessionFactory } from "./live/ui/useLiveSession";
 
-type Status = "idle" | "playing" | "paused" | "done";
 type Mode = "demo" | "live" | "architect";
 const TRANSCRIPT_KEY = "grafito.transcript";
 
@@ -24,14 +32,8 @@ export function BoardApp() {
   const svgRef = useRef<SVGSVGElement>(null);
   const engine = useRef<Engine | null>(null);
   const ctrl = useRef<BoardController | null>(null);
-  const player = useRef<Player | null>(null);
-  const status = useRef<Status>("idle");
-  const speedRef = useRef(1);
   const subRef = useRef<HTMLDivElement>(null);
 
-  const [demoId, setDemoId] = useState(() => new URLSearchParams(location.search).get("demo") ?? DEMOS[0].id);
-  const [st, setSt] = useState<Status>("idle");
-  const [speed, setSpeed] = useState(() => Number(new URLSearchParams(location.search).get("speed")) || 1);
   const [follow, setFollow] = useState(true);
   const [backlog, setBacklog] = useState({ pending: 0, speed: 1 });
   const [sub, setSub] = useState<Subtitle>({ spoken: [], current: "" });
@@ -39,7 +41,9 @@ export function BoardApp() {
   const [summary, setSummary] = useState("");
   // Without ?mode= in the URL the default depends on whether the server has an API key: live if so, demo if not.
   // ?mode=architect opens architect mode straight away, without waiting on that probe.
-  const [mode, setMode] = useState<Mode | null>(urlMode);
+  // A room (`?room=<id>`) is always live mode: the board is shared and the server calls Claude.
+  const [roomId] = useState(roomIdFromUrl);
+  const [mode, setMode] = useState<Mode | null>(() => (roomId ? "live" : urlMode()));
   // The architect panel starts its session on mount, which needs the controller made by the effect below.
   const [ready, setReady] = useState(false);
   const [mute, setMute] = useState<{ muted: boolean; toggle(): void } | null>(null);
@@ -48,8 +52,19 @@ export function BoardApp() {
   // An imported architect record waiting for the architect panel to mount and reopen it.
   const [architectSeed, setArchitectSeed] = useState<ArchitectRecord | null>(null);
   const [showTranscript, setShowTranscript] = useState(() => readFlag(TRANSCRIPT_KEY, true));
-
-  const setStatus = (s: Status) => { status.current = s; setSt(s); };
+  // The sketch people draw on the board. Alone it lives in this page; a room swaps in its own store.
+  const [localSketch] = useState<SketchStore>(createLocalSketchStore);
+  const canvas = useMemo<RoomCanvas>(() => ({
+    onPointer: (fn) => { if (engine.current) engine.current.onPointer = fn ?? undefined; },
+    setCursors: (list) => engine.current?.setCursors(list),
+  }), []);
+  const room = useRoom(roomId, ready ? canvas : null);
+  const roomClient = room.client;
+  const sketch = roomClient?.sketch ?? localSketch;
+  // In a room the panel talks to a session that speaks to the room's socket instead of calling Claude itself.
+  const createSession = useMemo<SessionFactory | undefined>(() => (roomClient ? (deps) => createRoomSession(roomClient, deps) : undefined), [roomClient]);
+  // Nothing drawn yet, by Claude or by hand: the board shows how to start.
+  const [blank, setBlank] = useState(true);
 
   useEffect(() => {
     const e = new Engine(svgRef.current!);
@@ -58,23 +73,11 @@ export function BoardApp() {
     const c = new BoardController(e);
     c.queue.onChange = (pending, sp) => setBacklog({ pending, speed: sp });
     c.onWarnings = (w) => setWarnings((p) => [...p, ...w].slice(-6));
-    c.onBoard = (b) => setSummary(b.summary);
+    c.onBoard = (b) => { setSummary(b.summary); boardEmpty.current = !b.zones.length; refreshBlank.current(); };
     ctrl.current = c;
     setReady(true);
     (window as any).__grafito = { engine: e, controller: c };
-    let last = performance.now();
-    let raf = 0;
-    const loop = (now: number) => {
-      raf = requestAnimationFrame(loop);
-      const dt = Math.min(100, now - last);
-      last = now;
-      if (status.current === "playing") player.current?.tick(dt * speedRef.current);
-    };
-    raf = requestAnimationFrame(loop);
-    const auto = new URLSearchParams(location.search).get("auto");
-    if (auto) setTimeout(() => play(), 200);
-    return () => { cancelAnimationFrame(raf); e.dispose(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only setup; later changes are read through refs
+    return () => e.dispose();
   }, []);
 
   useEffect(() => {
@@ -90,45 +93,42 @@ export function BoardApp() {
 
   useEffect(() => writeFlag(TRANSCRIPT_KEY, showTranscript), [showTranscript]);
 
-  useEffect(() => { speedRef.current = speed; if (engine.current) engine.current.userSpeed = speed; }, [speed]);
+  const boardEmpty = useRef(true);
+  const refreshBlank = useRef(() => {});
+  useEffect(() => {
+    engine.current?.setSketch(sketch);
+    refreshBlank.current = () => setBlank(boardEmpty.current && !sketch.strokes().length);
+    refreshBlank.current();
+    const off = sketch.subscribe(() => refreshBlank.current());
+    return () => { off(); engine.current?.setSketch(null); };
+  }, [sketch]);
 
-  const resetAll = useCallback(() => {
+  const resetBoard = useCallback(() => {
     ctrl.current?.reset();
     engine.current?.reset();
     engine.current?.setPaused(false);
-    player.current = null;
     setSub({ spoken: [], current: "" });
     setWarnings([]);
     setBacklog({ pending: 0, speed: 1 });
   }, []);
 
-  const play = useCallback(() => {
-    if (status.current === "paused") { engine.current?.setPaused(false); setStatus("playing"); return; }
-    if (status.current === "playing") return;
-    resetAll();
-    const id = new URLSearchParams(location.search).get("auto") ?? demoRef.current;
-    const info = DEMOS.find((s) => s.id === id) ?? DEMOS[0];
-    player.current = new Player(info.demo, {
-      onSubtitle: setSub,
-      onOps: (ops) => { void ctrl.current?.submit(ops); },
-      onEnd: () => setStatus("done"),
-    });
-    setStatus("playing");
-  }, [resetAll]);
+  // Demo mode's player: the transport, the loaded demo or replay, and its own sketch (see script/useScript.ts).
+  const script = useScript({ active: mode === "demo", getCtrl: () => ctrl.current, getEngine: () => engine.current, appSketch: sketch, resetBoard, onSubtitle: setSub });
+  const stopScript = script.stop;
+  const resetAll = useCallback(() => { stopScript(); resetBoard(); }, [stopScript, resetBoard]);
 
-  const demoRef = useRef(demoId);
-  useEffect(() => { demoRef.current = demoId; }, [demoId]);
-
-  const pause = () => {
-    if (status.current !== "playing") return;
-    engine.current?.setPaused(true);
-    setStatus("paused");
-  };
-  const restart = () => { resetAll(); setStatus("idle"); };
   const toggleFollow = (v: boolean) => { engine.current?.setFollow(v); setFollow(v); };
 
-  const locked = st === "playing" || st === "paused";
-  const changeMode = (m: Mode) => { if (m === mode) return; resetAll(); setStatus("idle"); setMode(m); };
+  const changeMode = (m: Mode) => {
+    if (m === mode) return;
+    // A room is live mode only: another mode means leaving it (Back returns to the room).
+    if (roomId) return location.assign(leaveRoomUrl(undefined, m));
+    resetAll();
+    // The ink goes with the board it was drawn on (a room keeps its own).
+    const ink = localSketch.strokes().map((s) => s.id);
+    if (!roomId && ink.length) localSketch.remove(ink);
+    setMode(m);
+  };
   const openArchitect = (rec: ArchitectRecord) => {
     if (mode === "architect" && architectSession) return architectSession.restore(rec);
     setArchitectSeed(rec);
@@ -142,41 +142,28 @@ export function BoardApp() {
     <div className="v2">
       <div className="canvas2">
         <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" />
-        {st === "idle" && mode === "demo" && <div className="hint">{t("app.demoHint")}</div>}
+        {mode === "live" && blank && <StartHint />}
       </div>
 
-      <header className="brand">
+      <header className={"brand" + (queued > 0 ? " busy" : "")}>
         <Logo />
         <span className="word">grafito</span>
-        {mode === "live" && <span className="board">{t("app.liveBadge")}</span>}
-        {mode === "architect" && <span className="board">{t("app.architectBadge")}</span>}
-        {mode === "demo" && (
-          <div className="demobar" role="group" aria-label={t("app.demoBar")}>
-            <select aria-label={t("app.demoBar")} value={demoId} disabled={locked} onChange={(e) => setDemoId(e.target.value)}>
-              {DEMOS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            {st === "playing" ? (
-              <button className="tb sm" aria-label={t("app.pause")} title={t("app.pause")} onClick={pause}><IconPause /></button>
-            ) : (
-              <button className="tb sm on" aria-label={st === "paused" ? t("app.resume") : t("app.play")} title={st === "paused" ? t("app.resume") : t("app.play")} onClick={play}><IconPlay /></button>
-            )}
-            <button className="tb sm" aria-label={t("app.restart")} title={t("app.restart")} onClick={restart}><IconRestart /></button>
-            <label className="spd">
-              {speed}x
-              <input type="range" aria-label={t("app.speed")} min={0.5} max={2} step={0.25} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} />
-            </label>
-          </div>
-        )}
       </header>
+
+      {mode === "demo" && <ScriptPlayer script={script} />}
 
       <LivePanel
         getCtrl={() => ctrl.current}
+        getEngine={() => engine.current}
+        sketch={sketch}
+        createSession={createSession}
+        me={room.state?.me ? { id: room.state.me.id, color: room.state.me.color } : undefined}
+        room={roomId ? { id: roomId, client: room.client, state: room.state } : null}
         exportSvg={() => engine.current?.exportSvg() ?? null}
         onSubtitle={setSub}
         onClear={() => { resetAll(); }}
         mode={mode}
         onMode={changeMode}
-        modeLocked={locked}
         follow={follow}
         onFollow={toggleFollow}
         summary={summary}
@@ -189,6 +176,8 @@ export function BoardApp() {
         onOpenArchitect={openArchitect}
       />
 
+      {room.needsName && roomId && <JoinDialog roomId={roomId} onJoin={room.join} />}
+
       {mode === "architect" && ready && (
         <ArchitectPanel
           board={{ get: () => ctrl.current!.board, submit: (ops) => ctrl.current!.submit(ops, applyArchitectOp), clear: resetAll }}
@@ -197,6 +186,7 @@ export function BoardApp() {
             select: (keys) => engine.current?.select(keys),
             screenRect: (key) => engine.current?.screenRect(key) ?? null,
           }}
+          sketch={sketch}
           onModelControl={setArchitectModel}
           onRecordControl={setArchitectSession}
           initialRecord={architectSeed}
@@ -207,7 +197,7 @@ export function BoardApp() {
         <IconChevron up={!showTranscript} />
       </button>}
 
-      <div className="subtitles" data-testid="subtitles" role="status" ref={subRef} hidden={!showTranscript || mode === "architect"}>
+      <div className={"subtitles" + (!sub.spoken.length && !sub.current && !mute ? " empty" : "")} data-testid="subtitles" role="status" ref={subRef} hidden={!showTranscript || mode === "architect"}>
         <span className="wv"><IconWave /></span>
         <div className="txt">
           {!sub.spoken.length && !sub.current ? (
@@ -218,7 +208,7 @@ export function BoardApp() {
               {sub.current && <p className={sub.interim ? "now interim" : "now"}>{sub.current}</p>}
             </>
           )}
-          <div className="backlog" data-testid="backlog">{t("app.queue", { count: queued })}</div>
+          <div className="backlog" data-testid="backlog" hidden={queued === 0}>{t("app.queue", { count: queued })}</div>
         </div>
         {mute && (
           <button className={"tb sm" + (mute.muted ? " on" : "")} data-testid="mute" aria-pressed={mute.muted} aria-label={mute.muted ? t("toolbar.mic.unmute") : t("toolbar.mic.mute")} title={mute.muted ? t("toolbar.mic.unmuteTitle") : t("toolbar.mic.muteTitle")} onClick={mute.toggle}>
