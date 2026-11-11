@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { parseOp } from "@grafito/contract";
 import { applyOps, emptyBoard } from "@grafito/board";
 import { DEMOS } from "./index";
-import { Player, latencyMs } from "@grafito/board";
+import { Player, demoTimeline, latencyMs, sketchBounds, stateAt } from "@grafito/board";
 
 /** Guiones cortos de una sola zona: sin mínimo de zonas ni autocorrección, duración propia. */
-const SHORT = ["context", "cycle", "before-after", "prototypes", "compact"];
+const SHORT = ["context", "cycle", "before-after", "prototypes", "compact", "data-model", "sketch"];
 
 describe.each(DEMOS)("demo $id", ({ id, demo }) => {
   it("todas las ops pasan parseOp", () => {
@@ -31,6 +31,66 @@ describe.each(DEMOS)("demo $id", ({ id, demo }) => {
     if (SHORT.includes(id)) return;
     const names = demo.flatMap((c) => c.ops.map((o) => o.name));
     expect(names.some((n) => ["update_label", "delete", "move_to_zone"].includes(n))).toBe(true);
+  });
+});
+
+describe("demo list", () => {
+  it("every demo has a unique id, a name and a one-line description", () => {
+    expect(new Set(DEMOS.map((d) => d.id)).size).toBe(DEMOS.length);
+    for (const d of DEMOS) {
+      expect(d.name.trim()).not.toBe("");
+      expect(d.description.trim().length).toBeGreaterThan(10);
+      expect(d.description).not.toContain("\n");
+      expect(["en", "es"]).toContain(d.lang);
+    }
+  });
+  it("every demo has chapters that cover it from start to end", () => {
+    for (const d of DEMOS) {
+      const tl = demoTimeline(d.demo);
+      expect(tl.chapters.length).toBeGreaterThanOrEqual(2);
+      expect(tl.chapters[0].start).toBe(0);
+      expect(tl.chapters.at(-1)!.end).toBe(tl.duration);
+      for (const ch of tl.chapters) { expect(ch.end).toBeGreaterThan(ch.start); expect(ch.title.trim()).not.toBe(""); }
+    }
+  });
+});
+
+describe("demo sketch", () => {
+  const demo = DEMOS.find((s) => s.id === "sketch")!.demo;
+  const tl = demoTimeline(demo);
+  const drawn = tl.chunks.map((c, i) => ({ c, i })).filter((x) => x.c.strokes.length);
+
+  it("draws by hand in more than one chunk, and opens with a sketch on an empty board", () => {
+    expect(drawn.length).toBeGreaterThanOrEqual(2);
+    expect(drawn[0].i).toBe(0);
+    expect(demo.every((c) => c.title)).toBe(true);
+  });
+  it("its strokes are well formed, with unique ids, and each one takes long enough to be seen", () => {
+    const all = drawn.flatMap((x) => x.c.strokes);
+    expect(new Set(all.map((s) => s.stroke.id)).size).toBe(all.length);
+    for (const s of all) {
+      expect(s.stroke.pts.length).toBeGreaterThanOrEqual(4);
+      expect(s.stroke.pts.length % 2).toBe(0);
+      expect(s.stroke.pts.every((v) => Number.isFinite(v))).toBe(true);
+      expect(s.to - s.from).toBeGreaterThan(100);
+    }
+  });
+  it("the ink is on the board before the diagram: drawn, read, then taken when the ops land", () => {
+    for (const { c } of drawn) {
+      const reading = stateAt(tl, (c.speakEnd + c.opsAt) / 2);
+      expect(reading.sketch.strokes).toHaveLength(c.strokes.length);
+      expect(reading.sketch.reading).toHaveLength(c.strokes.length);
+      expect(stateAt(tl, c.opsAt).sketch.strokes).toEqual([]);
+    }
+    const first = drawn[0].c;
+    expect(stateAt(tl, first.opsAt - 1).delivered).toBe(0);
+  });
+  it("each sketch sits near the board it is drawn on (no stroke far outside the final layout)", () => {
+    const box = sketchBounds(drawn.flatMap((x) => x.c.strokes.map((s) => s.stroke)))!;
+    expect(box.x).toBeGreaterThan(-50);
+    expect(box.y).toBeGreaterThan(-50);
+    expect(box.x + box.w).toBeLessThan(1400);
+    expect(box.y + box.h).toBeLessThan(450);
   });
 });
 
