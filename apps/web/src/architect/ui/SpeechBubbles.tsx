@@ -5,8 +5,8 @@ import type { BubbleMarker, Rect } from "../bubbles";
 import type { Bubble } from "../session";
 import { useT } from "../../i18n";
 
-/** Fixed screen parts a bubble must not cover: the ✓/✗ toolbar, the rail and text box, the side toolbar, the brand. */
-const AVOID = ".decide, .architect .trail, .architect .typebar, nav.toolbar, header.brand";
+/** Fixed screen parts a bubble must not cover: the ✓/✗ toolbar, the rail and text box, the review panel and its button, the side toolbar, the brand. */
+const AVOID = ".decide, .architect .trail, .architect .typebar, .architect .review, .architect .review-toggle, nav.toolbar, header.brand";
 /** Room kept around what a bubble avoids, other bubbles included. */
 const PAD = 8;
 

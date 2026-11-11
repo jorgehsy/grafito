@@ -1,0 +1,89 @@
+/* Architect mode: the Well-Architected review. The panel is an instrument (graphite, like the stats panel) on the
+   right edge; it takes its room from the free rectangle, so the board is never drawn under it. */
+.v2:has(.review) { --free-r: 344px; }
+
+.review-toggle { position: fixed; top: var(--edge); right: var(--edge); height: 44px; padding: 0 14px 0 12px; display: flex; align-items: center; gap: 8px; border-radius: var(--r-pill); font-size: 13px; font-weight: 500; cursor: pointer; z-index: 11; transition: filter var(--t1), transform var(--t1) var(--e-out); animation: in-right var(--t3) var(--e-out) .1s both; }
+.review-toggle:hover { filter: brightness(1.15); }
+.review-toggle:active { transform: scale(.97); }
+.review-toggle.on { box-shadow: var(--lift), 0 0 0 2px var(--pizarra-luz); }
+.rv-count { min-width: 20px; height: 20px; padding: 0 6px; display: grid; place-items: center; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--sev); color: var(--sev-ink); }
+
+/* severity colours: one variable pair, read by the count, the chips, the finding rows and the pins */
+.sev-high { --sev: var(--rojo); --sev-ink: #fff; --sev-soft: rgba(209,69,59,.2); }
+.sev-medium { --sev: var(--lapiz); --sev-ink: var(--mina); --sev-soft: rgba(255,212,59,.16); }
+.sev-low { --sev: var(--pizarra-luz); --sev-ink: var(--mina); --sev-soft: rgba(169,195,230,.16); }
+
+.review { position: fixed; top: var(--free-t); right: var(--edge); width: 320px; max-height: calc(100% - var(--free-t) - var(--edge)); padding: 12px 14px 14px; border-radius: var(--r-inst); z-index: 10; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; scrollbar-width: thin; font-size: 12.5px; line-height: 1.4; animation: in-right var(--t3) var(--e-out) both; }
+.review header { display: flex; align-items: flex-start; gap: 8px; }
+.review .rv-head { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.review .ttl { font-size: 14px; font-weight: 600; }
+.review .rv-sub { font-size: 11.5px; color: var(--s-dim); font-variant-numeric: tabular-nums; }
+.review .x { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--s-dim); cursor: pointer; transition: background var(--t1), color var(--t1); }
+.review .x:hover { color: var(--s-ink); background: var(--s-hover); }
+
+.rv-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; color: var(--s-dim); }
+.rv-empty p { margin: 0; }
+
+/* the six pillars: status dot, name, status word, open findings */
+.rv-pillars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; border-radius: var(--r-ctl); overflow: hidden; background: var(--s-line); }
+.rv-pillars li { background: var(--mina-2); }
+.rv-pillar { width: 100%; display: grid; grid-template-columns: 10px 1fr auto auto; align-items: center; gap: 8px; padding: 8px 10px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background var(--t1); }
+.rv-pillar:hover { background: var(--s-hover); }
+.rv-pillar.on { background: var(--s-acc-bg); }
+.rv-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px dashed var(--s-dim); }
+.rv-pillar.st-covered .rv-dot { border: 0; background: #5FBF86; }
+.rv-pillar.st-partial .rv-dot { border: 0; background: var(--lapiz); }
+.rv-pillar.st-gap .rv-dot { border: 0; background: var(--rojo-luz); }
+.rv-name { font-weight: 500; }
+.rv-status { font-size: 11px; color: var(--s-dim); }
+.rv-pillar.st-covered .rv-status { color: #8FD6AC; }
+.rv-pillar.st-partial .rv-status { color: var(--lapiz); }
+.rv-pillar.st-gap .rv-status { color: var(--rojo-luz); }
+.rv-n { min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: var(--r-pill); background: var(--s-line); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rv-note { margin: -2px 0 0; padding: 0 10px 8px 28px; font-size: 11.5px; color: var(--s-dim); }
+
+.rv-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.rv-label { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--s-dim); }
+.rv-chip { padding: 2px 8px; border-radius: var(--r-pill); font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; background: var(--sev-soft); color: var(--sev); }
+.rv-chip.zero { background: transparent; color: var(--s-dim); box-shadow: inset 0 0 0 1px var(--s-line); }
+
+/* findings: a coloured edge for the severity; the whole row points at the item on the board */
+.rv-findings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rv-finding { border-radius: var(--r-ctl); background: var(--mina-2); border-left: 3px solid var(--sev); overflow: hidden; transition: box-shadow var(--t1); }
+.rv-finding.on { box-shadow: 0 0 0 2px var(--pizarra-luz); }
+.rv-main { width: 100%; display: flex; flex-direction: column; gap: 5px; padding: 9px 10px 6px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background var(--t1); }
+.rv-main:hover { background: var(--s-hover); }
+.rv-tags { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.rv-num { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: var(--sev); color: var(--sev-ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rv-sev { font-weight: 600; color: var(--sev); text-transform: uppercase; letter-spacing: .04em; }
+.rv-pil { color: var(--s-dim); }
+.rv-text { color: var(--s-ink); overflow-wrap: anywhere; }
+.rv-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--s-dim); }
+.rv-target { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--s-acc); }
+.rv-target::before { content: "→ "; }
+.rv-target.none { color: var(--s-dim); }
+.rv-target.none::before { content: ""; }
+.rv-meta code { flex: none; font: 500 10.5px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 1px 6px; border: 1px solid var(--s-line); border-radius: 6px; }
+.rv-fix { margin: 0 10px 9px; padding: 4px 10px; font-size: 11.5px; }
+.rv-none { margin: 0; color: var(--s-dim); }
+
+.rv-resolved { font-size: 11.5px; color: var(--s-dim); }
+.rv-resolved summary { cursor: pointer; }
+.rv-resolved ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+.review footer { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; border-top: 1px solid var(--s-line); padding-top: 10px; }
+.review footer small { font-size: 10.5px; color: var(--s-dim); }
+
+/* pins: one numbered dot per finding on the corner of its item, placed every frame by FindingPins */
+.rv-pins { position: fixed; inset: 0; pointer-events: none; z-index: 7; }
+.rv-pins .rv-pin { position: fixed; display: grid; place-items: center; padding: 0; border: 2px solid #fff; border-radius: 50%; background: var(--sev); color: var(--sev-ink); font: 600 11px var(--ui); font-variant-numeric: tabular-nums; box-shadow: var(--sombra); cursor: pointer; pointer-events: auto; transition: transform var(--t1) var(--e-spring); animation: rv-pin-in var(--t2) var(--e-spring) both; }
+.rv-pins .rv-pin:hover { transform: scale(1.2); }
+.rv-pins .rv-pin.on { transform: scale(1.3); box-shadow: 0 0 0 3px var(--pizarra-luz), var(--sombra); }
+@keyframes rv-pin-in { from { opacity: 0; transform: scale(.4); } }
+
+@media (max-width: 900px) {
+  .v2:has(.review) { --free-r: 0px; }
+  .review { width: min(320px, calc(100% - 20px)); max-height: 50%; }
+  .review-toggle span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .review, .review-toggle, .rv-pins .rv-pin { animation: none; } }

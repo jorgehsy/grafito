@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { findProposal, proposalItems } from "@grafito/board";
-import type { Board } from "@grafito/board";
+import { emptyReview, findProposal, proposalItems, reviewIsEmpty } from "@grafito/board";
+import type { Board, Finding } from "@grafito/board";
 import { ARCHITECT_DEFAULT_MODEL, isModelId } from "@grafito/contract";
-import type { ArchitectRecord, Op } from "@grafito/contract";
+import type { ArchitectRecord, Op, SketchPayload } from "@grafito/contract";
 import { createArchitectSession, pickProposal } from "../session";
 import type { ArchitectSessionState } from "../session";
 import { loadCatalogs } from "../../live/catalogs";
@@ -13,6 +13,9 @@ import { browserStore } from "../../storage";
 import { ProposalToolbar } from "./ProposalToolbar";
 import { SpeechBubbles } from "./SpeechBubbles";
 import { TimelineRail } from "./TimelineRail";
+import { ReviewPanel } from "./ReviewPanel";
+import { FindingPins } from "./FindingPins";
+import { findingKeys, listedFindings, targetLabel } from "../review";
 import { bubbleMarkers, initialBubbleView, openBubbles, toggleMarker, toggleRail, withCurrent } from "../bubbles";
 
 /** What the panel needs from the drawn board: clicks on it, the selection outline, and where an item is on screen. */
@@ -29,6 +32,8 @@ export interface ArchitectRecordControl {
   restore(rec: ArchitectRecord): void;
   /** Starts over on a blank board and forgets the autosaved session. */
   reset(): void;
+  /** Hands a sketch drawn on the board to the architect as a turn; true when Claude drew something from it. */
+  sendSketch(sketch: SketchPayload): Promise<boolean>;
   /** At least one turn to export. */
   canExport: boolean;
   savedAt: number | null;
@@ -37,6 +42,8 @@ export interface ArchitectRecordControl {
 interface Props {
   board: { get(): Board; submit(ops: Op[]): Promise<void>; clear(): void };
   canvas: BoardCanvas;
+  /** The sketch on the board: the strokes the architect drew something from are removed. */
+  sketch?: { remove(ids: readonly string[]): void };
   /** The model choice for the options popover, while this panel is mounted. */
   onModelControl(c: ModelControl | null): void;
   /** The session controls for the toolbar, while this panel is mounted. */
@@ -49,12 +56,12 @@ interface Props {
  * Architect mode's controls: the speech bubbles, the timeline rail of bubble markers, the one text box and the
  * restore banner. Mounting it starts a session on a blank board, or reopens `initialRecord`; unmounting saves it.
  */
-export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl, initialRecord }: Props) {
+export function ArchitectPanel({ board, canvas, sketch, onModelControl, onRecordControl, initialRecord }: Props) {
   const t = useT();
   const lang = useLang();
   const [available, setAvailable] = useState<string[] | null>(null);
   const [model, setModel] = useState(ARCHITECT_DEFAULT_MODEL);
-  const deps = useRef({ board, canvas, model, lang, available, busy: false });
+  const deps = useRef({ board, canvas, sketch, model, lang, available, busy: false });
   const session = useMemo(
     () => createArchitectSession({
       board: { get: () => deps.current.board.get(), submit: (ops) => deps.current.board.submit(ops), clear: () => deps.current.board.clear() },
@@ -67,12 +74,14 @@ export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl,
         },
       },
       zoneTitle: () => translate("architect.zoneTitle"),
+      dataTitle: () => translate("architect.dataTitle"),
+      sketch: { remove: (ids) => deps.current.sketch?.remove(ids) },
       storage: browserStore,
     }),
     [],
   );
-  const [state, setState] = useState<ArchitectSessionState>({ turns: [], busy: false, bubble: null, error: "", clicks: [], unclosed: null, savedAt: null, warning: "" });
-  deps.current = { board, canvas, model, lang, available, busy: state.busy };
+  const [state, setState] = useState<ArchitectSessionState>({ turns: [], busy: false, bubble: null, error: "", clicks: [], review: emptyReview(), unclosed: null, savedAt: null, warning: "" });
+  deps.current = { board, canvas, sketch, model, lang, available, busy: state.busy };
   const seed = useRef(initialRecord);
   useEffect(() => {
     const off = session.subscribe(setState);
@@ -113,21 +122,35 @@ export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl,
       const choose = pick.do === "choose" && !deps.current.busy;
       if (choose) session.decide("accept", pick.proposal);
       setSel(pick.do !== "none" && !choose && key ? { proposal: pick.proposal, key } : null);
+      if (pick.do !== "none") setFocus(null);
     });
     return () => { c.onPick(null); c.select([]); };
   }, [session]);
-  useEffect(() => { deps.current.canvas.select(sel ? proposalItems(deps.current.board.get(), sel.proposal) : []); }, [sel]);
+  // The review: its panel opens by itself when the first review arrives; a finding clicked there (or its pin) is
+  // pointed at on the board with the same outline a selected proposal gets. One or the other, never both.
+  const review = state.review;
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [focus, setFocus] = useState<string | null>(null);
+  const hasReview = !reviewIsEmpty(review);
+  useEffect(() => { if (hasReview) setReviewOpen(true); }, [hasReview]);
+  const focused = focus ? review.findings.find((f) => f.id === focus && f.open) : undefined;
   useEffect(() => {
-    if (!sel) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSel(null); };
+    const b = deps.current.board.get();
+    deps.current.canvas.select(sel ? proposalItems(b, sel.proposal) : focused ? findingKeys(b, focused) : []);
+  }, [sel, focused]);
+  useEffect(() => {
+    if (!sel && !focus) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setSel(null); setFocus(null); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [sel]);
-  const restore = useCallback((rec: ArchitectRecord) => { setSel(null); session.restore(rec); }, [session]);
-  const reset = useCallback(() => { setSel(null); session.reset(); }, [session]);
+  }, [sel, focus]);
+  const selectFinding = (id: string | null) => { setSel(null); setFocus(id); if (id) setReviewOpen(true); };
+  const fix = (f: Finding) => { if (session.send(t("architect.review.fixPrompt", { id: f.id, text: f.text }))) setFocus(null); };
+  const restore = useCallback((rec: ArchitectRecord) => { setSel(null); setFocus(null); session.restore(rec); }, [session]);
+  const reset = useCallback(() => { setSel(null); setFocus(null); setReviewOpen(false); session.reset(); }, [session]);
   const canExport = state.turns.length > 0;
   useEffect(() => {
-    onRecordControl({ snapshot: session.snapshot, restore, reset, canExport, savedAt: state.savedAt });
+    onRecordControl({ snapshot: session.snapshot, restore, reset, sendSketch: (s) => session.sendSketch(s), canExport, savedAt: state.savedAt });
   }, [session, restore, reset, canExport, state.savedAt, onRecordControl]);
   useEffect(() => () => onRecordControl(null), [onRecordControl]);
 
@@ -155,6 +178,27 @@ export function ArchitectPanel({ board, canvas, onModelControl, onRecordControl,
           onDecide={decide}
           busy={state.busy}
           onGone={() => setSel(null)}
+        />
+      )}
+      <ReviewPanel
+        review={review}
+        open={reviewOpen}
+        onOpen={(v) => { setReviewOpen(v); if (!v) setFocus(null); }}
+        busy={state.busy}
+        canRun={state.turns.length > 0}
+        targetLabel={(target) => targetLabel(deps.current.board.get(), target)}
+        selected={focused?.id ?? null}
+        onSelect={selectFinding}
+        onRun={() => session.send(t("architect.review.runPrompt"))}
+        onFix={fix}
+      />
+      {reviewOpen && (
+        <FindingPins
+          findings={listedFindings(review)}
+          keysOf={(f) => findingKeys(deps.current.board.get(), f)}
+          screenRect={(key) => deps.current.canvas.screenRect(key)}
+          selected={focused?.id ?? null}
+          onSelect={selectFinding}
         />
       )}
       <div className="toasts">
