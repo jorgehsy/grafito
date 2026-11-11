@@ -2,7 +2,7 @@
 // transcript, the session record (snapshot / restore / undo replay) and autosave to storage and the server.
 import type { Board } from "@grafito/board";
 import { serializeBoard } from "@grafito/board";
-import type { LiveRecord, Op, RecordRequest, Usage } from "@grafito/contract";
+import type { LiveRecord, Op, RecordRequest, SketchPayload, Usage } from "@grafito/contract";
 import { addUsage, costUsd, parseOp, parseRecord, PROMPT_VERSION, RECORD_VERSION, zeroUsage } from "@grafito/contract";
 import { CATALOG_IDS } from "@grafito/icons";
 import { createScheduler } from "./scheduler";
@@ -13,6 +13,7 @@ import { streamBoard } from "./sse";
 import type { UsageInfo } from "./sse";
 import { RECORD_KEYS } from "../storage";
 import type { Store } from "../storage";
+import type { SketchStore } from "../sketch/store";
 import { t } from "../i18n";
 
 export interface LogEntry {
@@ -56,6 +57,8 @@ export interface LiveSessionDeps {
   /** `apply` gets a restored record's settings; it may ignore values it does not offer. */
   settings: { get(): Settings; apply(s: Omit<Settings, "catalogs">): void };
   storage: Store;
+  /** The sketch: strokes Claude turned into board elements are removed from it. */
+  sketch?: SketchStore;
   fetchImpl?: typeof fetch;
 }
 
@@ -78,6 +81,12 @@ export interface LiveSessionState {
 export interface LiveSession {
   /** A finished speech result or typed text. `endOfTurn` sends what is grouped now (mic stopped, text typed); text may then be "". */
   onFinalText(text: string, opts?: { endOfTurn?: boolean }): void;
+  /**
+   * Hands a hand-drawn sketch to Claude, as a request of its own. Resolves when that request ends: true if Claude
+   * drew something from it (at least one op other than `update_summary`), and those strokes are then removed
+   * from the sketch; false if it drew nothing or the request was cancelled, and the ink stays.
+   */
+  sendSketch(sketch: SketchPayload): Promise<boolean>;
   /** Cancels pending and in-flight requests and timers; the session stays usable. */
   stop(): void;
   /** Starts a new session on an empty board and forgets the stored one. */
@@ -103,11 +112,11 @@ const median = (xs: number[]) => {
   return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
 };
 
-/** The last instruction that finished, without error and not undone: the one Undo would revert. */
+/** The last instruction or sketch that finished, without error and not undone: the one Undo would revert. */
 function lastUndoable(entries: LogEntry[]): LogEntry | null {
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
-    if (e.mode === "instruction" && e.done && !e.undone && e.ops > 0) return e;
+    if (e.mode !== "content" && e.done && !e.undone && e.ops > 0) return e;
   }
   return null;
 }
@@ -162,6 +171,9 @@ export function createLiveSession(d: LiveSessionDeps): LiveSession {
   let autosaveTimer: ReturnType<typeof setTimeout> | undefined;
   let soonTimer: ReturnType<typeof setTimeout> | undefined;
   const listeners = new Set<(s: LiveSessionState) => void>();
+  // Sketches waiting for their request, oldest first: the scheduler sends each one alone and in order.
+  const sketches: { sketch: SketchPayload; resolve(drew: boolean): void }[] = [];
+  let sketchInFlight: (typeof sketches)[number] | null = null;
 
   const state = (): LiveSessionState => ({
     entries: [...entries], current, totals: { ...totals }, busy, transcript,
@@ -203,6 +215,8 @@ export function createLiveSession(d: LiveSessionDeps): LiveSession {
     const { model, shape, catalogs, speechLang } = d.settings.get();
     const voice = voiceAt;
     voiceAt = null;
+    const drawing = mode === "sketch" ? sketches.shift() : undefined;
+    sketchInFlight = drawing ?? null;
     const e: LogEntry = {
       id: ++seq, model, promptVersion: PROMPT_VERSION, batch, mode, startedAt: t0, firstOpMs: null, voiceFirstMs: null, totalMs: null,
       ops: 0, opList: [], usage: zeroUsage(), usageEstimated: false, costUsd: 0, warnings: [], done: false,
@@ -221,7 +235,10 @@ export function createLiveSession(d: LiveSessionDeps): LiveSession {
     };
     const board = d.board.get();
     await streamBoard(
-      { delta: batch, lang: speechLang, summary: board.summary, board: serializeBoard(board, { catalog: catalogs.length > 0 }), model, shape, mode, catalogs },
+      {
+        delta: drawing ? "" : batch, lang: speechLang, summary: board.summary, board: serializeBoard(board, { catalog: catalogs.length > 0 }), model, shape, mode, catalogs,
+        ...(drawing ? { sketch: { hints: drawing.sketch.hints, ...(drawing.sketch.image ? { image: drawing.sketch.image } : {}) } } : {}),
+      },
       {
         onOp(o) {
           if (myEpoch !== epoch) return;
@@ -248,7 +265,14 @@ export function createLiveSession(d: LiveSessionDeps): LiveSession {
     if (e.totalMs === null) e.totalMs = Date.now() - t0;
     e.done = true;
     await last; // the next batch must see the board already updated
-    if (myEpoch !== epoch) return;
+    if (myEpoch !== epoch) { drawing?.resolve(false); return; }
+    if (drawing) {
+      sketchInFlight = null;
+      // Claude took the ink: what it drew stands in for the strokes.
+      const drew = e.opList.some((o) => o.name !== "update_summary");
+      if (drew) d.sketch?.remove(drawing.sketch.strokeIds);
+      drawing.resolve(drew);
+    }
     abort = null;
     current = null;
     busy = false;
@@ -265,7 +289,13 @@ export function createLiveSession(d: LiveSessionDeps): LiveSession {
   };
   const grouper = createGrouper(toScheduler);
 
-  const halt = () => { epoch++; grouper.cancel(); scheduler.stop(); abort?.abort(); abort = null; current = null; busy = false; };
+  const halt = () => {
+    epoch++; grouper.cancel(); scheduler.stop(); abort?.abort(); abort = null; current = null; busy = false;
+    // a cancelled sketch drew nothing: the one in flight and the ones still queued
+    sketchInFlight?.resolve(false);
+    sketchInFlight = null;
+    for (const s of sketches.splice(0)) s.resolve(false);
+  };
 
   function snapshot(): LiveRecord {
     const s = d.settings.get();
@@ -295,6 +325,14 @@ export function createLiveSession(d: LiveSessionDeps): LiveSession {
       }
       if (opts?.endOfTurn) grouper.flush();
       if (s) changed();
+    },
+    sendSketch(sketch) {
+      return new Promise<boolean>((resolve) => {
+        sketches.push({ sketch, resolve });
+        voiceAt = null;
+        // The batch on record is the sketch in words; the picture is not kept.
+        scheduler.onFragment(sketch.hints.trim() || "(sketch)", "sketch");
+      });
     },
     stop() { halt(); clearTimers(); emit(); },
     reset() {

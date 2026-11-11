@@ -7,6 +7,8 @@ import { createLiveSession, RECORD_KEY } from "./session";
 import type { LiveSession, LiveSessionState, Settings } from "./session";
 import { memoryStore, RECORD_KEYS } from "../storage";
 import type { Store } from "../storage";
+import { createLocalSketchStore } from "../sketch/store";
+import type { SketchStore } from "../sketch/store";
 import { setLang, t } from "../i18n";
 import fixture from "./fixtures/session-v2.json";
 
@@ -30,6 +32,7 @@ interface Options {
   storage?: Store;
   board?: Board;
   settings?: Partial<Settings>;
+  sketch?: SketchStore;
 }
 const open: LiveSession[] = [];
 afterEach(() => { open.splice(0).forEach((s) => s.stop()); setLang("en-US"); });
@@ -50,6 +53,7 @@ function harness(o: Options = {}) {
     board: { get: () => board, submit: async (ops) => { board = applyOps(board, ops).board; }, clear: () => { board = emptyBoard(); } },
     settings: { get: () => settings, apply: (s) => { settings = { ...settings, ...s }; } },
     storage,
+    sketch: o.sketch,
     fetchImpl,
   });
   open.push(session);
@@ -267,5 +271,83 @@ describe("autosave", () => {
     expect(h.state().unclosed).toBeNull();
     expect(h.state().warning).toBe(t("record.outdated"));
     expect(storage.get(RECORD_KEY)).toBeNull();
+  });
+});
+
+describe("sketch", () => {
+  const stroke = (id: string) => ({ id, by: "me", color: "#2A2A2E", pts: [0, 0, 40, 0] });
+  const drawn = [
+    ev("op", { name: "create_zone", input: { id: "app", kind: "system", title: "App" } }),
+    ev("op", { name: "add_component", input: { zone: "app", id: "api", label: "API", type: "service" } }),
+    ev("op", { name: "update_summary", input: { text: "An API." } }),
+    done(),
+  ];
+
+  it("sends the sketch as its own request and removes the strokes Claude drew from", async () => {
+    const sketch = createLocalSketchStore();
+    sketch.add(stroke("s1")); sketch.add(stroke("s2")); sketch.add(stroke("later"));
+    const h = harness({ sketch, respond: () => drawn });
+    const drew = await h.session.sendSketch({ strokeIds: ["s1", "s2"], hints: "STROKES (2)", image: "UE5H" });
+    expect(drew).toBe(true);
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0]).toMatchObject({ mode: "sketch", delta: "", sketch: { hints: "STROKES (2)", image: "UE5H" }, board: "(empty board)" });
+    expect(h.board().elements.map((e) => e.id)).toEqual(["api"]);
+    expect(sketch.strokes().map((s) => s.id)).toEqual(["later"]);
+    await settled(h, 1);
+    // on record: the sketch in words, never the picture
+    const rec = h.session.snapshot();
+    expect(rec.requests[0]).toMatchObject({ mode: "sketch", batch: "STROKES (2)" });
+    expect(JSON.stringify(rec)).not.toContain("UE5H");
+    expect(parseRecord(rec).ok).toBe(true);
+    expect(h.state().transcript).toEqual([]);
+  });
+
+  it("leaves the ink when Claude draws nothing from it", async () => {
+    const sketch = createLocalSketchStore();
+    sketch.add(stroke("s1"));
+    const h = harness({ sketch, respond: () => [ev("op", { name: "update_summary", input: { text: "nothing new" } }), done()] });
+    expect(await h.session.sendSketch({ strokeIds: ["s1"], hints: "STROKES (1)" })).toBe(false);
+    expect(h.requests[0].sketch).toEqual({ hints: "STROKES (1)" });
+    expect(sketch.strokes().map((s) => s.id)).toEqual(["s1"]);
+  });
+
+  it("goes alone, in order with the text around it", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const h = harness({ respond: async (i) => { if (i === 0) await gate; return [done()]; } });
+    h.say("one.");
+    const first = h.session.sendSketch({ strokeIds: ["a"], hints: "first sketch" });
+    const second = h.session.sendSketch({ strokeIds: ["b"], hints: "second sketch" });
+    h.say("two.");
+    release();
+    await settled(h, 4);
+    expect(h.requests.map((b) => [b.mode, b.delta, b.sketch?.hints])).toEqual([
+      ["content", "one.", undefined], ["sketch", "", "first sketch"], ["sketch", "", "second sketch"], ["content", "two.", undefined],
+    ]);
+    expect(await first).toBe(false);
+    expect(await second).toBe(false);
+  });
+
+  it("can be undone like an instruction; the ink does not come back", async () => {
+    const sketch = createLocalSketchStore();
+    sketch.add(stroke("s1"));
+    const h = harness({ sketch, respond: () => drawn });
+    await h.session.sendSketch({ strokeIds: ["s1"], hints: "STROKES (1)" });
+    await settled(h, 1);
+    expect(h.state().canUndo).toBe(true);
+    expect(h.session.undoLastInstruction()).toBe(true);
+    await until(() => h.board().elements.length === 0);
+    expect(sketch.strokes()).toEqual([]);
+    expect(h.session.snapshot().requests[0].undone).toBe(true);
+  });
+
+  it("answers false for a sketch cancelled before or during its request", async () => {
+    const h = harness({ respond: () => new Promise<string[]>(() => {}) });
+    const inFlight = h.session.sendSketch({ strokeIds: ["a"], hints: "in flight" });
+    const queued = h.session.sendSketch({ strokeIds: ["b"], hints: "queued" });
+    await until(() => h.requests.length === 1);
+    h.session.reset();
+    expect(await queued).toBe(false);
+    expect(await inFlight).toBe(false);
   });
 });

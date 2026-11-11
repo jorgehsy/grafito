@@ -1,6 +1,6 @@
 import { t } from "../i18n";
 import { parseOp } from "@grafito/contract";
-import type { Op, OpSet } from "@grafito/contract";
+import type { Op, OpSet, SketchPayload } from "@grafito/contract";
 import type { Usage } from "@grafito/contract";
 
 export interface SseEvent { event: string; data: any }
@@ -42,7 +42,11 @@ export interface BoardHandlers {
 }
 
 export function streamBoard(
-  body: { delta: string; summary: string; board: string; model: string; shape?: string; mode?: "content" | "instruction"; catalogs?: string[]; lang?: string },
+  body: {
+    delta: string; summary: string; board: string; model: string; shape?: string; mode?: "content" | "instruction" | "sketch"; catalogs?: string[]; lang?: string;
+    /** Sketch mode only: the drawing described in text and, when it could be made, as a picture. */
+    sketch?: Pick<SketchPayload, "hints" | "image">;
+  },
   h: BoardHandlers,
   signal?: AbortSignal,
   fetchImpl: typeof fetch = fetch,
