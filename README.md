@@ -31,10 +31,11 @@
 - **Rooms.** Press Collaborate, share the link, and several people talk, type and draw on one board, with Claude as one more participant.
 - **Data models.** Entities as tables with fields and keys, relations with crow's-foot ends.
 - **Voice commands.** Say *"Grafito, ..."* to ask for changes: *"Grafito, split this into two diagrams"*.
-- **Saves itself.** Each session is saved to `apps/server/sessions/`. You can restore, import and export (JSON and SVG).
+- **Saves itself.** Each session is saved to `apps/server/sessions/`. You can restore, import and export.
+- **Hi-fi export.** Export also saves a clean version of the diagram (SVG and PNG), ready for a design document or a slide.
 - **Visible cost.** Shows the tokens and the dollar cost of each request.
 - **AWS icons.** Turn on the catalog in Options → Icons and Claude puts the official icon (Lambda, S3, Cognito... 40 services) next to boxes that are AWS services.
-- **Architect mode.** Design an AWS architecture with Claude: you type, it draws, asks and pushes back, following the AWS Well-Architected Framework.
+- **Architect mode.** Design an AWS architecture with Claude: you type or sketch, it draws, asks and pushes back, following the AWS Well-Architected Framework. It can add the data model and review the design pillar by pillar.
 - **Script mode.** Demos that need no Claude and cost nothing, to see how it works: a player with chapters and a timeline you can drag. It also plays back any session you exported.
 
 ## Language
@@ -83,8 +84,10 @@ Only the local server reads the key. It never reaches the browser.
    This starts two things: the server (port `8787`) and the web app (port `5173`).
 
 2. Open **http://localhost:5173/?mode=live** in Chrome.
-3. Press **Talk** (or the space bar) and allow the microphone.
+3. Press **Talk** (the microphone next to the text box, or the space bar) and allow the microphone.
 4. Talk. The board draws itself.
+
+The three modes are tabs next to the logo: **Live**, **Script** and **Architect**. You can change mode at any time; the board and your ink start clean in the new one.
 
 ### Other ways to use it
 
@@ -92,20 +95,24 @@ Only the local server reads the key. It never reaches the browser.
 - **Give commands:** say or type *"Grafito"* and then the command. What came before is drawn; what comes after is taken as an instruction. If you do not like the result, use **Undo instruction**.
 - **Pick the shape:** in **Options** you choose the drawing shape, the model (Sonnet by default, Haiku is cheaper) and the language (es-CL, es-AR, es-MX, es-ES, en-US).
 - **See costs:** press **F3** or the stats button.
-- **Demo at no cost:** open **http://localhost:5173/?mode=demo** and pick a demo. To play one right away: `/?mode=demo&demo=architecture&auto=1&speed=2`. Space plays and pauses, ← and → jump between chapters, and the timeline takes you to any moment. `demo=sketch` shows hand drawing turned into a diagram.
-- **Replay a session:** in demo mode press **Open a session** (or drop the file on the bar) and pick a `.json` you exported. It plays step by step, with no Claude calls.
-- **Move around:** mouse wheel = zoom, drag = pan.
+- **Draw:** the dock at the top of the board has Move (V), Pen (P), Eraser (E) and four inks. Sketch a box, an arrow, a loop around something or a scribble over it. A moment after you stop, Claude reads the sketch and redraws it clean. Turn **auto** off to decide when: then press the spark button (or Enter). Each read is a request to Claude.
+- **Work with others:** press **Collaborate** and send the link. Everyone in the room talks, types and draws on the same board, with live cursors. To invite someone outside your network, see [Share a room over the internet](#share-a-room-over-the-internet).
+- **Script mode at no cost:** open **http://localhost:5173/?mode=demo** and pick a demo. To play one right away: `/?mode=demo&demo=architecture&auto=1&speed=2`. Space plays and pauses, ← and → jump between chapters, and the timeline takes you to any moment. `demo=sketch` shows hand drawing turned into a diagram, and `demo=data-model` a data model.
+- **Replay a session:** in script mode press **Open a session** (or drop the file on the bar) and pick a `.json` you exported. It plays step by step, with no Claude calls.
+- **Move around:** mouse wheel = zoom; drag with the Move tool, or hold Space with any tool, = pan.
 
 ### Architect mode
 
 Design an AWS architecture together with Claude. It draws, asks and pushes back like a senior architect would, following the AWS Well-Architected Framework.
 
-- **Enter:** press the compass button in the toolbar (next to live and demo), or open **http://localhost:5173/?mode=architect**. You start on a blank board with one system zone.
+- **Enter:** press the **Architect** tab next to the logo, or open **http://localhost:5173/?mode=architect**. You start on a blank board with one system zone.
 - **Talk by text:** there is one text box at the bottom. Say what you want to build and press Enter. What you ask for is drawn in ink.
 - **Pencil proposals:** what Claude adds on its own is drawn in pencil (grey and sketchy), with a question. Type *"yes"* or *"no"*, or click the sketch and press ✓ or ✗. When the choice depends on you, Claude draws two alternatives side by side: answer *"A"* or *"B"*, or click the one you want.
 - **Speech bubbles:** Claude answers in a short bubble that points at what it talks about. Past bubbles shrink to dots on the timeline rail above the text box: hover one to read it, click it to reopen it.
 - **Saves itself:** architect mode has its own autosave, apart from live mode, so one never overwrites the other. Switching modes wipes the board without asking; come back and press **Restore** to get the design back, pending pencil included. Export and import work too, and a file reopens in the mode it was saved in.
-- **Review:** when nothing big is left open, Claude offers a Well-Architected review, one gap at a time. Its advice uses a digest of the framework in `packages/wellarchitected/`, adapted from AWS documentation under CC BY-SA 4.0 (see [NOTICE.md](packages/wellarchitected/NOTICE.md)).
+- **Draw:** the draw dock works here too. Sketch boxes and arrows, a box around components or a cross over one, and the sketch goes to the architect as a turn. What you draw counts as asked for, so it comes back in ink.
+- **Data model:** ask for the tables and the architect draws the entities, fields and relations in a second zone under the architecture.
+- **Review:** the **Review** button (top right) opens the Well-Architected panel. **Review this design** makes Claude assess the six pillars and list the risks as findings, each pinned on the item it belongs to; you can ask Claude to fix one. Each of those is a request to Claude. Its advice uses a digest of the framework in `packages/wellarchitected/`, adapted from AWS documentation under CC BY-SA 4.0 (see [NOTICE.md](packages/wellarchitected/NOTICE.md)).
 
 Architect turns use Sonnet by default and follow the same key rules as live mode. If you change the architect prompt, run the scripted sessions first: `pnpm --filter @grafito/server eval architect scripts/architect/scenarios` (add `--dry` to see what would be sent without calling Claude).
 
@@ -142,12 +149,13 @@ Guests can only load the page and join a room they were sent. Live mode, archite
 
 - Each session is saved to `apps/server/sessions/` (on your disk, not uploaded to git).
 - On reload, you can **Restore** the last session.
-- **Export** downloads a `.json` and the board as `.svg`. **Import** loads a `.json`.
-- **Clear** starts a new session.
+- **Export** downloads a `.json`, the board as `.svg`, and the clean diagram as `.hifi.svg` and `.hifi.png`. **Import** loads a `.json`.
+- **Clear** wipes the board and your ink and starts a new session. In a room it clears for everyone.
 
 ## Privacy
 
-- Your text is sent to the Anthropic API to draw.
+- Your text is sent to the Anthropic API to draw. When Claude reads a sketch, a picture of it goes too.
+- In a room, what everyone says, types and draws goes through your server. With `pnpm share`, it travels through Cloudflare's tunnel.
 - The browser transcribes your voice. In Chrome, the audio goes through Google's speech service.
 - Sessions stay on your disk, in `apps/server/sessions/`.
 
@@ -167,6 +175,7 @@ grafito is a pnpm + Turborepo monorepo. Packages are private and source-only (no
 ```bash
 pnpm dev                                         # web on :5173, server on :8787
 pnpm turbo run typecheck lint test build         # what CI runs
+pnpm e2e                                         # the app driven in a browser (Playwright); never calls Claude
 pnpm --filter @grafito/server eval instruction <record.json> "<instruction>" [--dry]  # replay a saved session against an instruction
 pnpm --filter @grafito/server eval baseline <dir> [--dry]  # the prompt regression eval: 2 instructions per record
 pnpm --filter @grafito/server eval architect scripts/architect/scenarios [--dry] [--runs N]  # architect mode's scripted sessions, checked turn by turn
@@ -177,8 +186,8 @@ pnpm --filter @grafito/icons icons:aws <zip>     # reinstall the AWS icons from 
 
 | Package | What is in it |
 | --- | --- |
-| `apps/web` | Vite + React. Rendering engine, live session UI, speech, demos. |
-| `apps/server` | Express + Anthropic. `POST /api/board` (Claude call, streams ops over SSE), saved sessions, eval script. |
+| `apps/web` | Vite + React. Rendering engine, live session UI, speech, drawing, rooms, script mode, browser checks (`e2e/`). |
+| `apps/server` | Express + Anthropic. `POST /api/board` (Claude call, streams ops over SSE), rooms over WebSocket, share mode, saved sessions, eval script. |
 | `packages/contract` | The browser/server contract. Ops and their tool definitions, op validation, pricing. |
 | `packages/board` | The board engine, no DOM. Model (`applyOps`), layout, routing, render tree, animation queue, controller, board text for the prompt. |
 | `packages/icons` | Icon catalogs. AWS curated list, SVGs, NOTICE, fetch script. |
@@ -191,7 +200,7 @@ Demo scripts live in `apps/web/src/demos/`; the player UI is in `apps/web/src/sc
 
 Versions follow [SemVer](https://semver.org/). While in alpha they carry the `-alpha.N` suffix and are marked as *pre-release*. The changes of each version are in [CHANGELOG.md](CHANGELOG.md).
 
-- **CI** (`.github/workflows/ci.yml`): on every push to `main` and every PR it runs types, lint, tests and build.
+- **CI** (`.github/workflows/ci.yml`): on every push to `main` and every PR it runs types, lint, tests and build, and the browser checks.
 - **Release** (`.github/workflows/release.yml`): when a `v*` tag is pushed it checks again, builds and creates the GitHub release with automatic notes and two files (source code and the built `dist/`).
 
 To publish a new version, set `version` in the root `package.json`, then:
@@ -210,7 +219,7 @@ git push --follow-tags
 
 ## Contributing
 
-Welcome! Open an *issue* with what you found or what you would like. If you send a *pull request*, run `pnpm turbo run typecheck lint test build` first.
+Welcome! Open an *issue* with what you found or what you would like. If you send a *pull request*, run `pnpm turbo run typecheck lint test build` first, and `pnpm e2e` if you changed what happens on screen. Reviewers follow [CODING_STANDARDS.md](CODING_STANDARDS.md).
 
 ## License
 
