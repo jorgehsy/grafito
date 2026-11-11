@@ -51,7 +51,7 @@ These rules are enforced by tsconfig and by `no-restricted-imports` in the share
 - Formatting: see [`.editorconfig`](.editorconfig) (two spaces, LF, final newline).
 - Names: use the terms in `GLOSSARY.md`; don't invent synonyms.
 - Code, comments and docs are in English. The only exceptions are the speech-recognition language options and the demos ([ADR 0003](docs/adr/0003-english-code-language-follows-user.md)).
-- `no-explicit-any` and `react-hooks/exhaustive-deps` are warnings, not errors, because existing code has many hits. Don't add new ones.
+- `no-explicit-any` and `react-hooks/exhaustive-deps` are warnings, not errors, because existing code has many hits. Each package's `lint` script caps them at today's count with `--max-warnings`, so a new one fails the check. When you remove some, lower the number.
 
 ### Comments
 

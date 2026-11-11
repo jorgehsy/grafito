@@ -9,7 +9,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint . --max-warnings 7"
   },
   "dependencies": {
     "@grafito/contract": "workspace:*",

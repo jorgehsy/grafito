@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "wa:fetch": "tsx scripts/fetch-wellarchitected.ts",
-    "lint": "eslint ."
+    "lint": "eslint . --max-warnings 0"
   },
   "devDependencies": {
     "@grafito/config": "workspace:*",
