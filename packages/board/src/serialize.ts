@@ -54,6 +54,7 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
     if (e.type === "event") l += `${e.at !== undefined ? ` at:${e.at}` : ""}${e.when ? " when:" + q(e.when) : ""}${e.note ? " note:" + q(e.note) : ""}`;
     if (e.type === "span") l += ` from:${e.at} to:${e.to} tone:${e.tone ?? "neutral"}`;
     if ((e.type === "stage" || e.type === "branch") && e.note) l += ` note:${q(e.note)}`;
+    if (e.type === "entity") l += ` fields:[${(e.fields ?? []).map((f) => `${f.name}${f.type ? ":" + f.type : ""}${f.key ? " " + f.key : ""}`).join(", ")}]`;
     if (e.column) l += ` col:${e.column}`;
     if (e.after) l += ` after:${e.after}`;
     if (e.parent) l += ` parent:${e.parent}`;
@@ -64,7 +65,7 @@ export function serializeBoard(b: Board, opts: SerializeOpts = {}): string {
   if (b.connections.length) {
     out.push("CONNECTIONS");
     for (const c of b.connections) {
-      out.push(`- ${c.id}: ${c.from} ${c.both ? "<->" : "->"} ${c.to}${c.label ? " " + q(c.label) : ""}${c.style === "dashed" ? " dashed" : ""}${pencil(c)}`);
+      out.push(`- ${c.id}: ${c.from} ${c.both ? "<->" : "->"} ${c.to}${c.label ? " " + q(c.label) : ""}${c.cardinality ? " " + c.cardinality : ""}${c.style === "dashed" ? " dashed" : ""}${pencil(c)}`);
     }
   }
   if (b.callouts.length) {

@@ -26,6 +26,17 @@ export const GROUP_LABEL_SIZE = 19;
 const GROUP_LABEL_CW = 9.8;
 const GROUP_MIN = { w: 220, h: 130 };
 
+/** Entity box (data zone): header band with the name, one row per field, a column for the key mark. */
+export const ENTITY_HEAD = 40;
+export const ENTITY_ROW = 27;
+export const ENTITY_PAD = 14;
+export const ENTITY_KEY_W = 30;
+export const ENTITY_NAME_SIZE = 22;
+export const ENTITY_FIELD_SIZE = 19;
+const ENTITY_NAME_CW = 11.6;
+const ENTITY_FIELD_CW = 9.6;
+const ENTITY_TYPE_GAP = 22;
+
 /** Width of a group's header strip: icon, gap, label. */
 export const groupHeaderW = (label: string) => 8 + GROUP_ICON + 10 + [...label].length * GROUP_LABEL_CW + 14;
 /** Smallest box of a group: what an empty group gets, and the floor for one with content. */
@@ -57,6 +68,8 @@ export function labelLines(text: string): string[] {
 
 /** Visible lines of an element (the icon goes before the first). */
 export function elementLines(e: Element): string[] {
+  // an entity's name is one line: the table is as wide as it needs
+  if (e.type === "entity") return [e.label.trim()];
   const wrap = e.type === "mark" || e.type === "event" || e.type === "span" || e.type === "branch" ? 18 : e.type === "stage" ? 16 : e.type === "decision" ? 14 : e.type === "item" ? 28 : e.type === "node" ? 20 : e.comp === "actor" ? 14 : 18;
   const lines = wrapText(e.label, wrap);
   if (e.icon) lines[0] = `${e.icon} ${lines[0]}`;
@@ -94,6 +107,15 @@ export function elementSize(e: Element): { w: number; h: number } {
     case "span": {
       const w = [...e.label].length * LABEL_CW + 16;
       return { w, h: TL_LANE_H };
+    }
+    case "entity": {
+      const fields = e.fields ?? [];
+      const row = (f: { name: string; type?: string }) => ENTITY_KEY_W + ([...f.name].length + (f.type ? [...f.type].length : 0)) * ENTITY_FIELD_CW + (f.type ? ENTITY_TYPE_GAP : 0) + ENTITY_PAD;
+      return {
+        w: Math.ceil(Math.max(150, [...e.label].length * ENTITY_NAME_CW + 2 * ENTITY_PAD + 8, ...fields.map(row))),
+        // an entity with no fields yet keeps one empty row, so it still reads as a table
+        h: ENTITY_HEAD + Math.max(1, fields.length) * ENTITY_ROW + 8,
+      };
     }
     case "component":
       switch (e.comp) {

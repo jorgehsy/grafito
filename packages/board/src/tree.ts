@@ -1,5 +1,5 @@
 // Render tree: board + layout -> flat list of drawable items with a stable key.
-import type { Board } from "./model";
+import type { Board, Field } from "./model";
 import { derivedConnections, findElement } from "./model";
 import type { BoardLayout, Pt, Rect } from "./layout";
 import { bezierAt } from "./layout/edges";
@@ -21,6 +21,10 @@ export interface ItemData {
   label?: string;
   zoneKind?: string;
   cross?: boolean;
+  /** entity: its fields, one row each. */
+  fields?: Field[];
+  /** relation: crow's-foot ends instead of an arrowhead (`one_to_many`: one at the source, many at the target). */
+  cardinality?: string;
   /** group: how many groups it sits in (0 = top of the zone); drawn outermost first, under its children. */
   depth?: number;
   /** Drawn under an open proposal: the pencil look. Not part of `sig`: accepting inks it without a redraw. */
@@ -159,6 +163,11 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
       }
       continue;
     }
+    if (e.type === "entity") {
+      const fields = e.fields ?? [];
+      items.push({ key: e.id, kind: "element", sig: JSON.stringify([variant, lines, fields]), hue: zoneN.get(e.zone) ?? 0, geom: { ...r }, data: { variant, lines, fields, service: e.service } });
+      continue;
+    }
     items.push({ key: e.id, kind: "element", sig: JSON.stringify([variant, lines]), hue: zoneN.get(e.zone) ?? 0, geom: { ...r }, data: { variant, lines, service: e.service, ...pencil(e) } });
   }
   // brackets of a tree
@@ -186,9 +195,9 @@ export function buildTree(board: Board, lay: BoardLayout): RenderTree {
     const b = bbox(g.pts);
     items.push({
       key: c.id, kind: "connection", hue: -1,
-      sig: JSON.stringify([c.style, c.both, c.label ?? ""]),
+      sig: JSON.stringify(c.cardinality ? [c.style, c.both, c.label ?? "", c.cardinality] : [c.style, c.both, c.label ?? ""]),
       geom: { ...b, pts: g.pts, curve: g.kind === "curve", lab: g.label ? { x: g.label.x, y: g.label.y } : undefined },
-      data: { dashed: c.style === "dashed", both: c.both, label: g.label?.text, cross: g.cross, ...pencil(c) },
+      data: { dashed: c.style === "dashed", both: c.both, label: g.label?.text, cross: g.cross, ...(c.cardinality ? { cardinality: c.cardinality } : {}), ...pencil(c) },
     });
   }
 

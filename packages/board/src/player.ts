@@ -1,74 +1,66 @@
-// Demo player: virtual clock (pause and speed) + word-by-word subtitles
-// + delivery of ops after Claude's simulated latency.
+// Demo player: a virtual clock (pause, speed and seek) over a demo timeline. Each tick it compares what the
+// demo looks like now with what it last reported and calls the hooks for the difference: subtitles word by
+// word, ops after Claude's simulated latency, the hand-drawn sketch. A seek does the same in one step, and
+// when it changes which chunks are on the board it hands over the ops that rebuild it.
 import type { Op } from "@grafito/contract";
+import { clampTime, demoTimeline, opsUpTo, stateAt } from "./demo-timeline";
+import type { Demo, DemoState, DemoTimeline, SketchFrame, Subtitle } from "./demo-timeline";
 
-export interface DemoChunk { at_ms: number; text: string; ops: Op[] }
-export type Demo = DemoChunk[];
-
-export const MS_PER_WORD = 440;
-export const speakMs = (text: string) => text.trim().split(/\s+/).length * MS_PER_WORD;
-/** deterministic 1.5–3 s latency depending on the chunk index */
-export const latencyMs = (i: number) => 1500 + ((i * 7919) % 11) * 150;
-
-/** Demo builder: computes at_ms by accumulating speaking time plus a short pause. */
-export function timeline(chunks: { text: string; ops: Op[] }[], startMs = 600, pauseMs = 800): Demo {
-  let t = startMs;
-  return chunks.map((c) => {
-    const out = { at_ms: t, text: c.text, ops: c.ops };
-    t += speakMs(c.text) + pauseMs;
-    return out;
-  });
-}
-
-export interface Subtitle { spoken: string[]; current: string; interim?: boolean }
 export interface PlayerHooks {
   onSubtitle(s: Subtitle): void;
+  /** A chunk's ops land during playback: draw them animated. */
   onOps(ops: Op[], chunkIndex: number): void;
   onEnd(): void;
+  /** The hand-drawn sketch changed. */
+  onSketch?(frame: SketchFrame): void;
+  /**
+   * A seek changed which chunks are on the board. `ops` rebuild that board from an empty one and are meant to
+   * be shown at once, with no animation; `delivered` is how many chunks they cover.
+   */
+  onJump?(ops: Op[], delivered: number): void;
 }
-
-interface Ev { t: number; run: () => void }
 
 export class Player {
   clock = 0;
-  private events: Ev[] = [];
-  private next = 0;
-  private endAt = 0;
+  readonly timeline: DemoTimeline;
+  private state: DemoState;
   private ended = false;
 
-  constructor(private script: Demo, private hooks: PlayerHooks) {
-    this.build();
+  constructor(script: Demo, private hooks: PlayerHooks) {
+    this.timeline = demoTimeline(script);
+    this.state = stateAt(this.timeline, 0);
   }
 
-  private build() {
-    const spoken: string[] = [];
-    this.script.forEach((c, i) => {
-      const words = c.text.trim().split(/\s+/);
-      words.forEach((_, w) => {
-        this.events.push({
-          t: c.at_ms + w * MS_PER_WORD,
-          run: () => this.hooks.onSubtitle({ spoken: [...spoken], current: words.slice(0, w + 1).join(" ") }),
-        });
-      });
-      const speakEnd = c.at_ms + words.length * MS_PER_WORD;
-      this.events.push({
-        t: speakEnd,
-        run: () => { spoken.push(c.text); this.hooks.onSubtitle({ spoken: [...spoken], current: "" }); },
-      });
-      const opsAt = speakEnd + latencyMs(i);
-      this.events.push({ t: opsAt, run: () => this.hooks.onOps(c.ops, i) });
-      this.endAt = Math.max(this.endAt, opsAt);
-    });
-    this.events.sort((a, b) => a.t - b.t);
-    this.endAt += 1500;
-  }
-
-  get duration() { return this.endAt; }
+  get duration() { return this.timeline.duration; }
+  get done() { return this.ended; }
+  /** Index of the chapter playing now. */
+  get chapter() { return this.state.chapter; }
+  /** How many chunks have their ops on the board. */
+  get delivered() { return this.state.delivered; }
 
   tick(dtMs: number) {
     if (this.ended) return;
     this.clock += dtMs;
-    while (this.next < this.events.length && this.events[this.next].t <= this.clock) this.events[this.next++].run();
-    if (this.clock >= this.endAt) { this.ended = true; this.hooks.onEnd(); }
+    const prev = this.state;
+    const next = stateAt(this.timeline, this.clock);
+    this.state = next;
+    if (next.subtitleKey !== prev.subtitleKey) this.hooks.onSubtitle(next.subtitle);
+    for (let i = prev.delivered; i < next.delivered; i++) this.hooks.onOps(this.timeline.demo[i].ops, i);
+    if (next.sketch.key !== prev.sketch.key) this.hooks.onSketch?.(next.sketch);
+    if (this.clock >= this.timeline.duration) { this.ended = true; this.hooks.onEnd(); }
+  }
+
+  /** Moves the clock to `ms` (clamped to the demo). The result depends only on `ms`, never on where the clock was. */
+  seek(ms: number) {
+    const prev = this.state;
+    this.clock = clampTime(this.timeline, ms);
+    const next = stateAt(this.timeline, this.clock);
+    this.state = next;
+    if (next.delivered !== prev.delivered) this.hooks.onJump?.(opsUpTo(this.timeline, next.delivered), next.delivered);
+    this.hooks.onSubtitle(next.subtitle);
+    this.hooks.onSketch?.(next.sketch);
+    const wasEnded = this.ended;
+    this.ended = this.clock >= this.timeline.duration;
+    if (this.ended && !wasEnded) this.hooks.onEnd();
   }
 }

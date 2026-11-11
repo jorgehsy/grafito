@@ -36,7 +36,7 @@ export async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
   const elements = zone.kind === "system" && board.proposals.length ? alternativesTogether(board, own) : own;
   const ids = new Set(elements.map((e) => e.id));
   const linked =
-    zone.kind === "flow" || zone.kind === "system"
+    zone.kind === "flow" || zone.kind === "system" || zone.kind === "data"
       ? [...derivedConnections(board), ...board.connections].filter((c) => ids.has(c.from) && ids.has(c.to))
       : [];
   const connections = zone.kind === "system" && board.proposals.length ? alternativesTogether(board, linked) : linked;
@@ -49,7 +49,7 @@ export async function layoutZone(board: Board, zone: Zone): Promise<ZoneLocal> {
     else if (zone.kind === "cycle") content = layoutCycle(zone, elements);
     else if (zone.kind === "timeline") content = layoutTimeline(zone, elements);
     else if (!elements.length && !groups.length) content = { w: 0, h: 0, elements: {}, connections: {} };
-    else if (zone.kind === "flow" || zone.kind === "system") content = await layoutElkWithEmph(zone, elements, connections, circled, groups);
+    else if (zone.kind === "flow" || zone.kind === "system" || zone.kind === "data") content = await layoutElkWithEmph(zone, elements, connections, circled, groups);
     else if (zone.kind === "mindmap") content = layoutMindmap(elements);
     else if (zone.kind === "tree") content = layoutTree(elements);
     else content = layoutStack(zone, elements);
