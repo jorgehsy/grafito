@@ -1,5 +1,5 @@
-export { GROUP_KINDS, ZONE_KINDS, op } from "./ops";
-export type { ComponentType, EmphasisStyle, GroupKind, MarkTone, Op, OpInputs, OpName, OpSet, TextField, ZoneKind } from "./ops";
+export { BEST_PRACTICE_ID, CARDINALITIES, GROUP_KINDS, MAX_FIELDS, PILLAR_STATUSES, SEVERITIES, WA_PILLARS, ZONE_KINDS, op } from "./ops";
+export type { Cardinality, ComponentType, FieldKey, EmphasisStyle, GroupKind, MarkTone, Op, OpInputs, OpName, OpSet, PillarStatus, Severity, TextField, WaPillar, ZoneKind } from "./ops";
 export { MAX_CLICKS, ProposalClickSchema, parseClicks } from "./clicks";
 export type { ProposalClick } from "./clicks";
 export { normalizeCatalogs, parseOp, toolDefs } from "./parse";
@@ -11,3 +11,4 @@ export { DEFAULT_LANG, LANGS, isLang, languageName } from "./lang";
 export type { Lang } from "./lang";
 export { ARCHITECT_PROMPT_VERSION, OUTDATED_RECORD, PROMPT_VERSION, RECORD_VERSION, parseRecord } from "./record";
 export type { AppMode, ArchitectRecord, LiveRecord, ParsedRecord, RecordClick, RecordRequest, RecordTurn, SessionRecord, TimelineEntry } from "./record";
+export * from "./room";
