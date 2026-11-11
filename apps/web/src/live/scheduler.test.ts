@@ -57,4 +57,18 @@ describe("scheduler modes", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(calls).toEqual([["one", "content"], ["two", "content"], ["split", "instruction"], ["three", "instruction"], ["four", "content"]]);
   });
+
+  it("sends each sketch alone, never joined with content or another sketch", async () => {
+    const calls: [string, string][] = [];
+    const gate = defer();
+    const s = createScheduler(async (t, m) => { calls.push([t, m]); if (calls.length === 1) await gate.p; });
+    s.onFragment("one");
+    s.onFragment("a box", "sketch");
+    s.onFragment("an arrow", "sketch");
+    s.onFragment("two");
+    s.onFragment("three");
+    gate.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls).toEqual([["one", "content"], ["a box", "sketch"], ["an arrow", "sketch"], ["two three", "content"]]);
+  });
 });

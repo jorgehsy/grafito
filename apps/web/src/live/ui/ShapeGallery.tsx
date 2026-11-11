@@ -43,6 +43,10 @@ export const SHAPE_OPTIONS: { value: string; thumb: ReactNode }[] = [
     thumb: <T><rect x="18" y="11" width="12" height="10" rx="2" /><rect x="3" y="3" width="9" height="7" rx="1.5" /><rect x="36" y="3" width="9" height="7" rx="1.5" /><rect x="3" y="22" width="9" height="7" rx="1.5" /><rect x="36" y="22" width="9" height="7" rx="1.5" /><path d="M12 8l6 5M36 8l-6 5M12 24l6-5M36 24l-6-5M7.5 10v12" /></T>,
   },
   {
+    value: "data",
+    thumb: <T><rect x="3" y="4" width="17" height="19" rx="1.5" /><path d="M3 10h17M7 14h9M7 18h7" /><rect x="29" y="9" width="16" height="19" rx="1.5" /><path d="M29 15h16M33 19h8M33 23h6" /><path d="M20 13h4v6h5M26 16l3 3-3 3M22 11v4" /></T>,
+  },
+  {
     value: "list",
     thumb: <T><circle cx="10" cy="7" r="1.5" /><circle cx="10" cy="16" r="1.5" /><circle cx="10" cy="25" r="1.5" /><path d="M15 7h22M15 16h18M15 25h20" /></T>,
   },

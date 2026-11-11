@@ -2,10 +2,15 @@
 // Each typed message is one turn: POST /api/architect, drawing ops onto the board, the `say` into the speech bubble.
 // A click on a proposal (✓, ✗, or choosing an alternative) applies at once and rides along with the next turn; there
 // is none while a turn is in flight, since the replay could not put it between that turn's ops.
+// A sketch drawn on the board is a turn too (`sendSketch`): the ink goes described in text and as a picture.
+// The Well-Architected review is kept beside the board: the review ops of every turn, applied in order.
 // The session is saved as a timeline of turns and clicks (session record version 3) and restored by replaying it.
-import { alternativesOf, architectZoneOp, findProposal, lastSay, proposalOf, replayArchitect, serializeBoard } from "@grafito/board";
-import type { Board, ReplayedTurn } from "@grafito/board";
-import type { ArchitectRecord, Op, ProposalClick, TimelineEntry, Usage } from "@grafito/contract";
+import {
+  ARCHITECT_DATA_ZONE_ID, alternativesOf, applyReviewOp, architectDataZoneOp, architectZoneOp, emptyReview, findProposal, findZone, isReviewOp, lastSay,
+  needsDataZone, proposalOf, replayArchitect, serializeBoard, serializeReview,
+} from "@grafito/board";
+import type { Board, ReplayedTurn, Review } from "@grafito/board";
+import type { ArchitectRecord, Op, ProposalClick, SketchPayload, TimelineEntry, Usage } from "@grafito/contract";
 import { ARCHITECT_PROMPT_VERSION, costUsd, parseRecord, RECORD_VERSION, zeroUsage } from "@grafito/contract";
 import { streamOps } from "../live/sse";
 import type { UsageInfo } from "../live/sse";
@@ -23,10 +28,15 @@ export interface Bubble {
   target?: string;
 }
 
+/** What a sketch turn with no typed text shows as the user's message, in `recent`. */
+export const SKETCH_TURN_TEXT = "(hand-drawn sketch)";
+
 export interface ArchitectTurn {
   n: number;
-  /** What the user typed. */
+  /** What the user typed; may be empty on a sketch turn. */
   text: string;
+  /** A sketch turn: the user's ink described in text. The picture is not kept. */
+  sketch?: string;
   model: string;
   promptVersion: number;
   startedAt: number;
@@ -62,6 +72,10 @@ export interface ArchitectSessionDeps {
   settings: { get(): ArchitectSettings; apply?(s: { model: string; lang: string }): void };
   /** Title of the system zone, in the app's language. */
   zoneTitle(): string;
+  /** Title of the data zone, in the app's language; made before the first entity. */
+  dataTitle?(): string;
+  /** The sketch on the board: the strokes Claude drew something from are removed. */
+  sketch?: { remove(ids: readonly string[]): void };
   /** Where the session autosaves: its own slot, RECORD_KEYS.architect. */
   storage: Store;
   fetchImpl?: typeof fetch;
@@ -77,6 +91,8 @@ export interface ArchitectSessionState {
   error: string;
   /** Clicks since the last turn was sent, in order: the next turn's `actions`. */
   clicks: ArchitectClick[];
+  /** The Well-Architected review so far: every turn's review ops, in order. */
+  review: Review;
   /** An architect session left in storage by an earlier visit; offered until this session sends its first turn. */
   unclosed: ArchitectRecord | null;
   savedAt: number | null;
@@ -97,6 +113,13 @@ export interface ArchitectSession {
    * settled it.
    */
   decide(type: ProposalClick["type"], proposal: string): boolean;
+  /**
+   * Sends a sketch as a turn: the ink described in text and, when one could be made, its picture; `text` is what the
+   * user typed about it, if anything. It waits for a turn in flight. Resolves to true when Claude drew something
+   * from it (a board op: not just a bubble, the summary or the review), and those strokes are then removed from
+   * the sketch; false if it drew nothing, failed or was cancelled, and the ink stays.
+   */
+  sendSketch(sketch: SketchPayload, text?: string): Promise<boolean>;
   /** Cancels the turn in flight; the session stays usable. */
   stop(): void;
   /** Stops, and saves now if anything changed since the last save. For leaving architect mode. */
@@ -113,7 +136,10 @@ export interface ArchitectSession {
 
 /** The past turns the request carries: user text and the bubble text Claude answered with. */
 export const recentTurns = (turns: readonly ArchitectTurn[]): { text: string; bubble: string }[] =>
-  turns.filter((x) => x.done).slice(-RECENT_TURNS).map((x) => ({ text: x.text, bubble: x.bubble?.text ?? "" }));
+  turns.filter((x) => x.done).slice(-RECENT_TURNS).map((x) => ({ text: x.text || (x.sketch ? SKETCH_TURN_TEXT : ""), bubble: x.bubble?.text ?? "" }));
+
+/** An op that changes the board: not the bubble, the summary or the review. A sketch turn with one took the ink. */
+export const drawsOnBoard = (o: Op): boolean => o.name !== "say" && o.name !== "update_summary" && !isReviewOp(o);
 
 /**
  * What a click on a board item does: nothing on ink or paper; on one of two alternatives it chooses that one at
@@ -137,7 +163,7 @@ type Step = { kind: "turn"; turn: ArchitectTurn } | { kind: "click"; click: Arch
 
 function turnFromRecord({ entry: e, ops, warnings }: ReplayedTurn): ArchitectTurn {
   return {
-    n: e.n, text: e.text, model: e.model, promptVersion: e.promptVersion, startedAt: e.startedAt, totalMs: e.totalMs,
+    n: e.n, text: e.text, ...(e.sketch ? { sketch: e.sketch } : {}), model: e.model, promptVersion: e.promptVersion, startedAt: e.startedAt, totalMs: e.totalMs,
     ops, bubble: lastSay(ops), warnings,
     usage: { input_tokens: e.usage.input, output_tokens: e.usage.output, cache_read_input_tokens: e.usage.cacheRead, cache_creation_input_tokens: e.usage.cacheWrite },
     costUsd: costUsd(e.model, zeroUsage()) === null ? null : e.costUsd, ...(e.error ? { error: e.error } : {}), done: true,
@@ -161,7 +187,12 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
   let turns: ArchitectTurn[] = [];
   let clicks: ArchitectClick[] = [];
   let timeline: Step[] = [];
+  let review = emptyReview();
+  // The app makes the data zone, once, before the first entity.
+  let dataZone = false;
   let busy = false;
+  // The turn in flight, for a sketch that waits its turn.
+  let running: Promise<unknown> = Promise.resolve();
   let abort: AbortController | null = null;
   // Every board submit not yet applied: a turn serializes the board only once they are.
   let applying: Promise<void> = Promise.resolve();
@@ -180,7 +211,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
 
   const state = (): ArchitectSessionState => {
     const last = turns.at(-1);
-    return { turns: [...turns], busy, bubble: last?.bubble ?? null, error: last?.error ?? "", clicks: [...clicks], unclosed, savedAt, warning };
+    return { turns: [...turns], busy, bubble: last?.bubble ?? null, error: last?.error ?? "", clicks: [...clicks], review, unclosed, savedAt, warning };
   };
   const emit = () => { const s = state(); listeners.forEach((f) => f(s)); };
 
@@ -215,7 +246,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     if (s.kind === "click") return { kind: "click", type: s.click.type, proposal: s.click.proposal, at: s.click.at };
     const x = s.turn;
     return {
-      kind: "turn", n: x.n, text: x.text, model: x.model, promptVersion: x.promptVersion, startedAt: x.startedAt, totalMs: x.totalMs,
+      kind: "turn", n: x.n, text: x.text, ...(x.sketch ? { sketch: x.sketch } : {}), model: x.model, promptVersion: x.promptVersion, startedAt: x.startedAt, totalMs: x.totalMs,
       ops: x.ops.map((o) => ({ name: o.name, input: o.input })), warnings: [...x.warnings], usage: recordUsage(x.usage), costUsd: x.costUsd ?? 0,
       ...(x.error ? { error: x.error } : {}),
     };
@@ -232,14 +263,14 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     };
   }
 
-  async function run(text: string) {
+  async function run(text: string, sketch?: SketchPayload): Promise<ArchitectTurn | null> {
     const myEpoch = epoch;
     const { model, catalogs, lang } = d.settings.get();
     const recent = recentTurns(turns);
     const actions = requestClicks(clicks);
     clicks = [];
     const turn: ArchitectTurn = {
-      n: (turns.at(-1)?.n ?? 0) + 1, text, model, promptVersion: ARCHITECT_PROMPT_VERSION, startedAt: Date.now(), totalMs: null,
+      n: (turns.at(-1)?.n ?? 0) + 1, text, ...(sketch ? { sketch: sketch.hints } : {}), model, promptVersion: ARCHITECT_PROMPT_VERSION, startedAt: Date.now(), totalMs: null,
       ops: [], bubble: null, warnings: [], usage: zeroUsage(), costUsd: 0, done: false,
     };
     turns = [...turns, turn];
@@ -250,15 +281,20 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     changed();
     const mine = () => myEpoch === epoch;
     await applying; // the board sent must show the clicks and the last turn's ops
-    if (!mine()) return;
+    if (!mine()) return null;
     const board = d.board.get();
+    const reviewText = serializeReview(review);
     const setUsage = (u: UsageInfo) => {
       turn.usage = { input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_input_tokens: u.cache_read_input_tokens, cache_creation_input_tokens: u.cache_creation_input_tokens };
       turn.costUsd = costUsd(model, turn.usage);
     };
     await streamOps(
       "/api/architect",
-      { text, board: serializeBoard(board, { catalog: catalogs.length > 0 }), summary: board.summary, recent, actions, model, lang, catalogs },
+      {
+        text, board: serializeBoard(board, { catalog: catalogs.length > 0 }), summary: board.summary, ...(reviewText ? { review: reviewText } : {}), recent, actions,
+        ...(sketch ? { sketch: { hints: sketch.hints, ...(sketch.image ? { image: sketch.image } : {}) } } : {}),
+        model, lang, catalogs,
+      },
       "architect",
       {
         onOp(o) {
@@ -266,7 +302,15 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
           turn.ops.push(o);
           // say is not a board element: the last one of the turn is its bubble.
           if (o.name === "say") turn.bubble = { text: o.input.text, ...(o.input.target ? { target: o.input.target } : {}) };
-          else submit([o]);
+          else if (isReviewOp(o)) {
+            // review ops draw nothing: they go to the review beside the board
+            const r = applyReviewOp(review, o);
+            review = r.review;
+            turn.warnings.push(...r.warnings);
+          } else {
+            if (needsDataZone(o) && !dataZone) { dataZone = true; submit([architectDataZoneOp(dataTitle())]); }
+            submit([o]);
+          }
           changed();
         },
         onInvalid(w) { if (mine()) { turn.warnings.push(w); changed(); } },
@@ -280,11 +324,13 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     if (turn.totalMs === null) turn.totalMs = Date.now() - turn.startedAt;
     turn.done = true;
     await applying;
-    if (!mine()) return;
+    if (!mine()) return null;
     abort = null;
     busy = false;
     changed(true);
+    return turn;
   }
+  const dataTitle = () => d.dataTitle?.() ?? t("architect.dataTitle");
 
   const halt = () => { epoch++; abort?.abort(); abort = null; busy = false; };
 
@@ -292,6 +338,7 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     halt();
     clearTimers();
     turns = []; clicks = []; timeline = [];
+    review = emptyReview(); dataZone = false;
     id = newSessionId(); startedAt = Date.now();
     dirty = false; savedAt = null;
     d.board.clear();
@@ -310,8 +357,21 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     send(text) {
       const s = text.trim();
       if (!s || busy) return false;
-      void run(s);
+      running = run(s);
       return true;
+    },
+    async sendSketch(sketch, text = "") {
+      const myEpoch = epoch;
+      // one turn at a time: the sketch goes after the one in flight
+      while (busy && myEpoch === epoch) await running;
+      if (myEpoch !== epoch) return false;
+      const mine = run(text.trim(), sketch);
+      running = mine;
+      const turn = await mine;
+      const drew = !!turn && !turn.error && turn.ops.some(drawsOnBoard);
+      // Claude took the ink: what it drew stands in for the strokes.
+      if (drew) d.sketch?.remove(sketch.strokeIds);
+      return drew;
     },
     decide(type, proposal) {
       if (busy) return false;
@@ -336,7 +396,9 @@ export function createArchitectSession(d: ArchitectSessionDeps): ArchitectSessio
     restore(rec) {
       halt();
       clearTimers();
-      const r = replayArchitect(rec.timeline, d.zoneTitle());
+      const r = replayArchitect(rec.timeline, d.zoneTitle(), dataTitle());
+      review = r.review;
+      dataZone = !!findZone(r.board, ARCHITECT_DATA_ZONE_ID);
       const byTurn = new Map(r.turns.map((x) => [x.entry, turnFromRecord(x)]));
       timeline = rec.timeline.map((e): Step => (e.kind === "turn" ? { kind: "turn", turn: byTurn.get(e)! } : { kind: "click", click: { type: e.type, proposal: e.proposal, at: e.at } }));
       turns = timeline.flatMap((s) => (s.kind === "turn" ? [s.turn] : []));

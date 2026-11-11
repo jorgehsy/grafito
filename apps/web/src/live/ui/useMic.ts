@@ -3,6 +3,7 @@ import { WebSpeechSource } from "../speech/webSpeech";
 import { createMicLock } from "../speech/micLock";
 import type { SpeechSource, SpeechState } from "../speech/types";
 import { useT } from "../../i18n";
+import { spacePan } from "../../render/spacePan";
 
 interface MicOptions {
   lang: string;
@@ -74,10 +75,19 @@ export function useMic({ lang, active, onFinal, onInterim }: MicOptions) {
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(el.tagName))) return;
       e.preventDefault();
-      if (e.code === "Space") toggleRef.current(); else toggleMuteRef.current();
+      // Space toggles on release: held while dragging it pans the board instead (the engine marks that use).
+      if (e.code === "Space") { spacePan.used = false; spaceAt = performance.now(); } else toggleMuteRef.current();
+    };
+    let spaceAt: number | null = null;
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || spaceAt === null) return;
+      const held = performance.now() - spaceAt;
+      spaceAt = null;
+      if (cb.current.active && !spacePan.used && held < 600) toggleRef.current();
     };
     window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    window.addEventListener("keyup", up);
+    return () => { window.removeEventListener("keydown", h); window.removeEventListener("keyup", up); };
   }, []);
   useEffect(() => { if (!active && speech.current) toggleRef.current(); }, [active]);
 

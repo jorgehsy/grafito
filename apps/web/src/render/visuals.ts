@@ -3,7 +3,7 @@ import rough from "roughjs";
 import type { Options } from "roughjs/bin/core";
 import type { Drawable } from "roughjs/bin/core";
 import type { Geom, RenderItem } from "@grafito/board";
-import { GROUP_ICON, GROUP_LABEL_SIZE, LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "@grafito/board";
+import { ENTITY_FIELD_SIZE, ENTITY_HEAD, ENTITY_KEY_W, ENTITY_NAME_SIZE, ENTITY_PAD, ENTITY_ROW, GROUP_ICON, GROUP_LABEL_SIZE, LABEL_LH, LABEL_SIZE, labelLines, labelRect } from "@grafito/board";
 import { BLUE, GROUP_STYLES, OUTLINES, FILLS, FONT_FAMILY, INK, PAPER, PENCIL, PENCIL_TEXT, RED, TONES } from "@grafito/board";
 import type { GroupKind } from "@grafito/contract";
 import { addServiceIcon } from "./stamp";
@@ -155,6 +155,23 @@ function arrowHead(b: Builder, part: string, tip: { x: number; y: number }, from
   b.rough("path", part, [`M${a.x} ${a.y} L${tip.x} ${tip.y} L${c.x} ${c.y}`], { roughness: 0.8 }, { stroke: color, width });
 }
 
+/**
+ * One end of a relation in crow's-foot notation, at `tip` (on the entity's edge) for a line arriving from `from`:
+ * "one" is a short bar across the line, "many" the foot whose three toes spread onto the entity.
+ */
+function crowFoot(b: Builder, part: string, tip: { x: number; y: number }, from: { x: number; y: number }, many: boolean, color: string, width: number) {
+  const len = Math.hypot(tip.x - from.x, tip.y - from.y) || 1;
+  const u = { x: (tip.x - from.x) / len, y: (tip.y - from.y) / len };
+  const back = (d: number, side: number) => ({ x: tip.x - u.x * d - u.y * side, y: tip.y - u.y * d + u.x * side });
+  if (many) {
+    const heel = back(20, 0), a = back(0, 11), c = back(0, -11);
+    b.rough("path", part, [`M${a.x} ${a.y} L${heel.x} ${heel.y} L${c.x} ${c.y}`], { roughness: 0.7 }, { stroke: color, width });
+  } else {
+    const a = back(13, 10), c = back(13, -10);
+    b.rough("line", part, [a.x, a.y, c.x, c.y], { roughness: 0.7 }, { stroke: color, width: width + 0.4 });
+  }
+}
+
 function star(w: number): [number, number][] {
   const pts: [number, number][] = [];
   for (let i = 0; i < 10; i++) {
@@ -268,6 +285,23 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
     } else if (v === "cycle-center") {
       b.rough("ellipse", "ctr", [w / 2, h / 2, w - 6, h - 6], { roughness: 1.5, fillStyle: "solid" }, { stroke: outline, width: 2.4, fill, fillOpacity: 0.35 });
       b.text(item.data.lines ?? [], w / 2, h / 2, { size: 24, weight: 700 });
+    } else if (v === "entity") {
+      // a table: name in a tinted header band, a rule, then one row per field (key mark, name, type in grey)
+      const fields = item.data.fields ?? [];
+      for (const patch of [svgEl("rect", { x: 3, y: 3, width: w - 6, height: h - 6, fill: PAPER }), svgEl("rect", { x: 3, y: 3, width: w - 6, height: ENTITY_HEAD - 3, fill, opacity: 0.85 })]) {
+        b.v.g.appendChild(patch); b.v.fills.push(patch);
+      }
+      b.rough("rect", "box", [2, 2, w - 4, h - 4], { roughness: 1.2 }, { stroke: outline, width: 2.4 });
+      b.rough("line", "rule", [2, ENTITY_HEAD, w - 2, ENTITY_HEAD], { roughness: 0.9 }, { stroke: outline, width: 2.2 });
+      b.text(lines, w / 2, ENTITY_HEAD / 2 + 2, { size: ENTITY_NAME_SIZE, weight: 700 });
+      fields.forEach((f, i) => {
+        const y = ENTITY_HEAD + 4 + i * ENTITY_ROW + ENTITY_ROW / 2;
+        if (f.key) b.text([f.key.toUpperCase()], ENTITY_PAD - 4, y + 1, { size: 12, anchor: "start", weight: 700, fill: f.key === "pk" ? outline : "#7b8794" });
+        b.text([f.name], ENTITY_KEY_W, y, { size: ENTITY_FIELD_SIZE, anchor: "start", weight: f.key === "pk" ? 700 : 400 });
+        if (f.key === "pk") b.rough("line", `pk${i}`, [ENTITY_KEY_W, y + 11, ENTITY_KEY_W + [...f.name].length * 9.2, y + 11.5], { roughness: 0.8 }, { stroke: INK, width: 1.4 });
+        if (f.type) b.text([f.type], w - ENTITY_PAD, y, { size: ENTITY_FIELD_SIZE - 2, anchor: "end", fill: "#7b8794" });
+        if (i > 0) b.rough("line", `row${i}`, [8, ENTITY_HEAD + 4 + i * ENTITY_ROW, w - 8, ENTITY_HEAD + 4 + i * ENTITY_ROW], { roughness: 0.6 }, { stroke: "#D6D3CB", width: 1 });
+      });
     } else if (v === "step") {
       b.rough("rect", "s", [2, 2, w - 4, h - 4], {}, f);
       b.text(lines, w / 2, h / 2);
@@ -346,8 +380,17 @@ export function buildVisual(item: RenderItem, geom: Geom): Visual {
     if (pencil) b.v.g.appendChild(svgEl("path", { d, fill: "none", stroke: "transparent", "stroke-width": 16, "pointer-events": "stroke", "data-hit": "" }));
     const n = pts.length;
     const tipFrom = geom.curve ? pts[2] : pts[n - 2];
-    arrowHead(b, "head", pts[n - 1], tipFrom.x === pts[n - 1].x && tipFrom.y === pts[n - 1].y ? pts[0] : tipFrom, color, wd);
-    if (item.data.both) arrowHead(b, "head0", pts[0], geom.curve ? pts[1] : pts[1], color, wd);
+    const endFrom = tipFrom.x === pts[n - 1].x && tipFrom.y === pts[n - 1].y ? pts[0] : tipFrom;
+    const startFrom = pts[1].x === pts[0].x && pts[1].y === pts[0].y ? pts[n - 1] : pts[1];
+    if (item.data.cardinality) {
+      // a relation: crow's-foot ends, read "<source>_to_<target>"
+      const [source, target] = item.data.cardinality.split("_to_");
+      crowFoot(b, "foot0", pts[0], startFrom, source === "many", color, wd);
+      crowFoot(b, "foot", pts[n - 1], endFrom, target === "many", color, wd);
+    } else {
+      arrowHead(b, "head", pts[n - 1], endFrom, color, wd);
+      if (item.data.both) arrowHead(b, "head0", pts[0], startFrom, color, wd);
+    }
     if (item.data.label && geom.lab) {
       const lr = labelRect({ x: geom.lab.x, y: geom.lab.y, text: item.data.label });
       const patch = svgEl("rect", { x: lr.x, y: lr.y, width: lr.w, height: lr.h, rx: 6, fill: PAPER, opacity: 0.96 });

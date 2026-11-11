@@ -1,6 +1,6 @@
 // Pure board model. No React, no coordinates.
 import { qualifyService } from "@grafito/icons";
-import type { ComponentType, EmphasisStyle, GroupKind, MarkTone, Op, ZoneKind } from "@grafito/contract";
+import type { Cardinality, ComponentType, EmphasisStyle, FieldKey, GroupKind, MarkTone, Op, ZoneKind } from "@grafito/contract";
 import { ARCHITECT_ZONE_ID } from "./architect-zone";
 
 export type ZoneDirection = "horizontal" | "vertical";
@@ -22,7 +22,9 @@ export interface Zone {
   /** Creation order number (gives the zone a stable color). */
   n: number;
 }
-export type ElementType = "step" | "decision" | "component" | "node" | "item" | "mark" | "stage" | "event" | "span" | "branch";
+export type ElementType = "step" | "decision" | "component" | "node" | "item" | "mark" | "stage" | "event" | "span" | "branch" | "entity";
+/** One row of an entity (data zone): a field with an optional type and key mark. */
+export interface Field { name: string; type?: string; key?: FieldKey }
 export interface Element {
   id: string;
   zone: string;
@@ -46,6 +48,8 @@ export interface Element {
   when?: string;
   note?: string;
   tone?: MarkTone;
+  /** entity: its fields in order. */
+  fields?: Field[];
 }
 /** An AWS group (architect mode): a box in a system zone holding components and other groups. */
 export interface Group {
@@ -65,6 +69,8 @@ export interface Connection {
   label?: string;
   style: "solid" | "dashed";
   both: boolean;
+  /** A relation between two entities (data zone): drawn with crow's-foot ends instead of an arrowhead. */
+  cardinality?: Cardinality;
   /** Id of the open proposal it was drawn under: pencil. None = ink. */
   proposal?: string;
 }
@@ -104,7 +110,7 @@ export const emptyBoard = (): Board => ({
 export interface ApplyResult { board: Board; warnings: string[] }
 
 const ELEMENT_ZONE: Record<ElementType, ZoneKind[]> = {
-  step: ["flow"], decision: ["flow"], component: ["system"], node: ["mindmap"], item: ["list", "compare"], mark: ["scale"], stage: ["cycle"], event: ["timeline"], span: ["timeline"], branch: ["tree"],
+  step: ["flow"], decision: ["flow"], component: ["system"], node: ["mindmap"], item: ["list", "compare"], mark: ["scale"], stage: ["cycle"], event: ["timeline"], span: ["timeline"], branch: ["tree"], entity: ["data"],
 };
 
 export const findZone = (b: Board, id: string) => b.zones.find((z) => z.id === id);
@@ -231,6 +237,20 @@ function removeRefs(b: Board, ids: Set<string>) {
   b.callouts = b.callouts.filter((c) => !ids.has(c.target) && !ids.has(c.id));
 }
 
+/** Zone kinds laid out as a graph, which take a direction. */
+const DIRECTED: ZoneKind[] = ["flow", "system", "data"];
+
+/** The fields of an entity as stored: blank types dropped, a repeated name kept once (with a warning). */
+function cleanFields(raw: Field[] | undefined, opName: string, warnings: string[]): Field[] {
+  const out: Field[] = [];
+  for (const f of raw ?? []) {
+    const name = f.name.trim();
+    if (out.some((x) => x.name === name)) { warnings.push(`${opName}: field '${name}' is repeated; kept once`); continue; }
+    out.push({ name, ...(str(f.type) ? { type: f.type.trim() } : {}), ...(f.key ? { key: f.key } : {}) });
+  }
+  return out;
+}
+
 function str(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
@@ -266,12 +286,12 @@ export function applyOp(board: Board, op: Op): ApplyResult {
           warnings.push(`create_zone: place ignored (unknown zone '${i.place?.of}')`);
         else place = { relation: i.place.relation, of: i.place.of };
       }
-      if (i.direction && i.kind !== "flow" && i.kind !== "system") warnings.push(`create_zone: direction ignored on a ${i.kind} zone`);
+      if (i.direction && !DIRECTED.includes(i.kind)) warnings.push(`create_zone: direction ignored on a ${i.kind} zone`);
       b.zones.push({
         id: i.id, kind: i.kind, title: i.title, place, n: b.zoneCounter++,
         ...(i.kind === "compare" ? { leftTitle: i.left_title ?? "", rightTitle: i.right_title ?? "" } : {}),
         ...(i.kind === "cycle" && str(i.center_label) ? { centerLabel: i.center_label } : {}),
-        ...(i.direction && (i.kind === "flow" || i.kind === "system") ? { direction: i.direction } : {}),
+        ...(i.direction && DIRECTED.includes(i.kind) ? { direction: i.direction } : {}),
         ...(i.kind === "scale" ? { minLabel: str(i.min_label) ? i.min_label : "0%", maxLabel: str(i.max_label) ? i.max_label : "100%" } : {}),
       });
       return { board: b, warnings };
@@ -381,6 +401,33 @@ export function applyOp(board: Board, op: Op): ApplyResult {
       if (!zone) return bad(`zone '${i.zone}' does not exist`);
       if (zone.kind !== "timeline") return bad(`cannot add span to a ${zone.kind} zone`);
       b.elements.push({ id: i.id, zone: zone.id, type: "span", label: i.label, at: i.from, to: i.to, tone: i.tone ?? "neutral" });
+      return { board: b, warnings };
+    }
+    case "add_entity": {
+      const e = needNew(i.id);
+      if (e) return bad(e);
+      const zone = findZone(b, i.zone);
+      if (!zone) return bad(`zone '${i.zone}' does not exist`);
+      if (zone.kind !== "data") return bad(`cannot add entity to a ${zone.kind} zone`);
+      b.elements.push({ id: i.id, zone: zone.id, type: "entity", label: i.name, fields: cleanFields(i.fields, op.name, warnings) });
+      return { board: b, warnings };
+    }
+    case "set_fields": {
+      const element = findElement(b, i.id);
+      if (!element) return bad(`id '${i.id}' does not exist`);
+      if (element.type !== "entity") return bad(`'${i.id}' is a ${element.type}; only entities have fields`);
+      element.fields = cleanFields(i.fields, op.name, warnings);
+      return { board: b, warnings };
+    }
+    case "relate": {
+      const e = needNew(i.id);
+      if (e) return bad(e);
+      for (const end of [i.from, i.to]) {
+        const x = findElement(b, end);
+        if (!x) return bad(`entity '${end}' does not exist`);
+        if (x.type !== "entity") return bad(`'${end}' is a ${x.type}; relations join entities only (use connect)`);
+      }
+      b.connections.push({ id: i.id, from: i.from, to: i.to, label: str(i.label) ? i.label : undefined, style: "solid", both: false, cardinality: i.cardinality });
       return { board: b, warnings };
     }
     case "set_level": {

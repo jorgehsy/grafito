@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { IconBars, IconCompass, IconDoc, IconExport, IconGear, IconImport, IconMic, IconStop, IconTrash, IconUndo, IconWave } from "../../ui/icons";
 import type { BoardController, Subtitle } from "@grafito/board";
+import type { Engine } from "../../render/engine";
+import type { SketchStore } from "../../sketch/store";
+import { useSketch } from "../../sketch/useSketch";
+import { DrawDock } from "../../sketch/DrawDock";
+import type { SessionFactory } from "./useLiveSession";
 import { isModelId, MODELS, parseRecord } from "@grafito/contract";
 import type { ArchitectRecord } from "@grafito/contract";
 import type { ArchitectRecordControl } from "../../architect/ui/ArchitectPanel";
@@ -8,6 +13,7 @@ import type { Settings } from "../session";
 import { useLiveSession } from "./useLiveSession";
 import { useMic } from "./useMic";
 import { download } from "./download";
+import { saveHifi } from "../../render/hifi/save";
 import { SHAPE_OPTIONS } from "./ShapeGallery";
 import { OptionsPopover } from "./OptionsPopover";
 import { hhmm, StatsPanel } from "./StatsPanel";
@@ -16,11 +22,24 @@ import { fetchAvailableModels, totalCost, usableModel } from "../models";
 import type { ModelControl } from "../models";
 import { isLang, LANGS, setLang, useLang, useT } from "../../i18n";
 import { readFlag, writeFlag } from "../../storage";
+import type { RoomClient, RoomState } from "../../room/client";
+import { PresenceBar } from "../../room/ui/PresenceBar";
+import { Feed } from "../../room/ui/Feed";
+import { seedOps } from "../../room/start";
 
 const STATS_KEY = "grafito.stats";
 
 interface Props {
   getCtrl(): BoardController | null;
+  getEngine(): Engine | null;
+  /** The sketch people draw on the board: local when alone, the room's when in one. */
+  sketch: SketchStore;
+  /** Makes the session the panel talks to; absent = live mode's own. A room passes one that speaks to its socket. */
+  createSession?: SessionFactory;
+  /** Who draws here and in which ink, when a room says so. */
+  me?: { id: string; color: string };
+  /** The room this page is in (client and state are null until it connects); null when working alone. */
+  room: { id: string; client: RoomClient | null; state: RoomState | null } | null;
   /** The board as a standalone SVG file, or null if there is none. */
   exportSvg(): string | null;
   onSubtitle(s: Subtitle): void;
@@ -31,7 +50,6 @@ interface Props {
    */
   mode: "demo" | "live" | "architect" | null;
   onMode(m: "demo" | "live" | "architect"): void;
-  modeLocked: boolean;
   follow: boolean;
   onFollow(v: boolean): void;
   summary: string;
@@ -48,7 +66,7 @@ interface Props {
   onOpenArchitect(rec: ArchitectRecord): void;
 }
 
-export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMode, modeLocked, follow, onFollow, summary, warnings, showTranscript, onShowTranscript, onMuteControl, modelControl, architect, onOpenArchitect }: Props) {
+export function LivePanel({ getCtrl, getEngine, sketch, createSession, me, room, exportSvg, onSubtitle, onClear, mode, onMode, follow, onFollow, summary, warnings, showTranscript, onShowTranscript, onMuteControl, modelControl, architect, onOpenArchitect }: Props) {
   const t = useT();
   const lang = useLang();
   const active = mode === "live";
@@ -77,7 +95,14 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
       if (SHAPE_OPTIONS.some((o) => o.value === s.shape)) setShape(s.shape);
       if (isLang(s.speechLang)) setLang(s.speechLang);
     },
+    sketch,
+    createSession,
   );
+  const draw = useSketch({
+    // In architect mode the same dock draws, and a sketch read is an architect turn.
+    enabled: active || !!arch, getEngine, store: sketch, session: arch ?? session, author: me?.id, color: me?.color,
+    getBoard: () => { const c = getCtrl(); return c ? { board: c.board, layout: c.layout } : null; },
+  });
   useEffect(() => { (window as any).__live = session; }, [session]);
 
   useEffect(() => {
@@ -101,6 +126,9 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
     onInterim: (text) => onSubtitle({ spoken: [...spoken.current], current: text, interim: !!text }),
   });
 
+  // Leaving live mode stops its session: a request still in flight must not draw on another mode's board.
+  useEffect(() => { if (!active) session.stop(); }, [active, session]);
+
   useEffect(() => {
     onMuteControl(micOn ? { muted, toggle: toggleMute } : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- toggleMute reads current values through refs
@@ -121,13 +149,27 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  const clear = () => { if (arch) arch.reset(); else session.reset(); setImportWarn(""); };
+  const clear = () => {
+    if (arch) arch.reset(); else session.reset();
+    // the ink goes with the board (a room wipes its own sketch when it resets)
+    const ink = room ? [] : sketch.strokes().map((s) => s.id);
+    if (ink.length) sketch.remove(ink);
+    setImportWarn("");
+  };
   const exportAll = () => {
     const rec = arch ? arch.snapshot() : session.snapshot();
     const base = `grafito_${rec.id}`;
     download(base + ".json", JSON.stringify(rec, null, 2), "application/json");
     const svg = exportSvg();
     if (svg) download(base + ".svg", svg, "image/svg+xml");
+    // the same board drawn clean, for a document or a slide: <id>.hifi.svg and <id>.hifi.png
+    const c = getCtrl();
+    if (c?.layout && c.board.zones.length) {
+      void saveHifi(base + ".hifi", c.board, c.layout, {
+        date: new Date().toLocaleDateString(lang, { dateStyle: "long" }),
+        labels: { proposed: t("hifi.proposed"), one: t("hifi.endOne"), many: t("hifi.endMany"), pk: t("hifi.pk"), fk: t("hifi.fk"), madeWith: t("hifi.madeWith") },
+      });
+    }
   };
   const importFile = async (f: File | undefined) => {
     if (!f) return;
@@ -147,6 +189,8 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
     if (fileIn.current) fileIn.current.value = "";
   };
 
+  // In a room the other modes are a way out of it, and say so.
+  const leaves = room ? ` · ${t("mode.leavesRoom")}` : "";
   const listening = mic.state === "listening";
   const langLabel = LANGS.find((l) => l.code === lang)?.label ?? lang;
   const warn = importWarn || (arch ? "" : live.warning);
@@ -154,24 +198,34 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
 
   return (
     <div className="live" data-testid="live-panel">
+      {/* the three app modes, by the brand: the selected one shows its name */}
+      <nav className="modes" aria-label={t("mode.label")} data-testid="modes">
+        <button className={"mode" + (active ? " sel" : "")} data-testid="mode-live" aria-pressed={active} aria-label={t("toolbar.liveMode")} title={t("toolbar.liveModeTitle")} onClick={() => onMode("live")}><IconWave /><span>{t("mode.live")}</span></button>
+        <button className={"mode" + (mode === "demo" ? " sel" : "")} data-testid="mode-demo" aria-pressed={mode === "demo"} aria-label={t("toolbar.demoMode")} title={t("toolbar.demoModeTitle") + leaves} onClick={() => onMode("demo")}><IconDoc /><span>{t("mode.demo")}</span></button>
+        <button className={"mode" + (mode === "architect" ? " sel" : "")} data-testid="mode-architect" aria-pressed={mode === "architect"} aria-label={t("toolbar.architectMode")} title={t("toolbar.architectModeTitle") + leaves} onClick={() => onMode("architect")}><IconCompass /><span>{t("mode.architect")}</span></button>
+      </nav>
       <nav className="toolbar" aria-label={t("toolbar.label")}>
-        <button className={"tb" + (micOn ? " on" : "")} data-testid="mic" aria-pressed={micOn} aria-label={micOn ? t("toolbar.mic.stop") : t("toolbar.mic.talk")} title={micOn ? t("toolbar.mic.stopTitle") : t("toolbar.mic.talkTitle")} disabled={!active} onClick={toggleMic}>
-          {micOn ? <IconStop /> : <IconMic />}
-        </button>
-        <button className="tb" data-testid="import" aria-label={t("toolbar.import")} title={t("toolbar.importTitle")} disabled={!active && !arch} onClick={() => fileIn.current?.click()}><IconImport /></button>
+        <button className="tb" data-testid="import" aria-label={t("toolbar.import")} title={t("toolbar.importTitle")} disabled={(!active && !arch) || !!room} onClick={() => fileIn.current?.click()}><IconImport /></button>
         <input ref={fileIn} type="file" accept="application/json,.json" hidden onChange={(e) => void importFile(e.target.files?.[0])} />
-        <hr />
-        <button className={"tb mode" + (active ? " sel" : "")} aria-pressed={active} aria-label={t("toolbar.liveMode")} title={t("toolbar.liveModeTitle")} disabled={modeLocked} onClick={() => onMode("live")}><IconWave /></button>
-        <button className={"tb mode" + (mode === "demo" ? " sel" : "")} aria-pressed={mode === "demo"} aria-label={t("toolbar.demoMode")} title={t("toolbar.demoModeTitle")} disabled={modeLocked} onClick={() => onMode("demo")}><IconDoc /></button>
-        <button className={"tb mode" + (mode === "architect" ? " sel" : "")} aria-pressed={mode === "architect"} aria-label={t("toolbar.architectMode")} title={t("toolbar.architectModeTitle")} disabled={modeLocked} onClick={() => onMode("architect")}><IconCompass /></button>
         <hr />
         <button className="tb" data-testid="undo" aria-label={t("toolbar.undo")} title={t("toolbar.undo")} disabled={!active || !live.canUndo} onClick={() => session.undoLastInstruction()}><IconUndo /></button>
         <button className="tb" data-testid="export" aria-label={t("toolbar.export")} title={t("toolbar.exportTitle")} disabled={arch ? !arch.canExport : !live.entries.length} onClick={exportAll}><IconExport /></button>
         <button className="tb" data-testid="clear" aria-label={t("toolbar.clear")} title={t("toolbar.clearTitle")} disabled={!active && !arch} onClick={clear}><IconTrash /></button>
         <hr />
         <button ref={gearRef} className={"tb" + (optsOpen ? " on" : "")} aria-pressed={optsOpen} aria-expanded={optsOpen} aria-label={t("toolbar.options")} title={t("toolbar.options")} onClick={() => setOptsOpen((v) => !v)}><IconGear /></button>
-        <button className={"tb" + (statsOpen ? " on" : "")} aria-pressed={statsOpen} aria-label={t("toolbar.stats")} title={t("toolbar.statsTitle")} onClick={() => setStatsOpen((v) => !v)}><IconBars /></button>
+        <button className={"tb" + (statsOpen && active ? " on" : "")} disabled={!active} aria-pressed={statsOpen && active} aria-label={t("toolbar.stats")} title={t("toolbar.statsTitle")} onClick={() => setStatsOpen((v) => !v)}><IconBars /></button>
       </nav>
+
+      {(active || arch) && <DrawDock sketch={draw} />}
+
+      {active && (
+        <PresenceBar
+          room={room?.client && room.state ? { client: room.client, state: room.state } : null}
+          canCollaborate={!live.busy}
+          seedOps={() => seedOps(session.snapshot())}
+        />
+      )}
+      {active && room?.state && <Feed state={room.state} />}
 
       <OptionsPopover
         open={optsOpen} anchor={gearRef} onClose={() => setOptsOpen(false)}
@@ -183,13 +237,16 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
 
       {active && (
         <form className="typebar" data-testid="typebar" onSubmit={(e) => { e.preventDefault(); sendTyped(); }}>
+          <button type="button" className={"micbtn" + (micOn ? " on" : "") + (listening && !muted ? " hot" : "")} data-testid="mic" aria-pressed={micOn} aria-label={micOn ? t("toolbar.mic.stop") : t("toolbar.mic.talk")} title={micOn ? t("toolbar.mic.stopTitle") : t("toolbar.mic.talkTitle")} onClick={toggleMic}>
+            {micOn ? <IconStop /> : <IconMic />}
+          </button>
           <input data-testid="type-input" aria-label={t("typebar.label")} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t("typebar.placeholder")} />
           <button className="pbtn primary" type="submit" disabled={!typed.trim()}>{t("typebar.send")}</button>
         </form>
       )}
 
       <div className="toasts">
-        {active && live.unclosed && (
+        {active && !room && live.unclosed && (
           <div className="toast" data-testid="restore-banner">
             {t("restore.banner", { count: live.unclosed.requests.length, cost: totalCost(live.unclosed.requests.map((r) => r.model), live.unclosed.totals.costUsd, t("cost.included")) })}
             <button className="pbtn" onClick={() => live.unclosed && session.restore(live.unclosed)}>{t("restore.restore")}</button>
@@ -201,7 +258,7 @@ export function LivePanel({ getCtrl, exportSvg, onSubtitle, onClear, mode, onMod
         {mic.state === "restarting" && <div className="toast" role="status">{t("mic.reconnecting")}{mic.detail ? ` (${mic.detail})` : ""}</div>}
       </div>
 
-      {statsOpen && mode !== "architect" && <StatsPanel session={live} model={model} summary={summary} warnings={warnings} onClose={() => setStatsOpen(false)} />}
+      {statsOpen && active && <StatsPanel session={live} model={model} summary={summary} warnings={warnings} onClose={() => setStatsOpen(false)} />}
 
       <div className="corner">{listening && <span className="dot" />}{listening ? t(muted ? "mic.muted" : "mic.listening") + " · " : ""}{langLabel}{savedAt ? ` · ${t("corner.saved", { time: hhmm(savedAt) })}` : ""}</div>
     </div>

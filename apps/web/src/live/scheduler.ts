@@ -1,5 +1,6 @@
 // Keeps one request in flight; fragments that arrive meanwhile are batched.
-export type RequestMode = "content" | "instruction";
+/** `sketch`: a hand drawing handed to Claude; like an instruction, it goes alone. */
+export type RequestMode = "content" | "instruction" | "sketch";
 
 export interface TextInput {
   /** Called with each finished fragment of text. */
@@ -19,7 +20,7 @@ export function createScheduler(send: (batch: string, mode: RequestMode) => Prom
 
   async function pump() {
     if (inFlight || stopped || buffer.length === 0) return;
-    // Content fragments are joined; each instruction goes alone.
+    // Content fragments are joined; each instruction and each sketch goes alone.
     const mode = buffer[0].mode;
     let n = 1;
     if (mode === "content") while (n < buffer.length && buffer[n].mode === "content") n++;

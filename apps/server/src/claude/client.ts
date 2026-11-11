@@ -21,6 +21,8 @@ export interface ClaudeParams {
   effort: "low" | "medium";
   system: readonly SystemBlock[];
   userText: string;
+  /** A picture sent before the text: the user's sketch (PNG as base64), for sketch requests. */
+  image?: { mediaType: "image/png"; data: string };
   catalogs: readonly string[];
   opSet: OpSet;
   /**

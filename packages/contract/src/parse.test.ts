@@ -21,7 +21,7 @@ describe("toolDefs: what Claude sees", () => {
   it("21 tools with catalogs off; set_service added before update_summary with AWS on", () => {
     const off = toolDefs([]).map((t) => t.name);
     const on = toolDefs(["aws"]).map((t) => t.name);
-    expect(off).toHaveLength(21);
+    expect(off).toHaveLength(24);
     expect(off).not.toContain("set_service");
     expect(on).toEqual([...off.slice(0, -1), "set_service", "update_summary"]);
   });
@@ -59,8 +59,8 @@ describe("toolDefs: the architect op set", () => {
   it("architect, AWS catalog on", async () => {
     await expect(JSON.stringify(toolDefs(["aws"], "architect"), null, 2) + "\n").toMatchFileSnapshot("./__snapshots__/tools.architect.aws.json");
   });
-  it("keeps the component, connection, label, delete and summary ops, adds say, the group and proposal ops, and drops every zone op", () => {
-    const own = ["say", "add_group", "set_parent", "propose", "accept", "reject"];
+  it("keeps the component, connection, label, delete and summary ops, adds say, the group and proposal ops, the data model ops and the review ops, and drops every zone op", () => {
+    const own = ["say", "add_group", "set_parent", "propose", "accept", "reject", "add_entity", "set_fields", "relate", "assess_pillar", "add_finding", "resolve_finding"];
     expect(toolDefs([], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", ...own, "update_summary"]);
     expect(toolDefs(["aws"], "architect").map((t) => t.name)).toEqual(["add_component", "connect", "update_label", "delete", ...own, "set_service", "update_summary"]);
   });
@@ -89,9 +89,9 @@ describe("toolDefs: the architect op set", () => {
     expect(withProposal).toEqual(["add_component", "connect", "add_group", "accept", "reject"]);
     for (const name of ["accept", "reject"]) expect(toolDefs(["aws"], "architect").find((t) => t.name === name)!.input_schema.required).toEqual(["proposal"]);
   });
-  it("delete says what it may delete: components, groups and connections, never the system zone", () => {
+  it("delete says what it may delete: components, groups, connections, entities and relations, never the system zone or the data zone", () => {
     const del = toolDefs([], "architect").find((t) => t.name === "delete")!.description;
-    expect(del).toMatch(/^Deletes a component, group or connection\. Never the system zone/);
+    expect(del).toMatch(/^Deletes a component, group or connection, or an entity or relation of the data model\. Never the system zone or the data zone/);
   });
   it("a say may point at an element, a group or a proposal", () => {
     const say = toolDefs([], "architect").find((t) => t.name === "say")!;
@@ -101,6 +101,81 @@ describe("toolDefs: the architect op set", () => {
     for (const name of ["say", "add_group", "set_parent", "propose", "accept", "reject"]) expect(toolDefs(["aws"]).map((t) => t.name)).not.toContain(name);
     expect(toolDefs([], "board")).toBe(toolDefs([]));
     expect(toolDefs([], "architect")).toBe(toolDefs([], "architect"));
+  });
+});
+
+describe("parseOp: data model ops", () => {
+  const fields = [{ name: "id", type: "uuid", key: "pk" }, { name: "email" }];
+  it("accepts an entity with or without fields, a field list and a relation", () => {
+    expect(ok("create_zone", { id: "d", kind: "data", title: "Shop", direction: "vertical" })).toBe(true);
+    expect(ok("add_entity", { zone: "d", id: "users", name: "users" })).toBe(true);
+    expect(ok("add_entity", { zone: "d", id: "users", name: "users", fields })).toBe(true);
+    expect(ok("set_fields", { id: "users", fields: [] })).toBe(true);
+    expect(ok("relate", { id: "r", from: "users", to: "orders", cardinality: "one_to_many", label: "places" })).toBe(true);
+  });
+  it("rejects a blank name, an unknown key, too many fields, a missing list, an unknown cardinality and a relation to itself", () => {
+    expect(ok("add_entity", { zone: "d", id: "users", name: " " })).toBe(false);
+    expect(error("add_entity", { zone: "d", id: "users", name: "users", fields: [{ name: "id", key: "primary" }] })).toMatch(/^add_entity: .*\(at \/fields\/0\/key\)$/);
+    expect(ok("add_entity", { zone: "d", id: "users", name: "users", fields: [{ name: "" }] })).toBe(false);
+    expect(ok("add_entity", { zone: "d", id: "users", name: "users", fields: Array.from({ length: 21 }, (_, i) => ({ name: `f${i}` })) })).toBe(false);
+    expect(ok("set_fields", { id: "users" })).toBe(false);
+    expect(ok("relate", { id: "r", from: "users", to: "orders", cardinality: "some" })).toBe(false);
+    expect(ok("relate", { id: "r", from: "users", to: "orders" })).toBe(false);
+    expect(error("relate", { id: "r", from: "users", to: "users", cardinality: "one_to_one" })).toBe("relate: source and target are the same (at /to)");
+  });
+  it("architect mode offers them with the board set's inputs and its own words: one data zone, always ink", () => {
+    const board = new Map(toolDefs(["aws"]).map((t) => [t.name, t]));
+    for (const name of ["add_entity", "set_fields", "relate"] as const) {
+      const t = toolDefs(["aws"], "architect").find((x) => x.name === name)!;
+      expect(t.input_schema).toEqual(board.get(name)!.input_schema);
+      expect(t.input_schema.properties).not.toHaveProperty("proposal");
+    }
+    const arch = (name: string, input: unknown) => parseOp({ name, input }, [], "architect").ok;
+    expect(arch("add_entity", { zone: "data", id: "users", name: "users", fields })).toBe(true);
+    expect(arch("add_entity", { zone: "data", id: "users", name: "users", proposal: "P1" })).toBe(false);
+    expect(arch("relate", { id: "r", from: "users", to: "orders", cardinality: "one_to_many" })).toBe(true);
+    expect(toolDefs([], "architect").find((t) => t.name === "add_entity")!.description).toMatch(/to the data zone.*takes no proposal/);
+  });
+});
+
+describe("parseOp: the review ops (architect mode)", () => {
+  const arch = (name: string, input: unknown) => parseOp({ name, input }, [], "architect");
+  const finding = { id: "F1", pillar: "REL", severity: "high", text: "One database: if it dies, everything stops.", target: "db", best_practice: "REL10-BP01" };
+  it("assess_pillar: one of the six pillars, a status and a note", () => {
+    expect(arch("assess_pillar", { pillar: "SEC", status: "partial", note: "The API has no auth yet." })).toEqual({ ok: true, op: { name: "assess_pillar", input: { pillar: "SEC", status: "partial", note: "The API has no auth yet." } } });
+    for (const pillar of ["OPS", "SEC", "REL", "PERF", "COST", "SUS"]) for (const status of ["covered", "partial", "gap"]) expect(arch("assess_pillar", { pillar, status, note: "n" }).ok).toBe(true);
+    expect(arch("assess_pillar", { pillar: "security", status: "gap", note: "n" }).ok).toBe(false);
+    expect(arch("assess_pillar", { pillar: "SEC", status: "ok", note: "n" }).ok).toBe(false);
+    expect(arch("assess_pillar", { pillar: "SEC", status: "gap", note: " " }).ok).toBe(false);
+    expect(arch("assess_pillar", { pillar: "SEC", status: "gap" }).ok).toBe(false);
+  });
+  it("add_finding: id, pillar, severity and text; the target and the best practice are optional", () => {
+    expect(arch("add_finding", finding)).toEqual({ ok: true, op: { name: "add_finding", input: finding } });
+    expect(arch("add_finding", { id: "F2", pillar: "COST", severity: "low", text: "Idle instances cost money." }).ok).toBe(true);
+    for (const severity of ["high", "medium", "low"]) expect(arch("add_finding", { ...finding, severity }).ok).toBe(true);
+  });
+  it("add_finding rejects an unknown pillar or severity, blank text, a blank target, extra keys and a malformed best-practice id", () => {
+    const bad = (patch: Record<string, unknown>) => { const r = arch("add_finding", { ...finding, ...patch }); return r.ok ? null : r.error; };
+    expect(bad({ pillar: "RELIABILITY" })).toMatch(/^add_finding: .*\(at \/pillar\)$/);
+    expect(bad({ severity: "critical" })).toMatch(/^add_finding: .*\(at \/severity\)$/);
+    expect(bad({ text: "  " })).toBe("add_finding: must not be blank (at /text)");
+    expect(bad({ target: "" })).toMatch(/\(at \/target\)$/);
+    expect(bad({ fix: "add a replica" })).toMatch(/^add_finding: /);
+    for (const id of ["REL10", "rel10-bp01", "REL10-BP1", "REL 10", "(REL10-BP01)"]) expect(bad({ best_practice: id })).toBe("add_finding: not a best-practice id (at /best_practice)");
+    const { text: _drop, ...noText } = finding;
+    expect(arch("add_finding", noText).ok).toBe(false);
+  });
+  it("resolve_finding takes the finding's id and nothing else", () => {
+    expect(arch("resolve_finding", { id: "F1" }).ok).toBe(true);
+    expect(arch("resolve_finding", {}).ok).toBe(false);
+    expect(arch("resolve_finding", { id: "F1", why: "fixed" }).ok).toBe(false);
+  });
+  it("live mode and rooms never see them", () => {
+    for (const name of ["assess_pillar", "add_finding", "resolve_finding"]) {
+      expect(toolDefs(["aws"]).map((t) => t.name)).not.toContain(name);
+      expect(toolDefs(["aws"], "room").map((t) => t.name)).not.toContain(name);
+      expect(error(name, { id: "F1" })).toBe(`${name}: unknown tool "${name}"`);
+    }
   });
 });
 

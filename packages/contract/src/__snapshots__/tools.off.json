@@ -1,7 +1,7 @@
 [
   {
     "name": "create_zone",
-    "description": "Creates a zone (a topic box) on the board. Use it when the speaker starts a new topic. kind: flow = step-by-step process; system = architecture of components; list = list of items; compare = two columns compared; mindmap = branching ideas; scale = a quantity that changes along an axis (bar with thresholds: percentage, capacity, time, level); cycle = something that repeats in a loop; timeline = events or phases over time, before/now; tree = a hierarchy or classification that grows from left to right (categories with subcategories, types with their outcomes, breakdowns). No coordinates are given: the board places the zone. 'place' only to ask for a neighbor.",
+    "description": "Creates a zone (a topic box) on the board. Use it when the speaker starts a new topic. kind: flow = step-by-step process; system = architecture of components; list = list of items; compare = two columns compared; mindmap = branching ideas; scale = a quantity that changes along an axis (bar with thresholds: percentage, capacity, time, level); cycle = something that repeats in a loop; timeline = events or phases over time, before/now; tree = a hierarchy or classification that grows from left to right (categories with subcategories, types with their outcomes, breakdowns); data = a data model: entities (tables) with their fields and the relations between them. No coordinates are given: the board places the zone. 'place' only to ask for a neighbor.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -21,7 +21,8 @@
             "scale",
             "cycle",
             "timeline",
-            "tree"
+            "tree",
+            "data"
           ]
         },
         "title": {
@@ -54,7 +55,7 @@
             "horizontal",
             "vertical"
           ],
-          "description": "Flow and system only: which way the arrows run. horizontal = left to right, elements at the same level stack in a column (a sequence of steps). vertical = top to bottom, elements at the same level sit side by side in a row (layers such as users, frontend, services, data). Omit it when the meaning does not decide: the board picks one from the shape of the graph."
+          "description": "Flow, system and data only: which way the arrows run. horizontal = left to right, elements at the same level stack in a column (a sequence of steps). vertical = top to bottom, elements at the same level sit side by side in a row (layers such as users, frontend, services, data). Omit it when the meaning does not decide: the board picks one from the shape of the graph."
         },
         "place": {
           "type": "object",
@@ -534,6 +535,162 @@
       "required": [
         "zone",
         "at"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "add_entity",
+    "description": "Adds an entity (a table of a data model) to a data zone: a box with its name on top and one row per field. Mark the primary key with key 'pk' and each foreign key with key 'fk'.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "zone": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of a data zone."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the entity or table, e.g. 'orders'."
+        },
+        "fields": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Field name, e.g. 'user_id'."
+              },
+              "type": {
+                "type": "string",
+                "description": "Short type, e.g. 'uuid', 'text', 'int' (optional; only if said)."
+              },
+              "key": {
+                "type": "string",
+                "enum": [
+                  "pk",
+                  "fk"
+                ],
+                "description": "pk = primary key; fk = foreign key to another entity."
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Its fields in order, primary key first. Only the ones said; may be empty."
+        }
+      },
+      "required": [
+        "zone",
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "set_fields",
+    "description": "Replaces the field list of an entity already drawn: to add, rename, retype or remove a field, send the whole list as it should end up.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the entity."
+        },
+        "fields": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Field name, e.g. 'user_id'."
+              },
+              "type": {
+                "type": "string",
+                "description": "Short type, e.g. 'uuid', 'text', 'int' (optional; only if said)."
+              },
+              "key": {
+                "type": "string",
+                "enum": [
+                  "pk",
+                  "fk"
+                ],
+                "description": "pk = primary key; fk = foreign key to another entity."
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "description": "The whole new field list, in order: the fields kept, changed and added. A field left out is removed."
+        }
+      },
+      "required": [
+        "id",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "eager_input_streaming": true
+  },
+  {
+    "name": "relate",
+    "description": "Draws a relation between two entities of a data model, with crow's-foot ends for its cardinality. Use it instead of connect whenever how many of each side is said or follows from a foreign key.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier of the relation."
+        },
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the first entity."
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Id of the second entity."
+        },
+        "cardinality": {
+          "type": "string",
+          "enum": [
+            "one_to_one",
+            "one_to_many",
+            "many_to_one",
+            "many_to_many"
+          ],
+          "description": "Read from 'from' to 'to': one_to_many = one 'from' has many 'to' (a user has many orders: from user, to order); many_to_one the reverse; one_to_one; many_to_many."
+        },
+        "label": {
+          "type": "string",
+          "description": "Short verb over the line, e.g. 'places' (optional)."
+        }
+      },
+      "required": [
+        "id",
+        "from",
+        "to",
+        "cardinality"
       ],
       "additionalProperties": false
     },

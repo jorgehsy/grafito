@@ -3,7 +3,7 @@ import { ARCHITECT_ZONE_ID, applyOps, emptyBoard } from "@grafito/board";
 import type { Board } from "@grafito/board";
 import { ARCHITECT_PROMPT_VERSION, op, parseRecord } from "@grafito/contract";
 import type { ArchitectRecord, Op } from "@grafito/contract";
-import { createArchitectSession, pickProposal, recentTurns, RECORD_KEY } from "./session";
+import { createArchitectSession, drawsOnBoard, pickProposal, recentTurns, RECORD_KEY, SKETCH_TURN_TEXT } from "./session";
 import type { ArchitectSession, ArchitectSessionState, ArchitectSettings } from "./session";
 import { memoryStore, RECORD_KEYS } from "../storage";
 import { t } from "../i18n";
@@ -33,6 +33,8 @@ interface Extra {
   saveStatus?: number;
   /** Each submit applies after this many ms, like the controller awaiting layout. */
   submitMs?: number;
+  /** The sketch on the board: gets the strokes Claude drew something from. */
+  sketch?: { remove(ids: readonly string[]): void };
 }
 
 function harness(respond: (i: number) => string[] = () => [done], settings: Partial<ArchitectSettings> = {}, lag?: Op[][], extra: Extra = {}) {
@@ -59,6 +61,8 @@ function harness(respond: (i: number) => string[] = () => [done], settings: Part
       clear: () => { board = emptyBoard(); } },
     settings: { get: () => ({ model: "claude-sonnet-5-5", catalogs: ["aws"], lang: "es-CL", ...settings }), apply: (s) => applied.push(s) },
     zoneTitle: () => "Architecture",
+    dataTitle: () => "Data",
+    ...(extra.sketch ? { sketch: extra.sketch } : {}),
     storage,
     fetchImpl,
   });
@@ -77,7 +81,7 @@ describe("architect session: start", () => {
     await tick();
     expect(h.board().zones).toEqual([expect.objectContaining({ id: ARCHITECT_ZONE_ID, kind: "system", title: "Architecture" })]);
     expect(h.board().elements).toEqual([]);
-    expect(h.state()).toEqual({ turns: [], busy: false, bubble: null, error: "", clicks: [], unclosed: null, savedAt: null, warning: "" });
+    expect(h.state()).toEqual({ turns: [], busy: false, bubble: null, error: "", clicks: [], review: { pillars: [], findings: [] }, unclosed: null, savedAt: null, warning: "" });
   });
 });
 
@@ -511,5 +515,215 @@ describe("architect session: save and restore", () => {
     await until(() => h.state().warning !== "");
     expect(h.state().warning).toBe(t("save.failed", { error: "HTTP 500" }));
     expect(h.storage.get(RECORD_KEY)).not.toBeNull();
+  });
+});
+
+describe("architect session: the Well-Architected review", () => {
+  const opEv = (name: string, input: unknown) => ev("op", { name, input });
+  const db = opEv("add_component", { zone: ARCHITECT_ZONE_ID, id: "db", label: "DB", type: "database" });
+  const pillar = opEv("assess_pillar", { pillar: "REL", status: "gap", note: "One of everything." });
+  const f1 = opEv("add_finding", { id: "F1", pillar: "REL", severity: "high", text: "One database.", target: "db", best_practice: "REL10-BP01" });
+  const f2 = opEv("add_finding", { id: "F2", pillar: "SEC", severity: "low", text: "No encryption at rest." });
+  const reviewTurn = [pillar, f1, f2, say("One database. (REL10-BP01)", "db"), done];
+
+  it("keeps the review ops beside the board: nothing is drawn, the state carries the review", async () => {
+    const h = harness((i) => (i === 0 ? [db, done] : reviewTurn));
+    await tick();
+    h.session.send("a database");
+    await settled(h, 1);
+    const before = h.board();
+    h.session.send("review it");
+    await settled(h, 2);
+    expect(h.board()).toEqual(before);
+    expect(h.state().review).toEqual({
+      pillars: [{ pillar: "REL", status: "gap", note: "One of everything." }],
+      findings: [
+        { id: "F1", pillar: "REL", severity: "high", text: "One database.", target: "db", bestPractice: "REL10-BP01", open: true },
+        { id: "F2", pillar: "SEC", severity: "low", text: "No encryption at rest.", open: true },
+      ],
+    });
+    expect(h.state().turns[1].ops.map((o) => o.name)).toEqual(["assess_pillar", "add_finding", "add_finding", "say"]);
+    expect(h.state().turns[1].warnings).toEqual([]);
+  });
+
+  it("sends the review so far with the next turn, and nothing while there is none", async () => {
+    const h = harness((i) => (i === 0 ? reviewTurn : [opEv("resolve_finding", { id: "F1" }), opEv("resolve_finding", { id: "F8" }), say("Fixed."), done]));
+    await tick();
+    h.session.send("review it");
+    await settled(h, 1);
+    expect(h.requests[0].body).not.toHaveProperty("review");
+    h.session.send("add a standby");
+    await settled(h, 2);
+    expect(h.requests[1].body.review).toBe(
+      'PILLARS\n- OPS (not assessed)\n- SEC (not assessed)\n- REL gap "One of everything."\n- PERF (not assessed)\n- COST (not assessed)\n- SUS (not assessed)\nFINDINGS\n- F1 [REL high] @db "One database." (REL10-BP01)\n- F2 [SEC low] "No encryption at rest."',
+    );
+    expect(h.state().review.findings.map((f) => [f.id, f.open])).toEqual([["F1", false], ["F2", true]]);
+    expect(h.state().turns[1].warnings).toEqual(["resolve_finding: finding 'F8' does not exist"]);
+  });
+
+  it("is rebuilt from the saved ops on restore, and gone after starting over", async () => {
+    const h = harness((i) => (i === 0 ? [db, ...reviewTurn] : [opEv("resolve_finding", { id: "F2" }), done]));
+    await tick();
+    h.session.send("a database, reviewed");
+    await settled(h, 1);
+    h.session.send("encrypt it");
+    await settled(h, 2);
+    const p = parseRecord(JSON.parse(JSON.stringify(h.session.snapshot())));
+    if (!p.ok || p.record.appMode !== "architect") throw new Error("not an architect record");
+    expect(p.record).not.toHaveProperty("review");
+    const g = harness();
+    await tick();
+    g.session.restore(p.record);
+    await tick();
+    expect(g.state().review).toEqual(h.state().review);
+    expect(g.state().review.findings.map((f) => f.open)).toEqual([true, false]);
+    expect(g.board()).toEqual(h.board());
+    g.session.reset();
+    expect(g.state().review).toEqual({ pillars: [], findings: [] });
+  });
+});
+
+describe("architect session: the data model", () => {
+  const opEv = (name: string, input: unknown) => ev("op", { name, input });
+  const users = opEv("add_entity", { zone: "data", id: "users", name: "users", fields: [{ name: "id", key: "pk" }] });
+  const orders = opEv("add_entity", { zone: "data", id: "orders", name: "orders" });
+  const relate = opEv("relate", { id: "r1", from: "users", to: "orders", cardinality: "one_to_many" });
+
+  it("makes the data zone once, before the first entity, under the system zone, with the app's title", async () => {
+    const h = harness((i) => (i === 0 ? [users, orders, relate, say("Two tables."), done] : [opEv("add_entity", { zone: "data", id: "items", name: "items" }), done]));
+    await tick();
+    expect(h.board().zones.map((z) => z.id)).toEqual(["system"]);
+    h.session.send("show me the tables");
+    await settled(h, 1);
+    h.session.send("and the items");
+    await settled(h, 2);
+    expect(h.board().zones.map((z) => [z.id, z.kind, z.title])).toEqual([["system", "system", "Architecture"], ["data", "data", "Data"]]);
+    expect(h.board().zones[1].place).toEqual({ relation: "below", of: "system" });
+    expect(h.board().elements.map((e) => [e.id, e.type, e.zone])).toEqual([["users", "entity", "data"], ["orders", "entity", "data"], ["items", "entity", "data"]]);
+    expect(h.board().connections).toEqual([expect.objectContaining({ id: "r1", cardinality: "one_to_many" })]);
+    expect(h.state().turns.flatMap((x) => x.warnings)).toEqual([]);
+    expect(h.requests[1].body.board).toContain("- data [data]");
+  });
+
+  it("the zone is not in the record: a restore makes it again, and the next entity does not make a second one", async () => {
+    const h = harness(() => [users, done]);
+    await tick();
+    h.session.send("the users table");
+    await settled(h, 1);
+    const rec = h.session.snapshot();
+    expect(rec.timeline.flatMap((e) => (e.kind === "turn" ? e.ops.map((o) => o.name) : []))).toEqual(["add_entity"]);
+    const g = harness(() => [orders, done]);
+    await tick();
+    g.session.restore(rec);
+    await tick();
+    expect(g.board().zones.map((z) => z.id)).toEqual(["system", "data"]);
+    g.session.send("and orders");
+    await settled(g, 2);
+    expect(g.board().zones.map((z) => z.id)).toEqual(["system", "data"]);
+    expect(g.board().elements.map((e) => e.id)).toEqual(["users", "orders"]);
+    expect(g.state().turns.flatMap((x) => x.warnings)).toEqual([]);
+  });
+
+  it("starting over forgets the data zone", async () => {
+    const h = harness(() => [users, done]);
+    await tick();
+    h.session.send("the users table");
+    await settled(h, 1);
+    h.session.reset();
+    await tick();
+    expect(h.board().zones.map((z) => z.id)).toEqual(["system"]);
+    h.session.send("the users table again");
+    await settled(h, 1);
+    expect(h.board().zones.map((z) => z.id)).toEqual(["system", "data"]);
+  });
+});
+
+describe("architect session: a sketch is a turn", () => {
+  const sketch = { strokeIds: ["s1", "s2"], hints: "STROKES (2)\n- s1: a box\n- s2: a line", image: "iVBORw0KGgo=" };
+  const removals = () => { const removed: string[][] = []; return { removed, sketch: { remove: (ids: readonly string[]) => void removed.push([...ids]) } }; };
+
+  it("posts the strokes in text and the picture with the board; the strokes Claude drew from are removed", async () => {
+    const r = removals();
+    const h = harness(() => [ev("op", bucket), say("A bucket, as you drew it.", "bucket"), done], {}, undefined, { sketch: r.sketch });
+    await tick();
+    await expect(h.session.sendSketch(sketch)).resolves.toBe(true);
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].url).toBe("/api/architect");
+    expect(h.requests[0].body).toMatchObject({ text: "", sketch: { hints: sketch.hints, image: sketch.image }, board: expect.stringContaining("system [system]"), recent: [], actions: [] });
+    expect(h.requests[0].body.sketch).not.toHaveProperty("strokeIds");
+    expect(r.removed).toEqual([["s1", "s2"]]);
+    expect(h.board().elements.map((e) => e.id)).toEqual(["bucket"]);
+    expect(h.state().turns[0]).toMatchObject({ n: 1, text: "", sketch: sketch.hints, done: true });
+    expect(h.state().bubble).toEqual({ text: "A bucket, as you drew it.", target: "bucket" });
+  });
+
+  it("a turn that only talks, sums up or reviews drew nothing: the ink stays", async () => {
+    const r = removals();
+    const talk = [say("That is the API you mean?"), ev("op", { name: "update_summary", input: { text: "s" } }), ev("op", { name: "assess_pillar", input: { pillar: "SEC", status: "gap", note: "n" } }), done];
+    const h = harness(() => talk, {}, undefined, { sketch: r.sketch });
+    await tick();
+    await expect(h.session.sendSketch({ strokeIds: ["s1"], hints: "STROKES (1)\n- s1: a question mark" })).resolves.toBe(false);
+    expect(r.removed).toEqual([]);
+    expect(h.requests[0].body.sketch).toEqual({ hints: "STROKES (1)\n- s1: a question mark" });
+    expect(drawsOnBoard(op.say({ text: "x" }))).toBe(false);
+    expect(drawsOnBoard(op.update_summary({ text: "x" }))).toBe(false);
+    expect(drawsOnBoard(op.resolve_finding({ id: "F1" }))).toBe(false);
+    expect(drawsOnBoard(op.delete({ id: "x" }))).toBe(true);
+    expect(drawsOnBoard(op.accept({ proposal: "P1" }))).toBe(true);
+  });
+
+  it("a failed sketch turn keeps the ink, even with ops that arrived", async () => {
+    const r = removals();
+    const h = harness(() => [ev("op", bucket), ev("error", { message: "boom" })], {}, undefined, { sketch: r.sketch });
+    await tick();
+    await expect(h.session.sendSketch(sketch)).resolves.toBe(false);
+    expect(r.removed).toEqual([]);
+    expect(h.state().error).toBe("boom");
+  });
+
+  it("waits for the turn in flight instead of being dropped", async () => {
+    const r = removals();
+    const h = harness((i) => (i === 0 ? [say("First."), done] : [ev("op", bucket), done]), {}, undefined, { sketch: r.sketch, submitMs: 20 });
+    await tick();
+    h.session.send("a web app");
+    expect(h.state().busy).toBe(true);
+    const drew = h.session.sendSketch(sketch, "  this is where the files go ");
+    expect(h.requests.length).toBeLessThan(2);
+    await expect(drew).resolves.toBe(true);
+    expect(h.requests).toHaveLength(2);
+    expect(h.requests[1].body).toMatchObject({ text: "this is where the files go", sketch: { hints: sketch.hints }, recent: [{ text: "a web app", bubble: "First." }] });
+    expect(h.state().turns.map((x) => x.n)).toEqual([1, 2]);
+  });
+
+  it("stopping cancels it: the ink stays and nothing is removed", async () => {
+    const r = removals();
+    const h = harness(() => [ev("op", bucket), done], {}, undefined, { sketch: r.sketch, submitMs: 30 });
+    await tick(40);
+    const drew = h.session.sendSketch(sketch);
+    await tick();
+    h.session.stop();
+    await expect(drew).resolves.toBe(false);
+    expect(r.removed).toEqual([]);
+  });
+
+  it("is saved with the strokes in text, never the picture, restored as a sketch turn, and shown in recent as a sketch", async () => {
+    const h = harness((i) => (i === 0 ? [ev("op", bucket), say("A bucket."), done] : [say("Ok."), done]));
+    await tick();
+    await h.session.sendSketch(sketch);
+    const rec = h.session.snapshot();
+    expect(rec.timeline[0]).toMatchObject({ kind: "turn", text: "", sketch: sketch.hints });
+    expect(JSON.stringify(rec)).not.toContain(sketch.image);
+    const p = parseRecord(JSON.parse(JSON.stringify(rec)));
+    if (!p.ok || p.record.appMode !== "architect") throw new Error("not an architect record");
+    const g = harness(() => [say("Ok."), done]);
+    await tick();
+    g.session.restore(p.record);
+    await tick();
+    expect(g.state().turns[0]).toMatchObject({ text: "", sketch: sketch.hints });
+    expect(g.board().elements.map((e) => e.id)).toEqual(["bucket"]);
+    g.session.send("next");
+    await settled(g, 2);
+    expect(g.requests[0].body.recent).toEqual([{ text: SKETCH_TURN_TEXT, bubble: "A bucket." }]);
+    expect(g.requests[0].body).not.toHaveProperty("sketch");
   });
 });

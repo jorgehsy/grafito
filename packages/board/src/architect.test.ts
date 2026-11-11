@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { op } from "@grafito/contract";
 import type { Op, RecordTurn, TimelineEntry } from "@grafito/contract";
-import { ARCHITECT_ZONE_ID, applyArchitectOp, architectZoneOp, lastSay, replayArchitect } from "./architect";
+import { ARCHITECT_DATA_ZONE_ID, ARCHITECT_ZONE_ID, applyArchitectOp, architectDataZoneOp, architectZoneOp, lastSay, needsDataZone, replayArchitect } from "./architect";
 import { BoardController } from "./controller";
 import type { Sink } from "./controller";
 import { applyOps, emptyBoard, openProposals } from "./model";
@@ -29,7 +29,7 @@ describe("applyArchitectOp", () => {
   it("refuses deleting the system zone: every later add would fail", () => {
     const r = applyArchitectOp(start, op.delete({ id: Z }));
     expect(r.board).toBe(start);
-    expect(r.warnings).toEqual(["delete: 'system' is the system zone; delete deletes components, groups and connections"]);
+    expect(r.warnings).toEqual(["delete: 'system' is the system zone; delete deletes components, groups, connections, entities and relations"]);
     expect(applyArchitectOp(r.board, comp("db")).board.elements.map((e) => e.id)).toEqual(["api", "db"]);
   });
 
@@ -123,5 +123,61 @@ describe("replayArchitect", () => {
     const r = replayArchitect([turn(1, [op.add_component({ zone: Z, id: "fn", label: "Fn", type: "service", service: "lambda" })])], "A");
     expect(r.turns[0].warnings).toEqual([]);
     expect(r.board.elements[0].service).toBe("aws:lambda");
+  });
+});
+
+describe("architect board: the data zone", () => {
+  const users = op.add_entity({ zone: ARCHITECT_DATA_ZONE_ID, id: "users", name: "users", fields: [{ name: "id", key: "pk" }] });
+  const orders = op.add_entity({ zone: ARCHITECT_DATA_ZONE_ID, id: "orders", name: "orders" });
+
+  it("is a data zone under the system zone, which entities and relations go into", () => {
+    const r = applyOps(emptyBoard(), [architectZoneOp("A"), architectDataZoneOp("Data model"), users, orders, op.relate({ id: "r1", from: "users", to: "orders", cardinality: "one_to_many" })]);
+    expect(r.warnings).toEqual([]);
+    expect(r.board.zones[1]).toMatchObject({ id: "data", kind: "data", title: "Data model", place: { relation: "below", of: "system" } });
+    expect(r.board.elements.map((e) => [e.id, e.zone, e.type])).toEqual([["users", "data", "entity"], ["orders", "data", "entity"]]);
+    expect(r.board.connections).toEqual([expect.objectContaining({ id: "r1", cardinality: "one_to_many" })]);
+  });
+
+  it("only an entity for the data zone needs it", () => {
+    expect(needsDataZone(users)).toBe(true);
+    expect(needsDataZone(op.add_entity({ zone: "elsewhere", id: "x", name: "x" }))).toBe(false);
+    expect(needsDataZone(comp("api"))).toBe(false);
+    expect(needsDataZone(op.set_fields({ id: "users", fields: [] }))).toBe(false);
+  });
+
+  it("delete never takes the data zone either; an entity goes like any element", () => {
+    const start = applyOps(emptyBoard(), [architectZoneOp("A"), architectDataZoneOp("D"), users]).board;
+    const r = applyArchitectOp(start, op.delete({ id: ARCHITECT_DATA_ZONE_ID }));
+    expect(r.board).toBe(start);
+    expect(r.warnings).toEqual(["delete: 'data' is the data zone; delete deletes components, groups, connections, entities and relations"]);
+    expect(applyArchitectOp(start, op.delete({ id: "users" })).board.elements).toEqual([]);
+  });
+
+  it("the replay makes the data zone once, before the first entity, with the title it is given", () => {
+    const r = replayArchitect([turn(1, [comp("api"), users]), turn(2, [orders])], "Arquitectura", "Modelo de datos");
+    expect(r.warnings).toEqual([]);
+    expect(r.boardOps.map((o) => o.name)).toEqual(["create_zone", "add_component", "create_zone", "add_entity", "add_entity"]);
+    expect(r.board.zones.map((z) => [z.id, z.title])).toEqual([["system", "Arquitectura"], ["data", "Modelo de datos"]]);
+    expect(replayArchitect([turn(1, [users])], "A").board.zones[1].title).toBe("Data model");
+    expect(replayArchitect([turn(1, [comp("api")])], "A").board.zones).toHaveLength(1);
+  });
+});
+
+describe("replayArchitect: the review", () => {
+  const finding = op.add_finding({ id: "F1", pillar: "REL", severity: "high", text: "One database.", target: "db" });
+  it("review ops build the review and never reach the board", () => {
+    const r = replayArchitect([
+      turn(1, [comp("db"), op.assess_pillar({ pillar: "REL", status: "gap", note: "One of everything." }), finding, op.say({ text: "One database. (REL10-BP01)", target: "db" })]),
+      turn(2, [comp("standby"), op.resolve_finding({ id: "F1" }), op.resolve_finding({ id: "F9" })]),
+    ], "A");
+    expect(r.boardOps.map((o) => o.name)).toEqual(["create_zone", "add_component", "add_component"]);
+    expect(r.warnings).toEqual([]);
+    expect(r.review.pillars).toEqual([{ pillar: "REL", status: "gap", note: "One of everything." }]);
+    expect(r.review.findings).toEqual([{ id: "F1", pillar: "REL", severity: "high", text: "One database.", target: "db", open: false }]);
+    expect(r.turns[0].ops.map((o) => o.name)).toEqual(["add_component", "assess_pillar", "add_finding", "say"]);
+    expect(r.turns[1].warnings).toEqual(["resolve_finding: finding 'F9' does not exist"]);
+  });
+  it("a record saved before the review existed replays with an empty review", () => {
+    expect(replayArchitect([turn(1, [comp("api")])], "A").review).toEqual({ pillars: [], findings: [] });
   });
 });

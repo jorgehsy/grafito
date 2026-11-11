@@ -4,14 +4,14 @@
 import { z } from "zod";
 
 /** Bump when the system prompt or the tools Claude sees change; each request records it. */
-export const PROMPT_VERSION = 3;
+export const PROMPT_VERSION = 4;
 
 /**
  * Architect mode's own counter, stamped in each architect turn's `promptVersion` (the record's `appMode` says
  * which counter a number belongs to). Bump it on every change to the architect prompt, the Well-Architected
  * digest or the architect tools; apps/server/src/prompt/architect.test.ts pins their hash to this value.
  */
-export const ARCHITECT_PROMPT_VERSION = 5;
+export const ARCHITECT_PROMPT_VERSION = 6;
 
 export const RECORD_VERSION = 3;
 
@@ -28,7 +28,8 @@ const requestSchema = z.object({
   promptVersion: z.number(),
   /** The batch sent, untruncated. */
   batch: z.string(),
-  mode: z.enum(["content", "instruction"]),
+  /** `sketch`: the user drew by hand and Claude turned it into board elements; the batch is the sketch described in text. */
+  mode: z.enum(["content", "instruction", "sketch"]),
   undone: z.boolean().optional(),
   startedAt: z.number(),
   firstOpMs: ms,
@@ -78,6 +79,8 @@ const turnSchema = z.object({
   costUsd: z.number(),
   /** A turn that broke halfway keeps the ops that arrived. */
   error: z.string().optional(),
+  /** A sketch turn: the user's ink described in text (`describeSketch`); the picture is not kept. `text` may then be empty. */
+  sketch: z.string().optional(),
 });
 
 /** One click on a proposal. Choosing an alternative is an accept. */

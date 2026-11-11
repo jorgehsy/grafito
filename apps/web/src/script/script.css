@@ -1,0 +1,93 @@
+/*
+ * Demo mode's player. Two fixed pieces:
+ *   .sp-bar    the transport, in the console's slot at the bottom (where live mode has the text box)
+ *   .sp-start  the start card, centred in the free rectangle of paper while nothing plays
+ * The bar is an instrument (.inst, graphite); the picker, the notice and the card are slips (white paper).
+ */
+.sp-bar { position: fixed; bottom: 20px; left: var(--mid); translate: -50% 0; width: var(--console-w); height: 52px; padding: 6px 8px; display: flex; align-items: center; gap: 8px; border-radius: var(--r-pill); z-index: 6; animation: in-up var(--t3) var(--e-out) .24s both; transition: box-shadow var(--t2); }
+/* the bar takes the text box's slot, so the captions go back above it (board.css drops them to the edge when there is no text box) */
+.v2:has(.sp-bar) { --free-b: 156px; }
+.v2:has(.sp-bar):has(.subtitles.empty), .v2:has(.sp-bar):has(.subtitles[hidden]) { --free-b: 88px; }
+.v2:has(.sp-bar) .subtitles { bottom: 80px; }
+.sp-bar.dropping { box-shadow: 0 0 0 2px var(--lapiz), var(--lift); }
+.sp-buttons { display: flex; align-items: center; gap: 2px; flex: none; }
+.sp-bar .tb.sm { border-radius: var(--r-pill); }
+
+/* which demo: opens the list */
+.sp-source { flex: 0 1 190px; min-width: 44px; height: 40px; padding: 0 10px 0 12px; display: flex; align-items: center; gap: 8px; border: 0; border-radius: var(--r-pill); background: var(--s-hover); color: var(--s-ink); font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background var(--t1); }
+.sp-source:hover { background: rgba(255,255,255,.16); }
+.sp-source svg { flex: none; }
+.sp-source span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+
+/* the timeline: readout on top, chapters below */
+.sp-time { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 0 4px; }
+.sp-readout { display: flex; align-items: baseline; gap: 10px; font-size: 11.5px; line-height: 16px; color: var(--s-dim); font-variant-numeric: tabular-nums; }
+.sp-readout time:first-child { color: var(--s-ink); }
+.sp-chapter { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.sp-chapter b { color: var(--s-ink); font-weight: 600; margin-right: 4px; }
+.sp-track { position: relative; height: 18px; display: flex; align-items: center; cursor: pointer; touch-action: none; border-radius: 6px; outline-offset: 3px; }
+.sp-segs { flex: 1; height: 5px; display: flex; transition: height var(--t1) var(--e-out); }
+.sp-track:hover .sp-segs, .sp-track.drag .sp-segs, .sp-track:focus-visible .sp-segs { height: 8px; }
+/* one segment per chapter; the gap is a border, so position stays linear with time */
+.sp-seg { flex: 1 1 0; min-width: 0; height: 100%; border-right: 2px solid var(--s-bg); background: rgba(255,255,255,.2); background-clip: padding-box; overflow: hidden; }
+.sp-seg:first-child { border-radius: 4px 0 0 4px; }
+.sp-seg:last-child { border-right: 0; border-radius: 0 4px 4px 0; }
+.sp-seg.hover { background-color: rgba(255,255,255,.34); }
+.sp-seg i { display: block; height: 100%; background: var(--s-ink); }
+.sp-seg.now i { background: var(--lapiz); }
+.sp-thumb { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--lapiz); box-shadow: 0 0 0 2px var(--s-bg); scale: 0; transition: scale var(--t1) var(--e-out); pointer-events: none; }
+.sp-track:hover .sp-thumb, .sp-track.drag .sp-thumb, .sp-track:focus-visible .sp-thumb { scale: 1; }
+.sp-tip { position: absolute; bottom: 24px; translate: -50% 0; max-width: 260px; padding: 5px 9px; display: flex; flex-direction: column; align-items: center; gap: 1px; border-radius: var(--r-chip); background: #fff; color: var(--grafito); border: 1px solid var(--hueso); box-shadow: var(--sombra); font-size: 12px; line-height: 1.3; white-space: nowrap; pointer-events: none; z-index: 2; }
+.sp-tip b { max-width: 240px; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.sp-tip time { color: var(--humo); font-variant-numeric: tabular-nums; }
+
+.sp-speed { min-width: 44px; height: 36px; padding: 0 8px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--s-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background var(--t1); }
+.sp-speed:hover { background: var(--s-hover); }
+
+/* the demo list, above the bar */
+.sp-picker { position: absolute; left: 0; bottom: calc(100% + 10px); width: min(400px, calc(100vw - 32px)); max-height: min(60vh, 520px); padding: 6px; display: flex; flex-direction: column; overflow-y: auto; transform-origin: 20% 100%; animation: pop var(--t2) var(--e-out) both; z-index: 3; }
+.sp-picker ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.sp-item { width: 100%; padding: 9px 11px; display: grid; grid-template-columns: 1fr auto; gap: 1px 12px; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--s-ink); text-align: left; cursor: pointer; transition: background var(--t1); }
+.sp-item:hover { background: var(--s-hover); }
+.sp-item.sel { background: var(--s-acc-bg); }
+.sp-item-name { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.sp-item-name em { font-style: normal; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: var(--r-pill); border: 1px solid var(--s-line); color: var(--s-dim); }
+.sp-item-desc { grid-column: 1; font-size: 12.5px; line-height: 1.35; color: var(--s-dim); }
+.sp-item-meta { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 11.5px; color: var(--s-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sp-open { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--s-line); border-radius: 0 0 var(--r-ctl) var(--r-ctl); display: flex; align-items: center; gap: 12px; }
+.sp-open > svg { flex: none; color: var(--s-dim); }
+.sp-open > span { display: flex; flex-direction: column; gap: 1px; }
+
+/* a problem opening a session, or a note about the one playing */
+.sp-notice { position: absolute; left: 50%; bottom: calc(100% + 10px); translate: -50% 0; max-width: 100%; padding: 6px 6px 6px 14px; display: flex; align-items: center; gap: 8px; font-size: 13px; animation: in-up var(--t2) var(--e-out) both; z-index: 2; }
+.sp-drop { position: absolute; inset: 0; display: grid; place-items: center; border-radius: inherit; background: var(--s-bg); color: var(--lapiz); font-size: 14px; font-weight: 600; pointer-events: none; z-index: 4; }
+
+/* the start card: what will play, and a play button that is hard to miss */
+.sp-start { position: fixed; left: var(--free-l); right: var(--free-r); top: var(--free-t); bottom: var(--free-b); display: grid; place-items: center; padding: 16px; pointer-events: none; z-index: 3; }
+.sp-card { pointer-events: auto; width: min(440px, 100%); padding: 26px 28px 22px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: rgba(255,255,255,.82); border: 1.5px dashed var(--goma); border-radius: 22px 26px 20px 28px / 26px 20px 28px 22px; animation: in-up var(--t3) var(--e-out) both; transition: border-color var(--t1), background var(--t1); }
+.sp-card.dropping { border-color: var(--pizarra); background: var(--pizarra-claro); }
+.sp-kicker { display: none; }
+.sp-card h2 { margin: 0; font-family: var(--mano, 'Kalam', cursive); font-weight: 700; font-size: 30px; line-height: 1.15; color: var(--grafito); transform: rotate(-1deg); }
+.sp-card p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--humo); }
+.sp-bigplay { margin: 12px 0 8px; height: 56px; padding: 0 28px 0 22px; display: flex; align-items: center; gap: 10px; border: 0; border-radius: var(--r-pill); background: var(--grafito); color: var(--papel); font-size: 17px; font-weight: 600; cursor: pointer; box-shadow: var(--sombra); transition: transform var(--t1) var(--e-out), filter var(--t1); animation: sp-breathe 2.6s ease-in-out 1.2s infinite; }
+.sp-bigplay:hover { transform: scale(1.04); filter: brightness(1.15); }
+.sp-bigplay:active { transform: scale(.97); }
+.sp-bigplay svg { fill: currentColor; }
+.sp-card .sp-hint { font-size: 13px; }
+.sp-card .sp-keys { font-size: 12.5px; }
+.sp-keys kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 1px; border: 1px solid var(--hueso); border-bottom-width: 2px; border-radius: 6px; background: #fff; color: var(--grafito); font-family: inherit; font-size: 11.5px; }
+.sp-more { margin-top: 10px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+@keyframes sp-breathe { 0%, 100% { box-shadow: var(--sombra), 0 0 0 0 rgba(42,42,46,.28); } 50% { box-shadow: var(--sombra), 0 0 0 10px rgba(42,42,46,0); } }
+
+@media (max-width: 760px) {
+  .sp-source span, .sp-source svg:last-child { display: none; }
+  .sp-source { flex: none; padding: 0 12px; }
+  .sp-chapter { text-align: left; }
+  .sp-bar [data-testid="script-restart"] { display: none; }
+  .sp-card h2 { font-size: 25px; }
+  .sp-card .sp-keys { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-bigplay { animation: none; }
+  .sp-segs, .sp-thumb { transition: none; }
+}

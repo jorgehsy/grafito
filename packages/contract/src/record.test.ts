@@ -39,6 +39,13 @@ describe("parseRecord", () => {
     expect(p.record.timeline.map((e) => e.kind)).toEqual(["turn", "click", "turn"]);
     expect(p.record.timeline[2]).toMatchObject({ kind: "turn", error: "HTTP 500" });
   });
+  it("an architect turn may carry its sketch in text; a record without one (saved before sketch turns) still parses", () => {
+    const p = parseRecord(architect({ timeline: [turn(1, { text: "", sketch: "STROKES (1)\n- s1 box" }), turn(2)] }));
+    if (!p.ok || p.record.appMode !== "architect") throw new Error("not an architect record");
+    expect(p.record.timeline[0]).toMatchObject({ kind: "turn", text: "", sketch: "STROKES (1)\n- s1 box" });
+    expect(p.record.timeline[1]).not.toHaveProperty("sketch");
+    expect(parseRecord(architect({ timeline: [turn(1, { sketch: 5 })] })).ok).toBe(false);
+  });
   it("rejects version 1 with the outdated message", () => {
     expect(parseRecord({ version: 1, id: "abc", requests: [], transcript: [] })).toEqual({ ok: false, error: OUTDATED_RECORD, outdated: true });
   });

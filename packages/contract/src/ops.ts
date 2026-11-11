@@ -4,7 +4,7 @@
 // No operation carries coordinates.
 import { z } from "zod";
 
-export const ZONE_KINDS = ["flow", "system", "list", "compare", "mindmap", "scale", "cycle", "timeline", "tree"] as const;
+export const ZONE_KINDS = ["flow", "system", "list", "compare", "mindmap", "scale", "cycle", "timeline", "tree", "data"] as const;
 const MARK_TONES = ["neutral", "warn", "danger", "ok"] as const;
 const TEXT_FIELDS = ["label", "note", "text", "when"] as const;
 const COMP_TYPES = ["actor", "client", "service", "database", "queue", "storage", "external"] as const;
@@ -12,6 +12,26 @@ const EMPHASIS_STYLES = ["circle", "underline", "star"] as const;
 /** AWS group kinds (architect mode): the boxes AWS diagrams nest, outermost first, plus a generic one. */
 export const GROUP_KINDS = ["aws_cloud", "region", "vpc", "availability_zone", "public_subnet", "private_subnet", "generic"] as const;
 
+/** Data zones: what a field is a key of, and how many of each entity a relation joins. */
+const FIELD_KEYS = ["pk", "fk"] as const;
+export const CARDINALITIES = ["one_to_one", "one_to_many", "many_to_one", "many_to_many"] as const;
+/** At most this many fields per entity: a table on a board is a sketch, not a schema dump. */
+export const MAX_FIELDS = 20;
+
+/** The six Well-Architected pillars, in framework order (the ids `packages/wellarchitected` uses). */
+export const WA_PILLARS = ["OPS", "SEC", "REL", "PERF", "COST", "SUS"] as const;
+/** How well the design handles a pillar, as the architect's review reports it. */
+export const PILLAR_STATUSES = ["covered", "partial", "gap"] as const;
+/** How bad a review finding is, worst first. */
+export const SEVERITIES = ["high", "medium", "low"] as const;
+/** The shape of a best-practice id, e.g. `REL10-BP01`. Whether it exists is the server's check: it has the digest. */
+export const BEST_PRACTICE_ID = /^[A-Z]{2,5}\d{2}-BP\d{2}$/;
+
+export type WaPillar = (typeof WA_PILLARS)[number];
+export type PillarStatus = (typeof PILLAR_STATUSES)[number];
+export type Severity = (typeof SEVERITIES)[number];
+export type FieldKey = (typeof FIELD_KEYS)[number];
+export type Cardinality = (typeof CARDINALITIES)[number];
 export type ZoneKind = (typeof ZONE_KINDS)[number];
 export type MarkTone = (typeof MARK_TONES)[number];
 export type TextField = (typeof TEXT_FIELDS)[number];
@@ -36,6 +56,16 @@ const CONNECT_SHAPE = {
   style: z.enum(["solid", "dashed"]).describe("dashed = optional, asynchronous or weak relation.").optional(),
   both_ways: z.boolean().describe("Arrow with a head at both ends.").optional(),
 };
+const FIELDS = () =>
+  z
+    .array(
+      z.strictObject({
+        name: text("Field name, e.g. 'user_id'."),
+        type: str("Short type, e.g. 'uuid', 'text', 'int' (optional; only if said).").optional(),
+        key: z.enum(FIELD_KEYS).describe("pk = primary key; fk = foreign key to another entity.").optional(),
+      }),
+    )
+    .max(MAX_FIELDS);
 const twoEnds = (i: { from: string; to: string }) => i.from !== i.to;
 const SAME_ENDS = { message: "source and target are the same", path: ["to"] };
 
@@ -53,7 +83,7 @@ const INPUTS = {
     direction: z
       .enum(["horizontal", "vertical"])
       .describe(
-        "Flow and system only: which way the arrows run. horizontal = left to right, elements at the same level stack in a column (a sequence of steps). vertical = top to bottom, elements at the same level sit side by side in a row (layers such as users, frontend, services, data). Omit it when the meaning does not decide: the board picks one from the shape of the graph.",
+        "Flow, system and data only: which way the arrows run. horizontal = left to right, elements at the same level stack in a column (a sequence of steps). vertical = top to bottom, elements at the same level sit side by side in a row (layers such as users, frontend, services, data). Omit it when the meaning does not decide: the board picks one from the shape of the graph.",
       )
       .optional(),
     place: z
@@ -141,6 +171,27 @@ const INPUTS = {
     at: pos("How far the fill reaches, from 0 to 100."),
     label: str("Short text over the fill (optional), e.g. 'filling up'.").optional(),
   }),
+  add_entity: z.strictObject({
+    zone: id("Id of a data zone."),
+    id: id("Unique identifier."),
+    name: text("Name of the entity or table, e.g. 'orders'."),
+    fields: FIELDS().describe("Its fields in order, primary key first. Only the ones said; may be empty.").optional(),
+  }),
+  set_fields: z.strictObject({
+    id: id("Id of the entity."),
+    fields: FIELDS().describe("The whole new field list, in order: the fields kept, changed and added. A field left out is removed."),
+  }),
+  relate: z
+    .strictObject({
+      id: id("Unique identifier of the relation."),
+      from: id("Id of the first entity."),
+      to: id("Id of the second entity."),
+      cardinality: z
+        .enum(CARDINALITIES)
+        .describe("Read from 'from' to 'to': one_to_many = one 'from' has many 'to' (a user has many orders: from user, to order); many_to_one the reverse; one_to_one; many_to_many."),
+      label: str("Short verb over the line, e.g. 'places' (optional).").optional(),
+    })
+    .refine(twoEnds, SAME_ENDS),
   connect: z.strictObject(CONNECT_SHAPE).refine(twoEnds, SAME_ENDS),
   emphasize: z.strictObject({ target: id("Id of the element or zone."), style: z.enum(EMPHASIS_STYLES) }),
   mark_question: z.strictObject({ target: id("Id of the element or zone."), text: str("The doubt in a few words (optional).").optional() }),
@@ -159,7 +210,7 @@ const INPUTS = {
 /** Tool descriptions (prompt text). Key order = tool order. */
 const DESCRIPTIONS: Record<keyof typeof INPUTS, string> = {
   create_zone:
-    "Creates a zone (a topic box) on the board. Use it when the speaker starts a new topic. kind: flow = step-by-step process; system = architecture of components; list = list of items; compare = two columns compared; mindmap = branching ideas; scale = a quantity that changes along an axis (bar with thresholds: percentage, capacity, time, level); cycle = something that repeats in a loop; timeline = events or phases over time, before/now; tree = a hierarchy or classification that grows from left to right (categories with subcategories, types with their outcomes, breakdowns). No coordinates are given: the board places the zone. 'place' only to ask for a neighbor.",
+    "Creates a zone (a topic box) on the board. Use it when the speaker starts a new topic. kind: flow = step-by-step process; system = architecture of components; list = list of items; compare = two columns compared; mindmap = branching ideas; scale = a quantity that changes along an axis (bar with thresholds: percentage, capacity, time, level); cycle = something that repeats in a loop; timeline = events or phases over time, before/now; tree = a hierarchy or classification that grows from left to right (categories with subcategories, types with their outcomes, breakdowns); data = a data model: entities (tables) with their fields and the relations between them. No coordinates are given: the board places the zone. 'place' only to ask for a neighbor.",
   add_step: "Adds a step (rectangle) to a flow zone. 'after' connects it to the previous step automatically.",
   add_decision: "Adds a decision (diamond) to a flow zone. The branches are connected afterwards with connect and a label ('yes', 'no').",
   add_component:
@@ -177,6 +228,12 @@ const DESCRIPTIONS: Record<keyof typeof INPUTS, string> = {
   add_span:
     "Adds to a timeline zone a span (brace under the axis) covering a duration, e.g. '2 to 3 months'. 'from' and 'to' are axis positions from 0 to 100, with from < to.",
   set_level: "Fills the bar of a scale zone up to 'at' (0 to 100): the current level, e.g. 'filling up'. Calling it again moves the level.",
+  add_entity:
+    "Adds an entity (a table of a data model) to a data zone: a box with its name on top and one row per field. Mark the primary key with key 'pk' and each foreign key with key 'fk'.",
+  set_fields:
+    "Replaces the field list of an entity already drawn: to add, rename, retype or remove a field, send the whole list as it should end up.",
+  relate:
+    "Draws a relation between two entities of a data model, with crow's-foot ends for its cardinality. Use it instead of connect whenever how many of each side is said or follows from a foreign key.",
   connect:
     "Draws an arrow between two elements, inside one zone or across zones (e.g. from a step of a flow to a component of an architecture).",
   emphasize: "Highlights an element or zone by hand: circle, underline or star. For what the speaker marks as important.",
@@ -192,11 +249,17 @@ const DESCRIPTIONS: Record<keyof typeof INPUTS, string> = {
 
 // Architect mode offers its own op set: some board ops, then ops of its own that the board set never shows.
 
-/** Which tools Claude is offered: `board` in live mode, `architect` in architect mode. */
-export type OpSet = "board" | "architect";
+/** Which tools Claude is offered: `board` in live mode, `architect` in architect mode, `room` in a shared room. */
+export type OpSet = "board" | "architect" | "room";
 
-/** Board ops architect mode keeps, in tool order. No zone ops: the app makes the one system zone. */
+/** A room is live mode with several people: Claude gets the board ops plus `say`, to answer them. */
+const ROOM_SAY_DESCRIPTION =
+  "Speaks to the people in the room in a short speech bubble. Only when someone asks you something directly, or when two people contradict each other and you need to know which one to draw; at most one per response. Never narrate what you drew.";
+
+/** Board ops architect mode keeps, in tool order. No zone ops: the app makes the system zone and the data zone. */
 const ARCHITECT_KEPT = ["add_component", "connect", "update_label", "delete"] as const;
+/** The data model ops, kept as live mode has them; they go after the architect's own ops. */
+const ARCHITECT_DATA = ["add_entity", "set_fields", "relate"] as const;
 
 /** The field that puts a drawing op under a proposal (architect mode): without it, what is drawn is ink. */
 const proposalField = () =>
@@ -207,8 +270,18 @@ const ARCHITECT_KEPT_DESCRIPTIONS: Partial<Record<(typeof ARCHITECT_KEPT)[number
   add_component:
     "Adds a component to the system zone. type: actor = person (stick figure); client = browser or phone; service = service box; database = cylinder; queue = queue or pipe; storage = bucket or folder; external = dotted cloud of a third party. 'parent' puts it inside a group.",
   connect: "Draws an arrow between two components. Arrows join components only, never a group.",
-  update_label: "Changes the text of a component, group or connection.",
-  delete: "Deletes a component, group or connection. Never the system zone: it stays for the whole session. Deleting a component removes its arrows; deleting a group keeps what was inside it, moved up to the group's own parent.",
+  update_label: "Changes the text of a component, group or connection, the name of an entity or the label of a relation.",
+  delete: "Deletes a component, group or connection, or an entity or relation of the data model. Never the system zone or the data zone: they stay for the whole session. Deleting a component removes its arrows; deleting a group keeps what was inside it, moved up to the group's own parent.",
+};
+
+/** What the data model ops say in architect mode, where the app makes the one data zone. */
+const ARCHITECT_DATA_DESCRIPTIONS: Record<(typeof ARCHITECT_DATA)[number], string> = {
+  add_entity:
+    "Adds an entity (a table of the data model) to the data zone: a box with its name on top and one row per field. Mark the primary key with key 'pk' and each foreign key with key 'fk'. Always ink: an entity takes no proposal.",
+  set_fields:
+    "Replaces the field list of an entity already drawn: to add, rename, retype or remove a field, send the whole list as it should end up.",
+  relate:
+    "Draws a relation between two entities of the data model, with crow's-foot ends for its cardinality. Entities only: components are joined with connect.",
 };
 
 /** Input schema per architect-only op, in the order Claude sees the tools. */
@@ -240,6 +313,43 @@ const ARCHITECT_INPUTS = {
   reject: z.strictObject({ proposal: id("Id of the open proposal the user turns down.") }),
 };
 
+const pillar = () =>
+  z.enum(WA_PILLARS).describe("Well-Architected pillar: OPS = operational excellence; SEC = security; REL = reliability; PERF = performance efficiency; COST = cost optimization; SUS = sustainability.");
+
+/** Input schema per review op (architect mode): what the review panel shows. They draw nothing on the board. */
+const REVIEW_INPUTS = {
+  assess_pillar: z.strictObject({
+    pillar: pillar(),
+    status: z
+      .enum(PILLAR_STATUSES)
+      .describe("covered = the design handles what matters for this pillar at this level of detail; partial = some of it; gap = it is missing."),
+    note: text("Why, in one short plain sentence."),
+  }),
+  add_finding: z.strictObject({
+    id: id("Identifier of the finding, e.g. 'F1'. An id already listed replaces that finding."),
+    pillar: pillar(),
+    severity: z
+      .enum(SEVERITIES)
+      .describe("high = data loss, a breach or an outage is likely; medium = it will hurt under load or when something fails; low = an improvement."),
+    text: text("The risk in one plain sentence: what happens, and to what. Not a best-practice title."),
+    target: id("Id of the component, group, connection or entity the finding is about (optional; leave it out only for a gap of the whole design).").optional(),
+    best_practice: z
+      .string()
+      .regex(BEST_PRACTICE_ID, "not a best-practice id")
+      .describe("Id of the Well-Architected best practice it comes from, e.g. 'REL10-BP01'. Only real ids from the digest.")
+      .optional(),
+  }),
+  resolve_finding: z.strictObject({ id: id("Id of the finding the design no longer has.") }),
+};
+
+const REVIEW_DESCRIPTIONS: Record<keyof typeof REVIEW_INPUTS, string> = {
+  assess_pillar:
+    "Reports how the design stands on one Well-Architected pillar, for the review panel. One call per pillar in a pillar review; call it again when a pillar's status changes.",
+  add_finding:
+    "Reports one risk of the design in the review panel, tied to the item on the board it is about. Only in a pillar review, or once one exists. It draws nothing.",
+  resolve_finding: "Closes a finding once a change to the design settles it.",
+};
+
 const ARCHITECT_DESCRIPTIONS: Record<keyof typeof ARCHITECT_INPUTS, string> = {
   say: "Speaks to the user in a speech bubble over the board. Exactly one per turn, even when nothing is drawn; if you send more than one, only the last is shown.",
   add_group:
@@ -267,6 +377,11 @@ type InputSchema = { name: OpName; description: string; schema: z.ZodType };
 export function inputSchemas(serviceIds: readonly string[], set: OpSet = "board"): InputSchema[] {
   const board = boardSchemas(serviceIds);
   if (set === "board") return board;
+  if (set === "room") {
+    const say = { name: "say" as OpName, description: ROOM_SAY_DESCRIPTION, schema: ARCHITECT_INPUTS.say as z.ZodType };
+    // update_summary stays last
+    return [...board.slice(0, -1), say, board[board.length - 1]];
+  }
   const named = (name: OpName) => board.filter((t) => t.name === name);
   const kept = ARCHITECT_KEPT.flatMap(named).map((t) => {
     const description = ARCHITECT_KEPT_DESCRIPTIONS[t.name as (typeof ARCHITECT_KEPT)[number]] ?? t.description;
@@ -281,7 +396,13 @@ export function inputSchemas(serviceIds: readonly string[], set: OpSet = "board"
     description: ARCHITECT_DESCRIPTIONS[name],
     schema: name === "add_group" ? ARCHITECT_INPUTS.add_group.extend({ proposal: proposalField() }) : (ARCHITECT_INPUTS[name] as z.ZodType),
   }));
-  return [...kept, ...own, ...named("set_service"), ...named("update_summary")];
+  const data = ARCHITECT_DATA.flatMap(named).map((t) => ({ ...t, description: ARCHITECT_DATA_DESCRIPTIONS[t.name as (typeof ARCHITECT_DATA)[number]] }));
+  const review = (Object.keys(REVIEW_INPUTS) as (keyof typeof REVIEW_INPUTS)[]).map((name) => ({
+    name: name as OpName,
+    description: REVIEW_DESCRIPTIONS[name],
+    schema: REVIEW_INPUTS[name] as z.ZodType,
+  }));
+  return [...kept, ...own, ...data, ...review, ...named("set_service"), ...named("update_summary")];
 }
 
 function boardSchemas(serviceIds: readonly string[]): InputSchema[] {
@@ -323,7 +444,7 @@ export type OpInputs = Omit<BaseInputs, (typeof SERVICE_OPS)[number] | "connect"
   connect: BaseInputs["connect"] & { proposal?: string };
   /** Service icon for any element; an empty `service` removes it. Only with a catalog on. */
   set_service: { id: string; service: string };
-  /** Architect mode only: the turn's speech bubble. */
+  /** Architect mode and rooms: what Claude says in a speech bubble. */
   say: z.output<typeof ARCHITECT_INPUTS.say>;
   /** Architect mode only: an AWS group, optionally inside another; in pencil under a proposal. */
   add_group: z.output<typeof ARCHITECT_INPUTS.add_group> & { proposal?: string };
@@ -335,6 +456,12 @@ export type OpInputs = Omit<BaseInputs, (typeof SERVICE_OPS)[number] | "connect"
   accept: z.output<typeof ARCHITECT_INPUTS.accept>;
   /** Architect mode only: what was drawn under the proposal is erased. */
   reject: z.output<typeof ARCHITECT_INPUTS.reject>;
+  /** Architect mode only: how the design stands on one Well-Architected pillar. Not a board op. */
+  assess_pillar: z.output<typeof REVIEW_INPUTS.assess_pillar>;
+  /** Architect mode only: one risk of the design, tied to a board item. Not a board op. */
+  add_finding: z.output<typeof REVIEW_INPUTS.add_finding>;
+  /** Architect mode only: closes a finding. Not a board op. */
+  resolve_finding: z.output<typeof REVIEW_INPUTS.resolve_finding>;
 };
 export type OpName = keyof OpInputs;
 export type Op = { [K in OpName]: { name: K; input: OpInputs[K] } }[OpName];

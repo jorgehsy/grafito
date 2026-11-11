@@ -23,12 +23,15 @@ Everything runs through Turborepo from the repo root:
 | `pnpm lint` | ESLint in every package |
 | `pnpm test` | Vitest in every package that has tests |
 | `pnpm build` | the production build of `apps/web` |
+| `pnpm e2e` | Playwright in `apps/web/e2e`: the app driven in a browser (modes, ink, a room with two people). It starts the dev servers, or uses yours if they are up, and never calls Claude |
 
 Before you push, run what CI runs:
 
 ```sh
 pnpm turbo run typecheck lint test build
 ```
+
+If you changed how the app behaves on screen, also run `pnpm e2e`. CI runs it on every pull request.
 
 Pull requests run the same tasks with `--affected`. To work on one package, use `--filter`, for example `pnpm turbo run test --filter=@grafito/board`.
 
@@ -45,10 +48,12 @@ These rules are enforced by tsconfig and by `no-restricted-imports` in the share
 
 ## Code style
 
+Reviewers also read [`CODING_STANDARDS.md`](CODING_STANDARDS.md): the few rules no tool can check.
+
 - Formatting: see [`.editorconfig`](.editorconfig) (two spaces, LF, final newline).
 - Names: use the terms in `GLOSSARY.md`; don't invent synonyms.
 - Code, comments and docs are in English. The only exceptions are the speech-recognition language options and the demos ([ADR 0003](docs/adr/0003-english-code-language-follows-user.md)).
-- `no-explicit-any` and `react-hooks/exhaustive-deps` are warnings, not errors, because existing code has many hits. Don't add new ones.
+- `no-explicit-any` and `react-hooks/exhaustive-deps` are warnings, not errors, because existing code has many hits. Each package's `lint` script caps them at today's count with `--max-warnings`, so a new one fails the check. When you remove some, lower the number.
 
 ### Comments
 

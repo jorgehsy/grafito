@@ -120,5 +120,5 @@ function placeCallout(box: Rect, target: Rect, zone: Rect, zones: Rect[], elemen
 
 export type { BoardLayout, ConnectionGeom, MarkGeom, Pt, Rect, ScaleGeom, SpanGeom } from "./types";
 export { bezierAt } from "./edges";
-export { GROUP_HEAD, GROUP_ICON, GROUP_LABEL_SIZE, LABEL_LH, LABEL_SIZE, groupHeaderRect, labelLines, labelRect, overlaps } from "./geometry";
+export { ENTITY_FIELD_SIZE, ENTITY_HEAD, ENTITY_KEY_W, ENTITY_NAME_SIZE, ENTITY_PAD, ENTITY_ROW, GROUP_HEAD, GROUP_ICON, GROUP_LABEL_SIZE, LABEL_LH, LABEL_SIZE, groupHeaderRect, labelLines, labelRect, overlaps } from "./geometry";
 export { clearLayoutCache } from "./zones";

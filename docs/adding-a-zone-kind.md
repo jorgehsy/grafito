@@ -1,6 +1,6 @@
 # Adding a zone kind
 
-A **zone kind** (see `GLOSSARY.md`) is the shape a zone draws its topic in: flow, system, list, compare, mindmap, scale, cycle, timeline or tree. A kind touches every layer of the pipeline in `ARCHITECTURE.md`. This list was built by grepping the repo for `timeline` and `cycle`; do the same for the kind closest to yours to catch anything added since.
+A **zone kind** (see `GLOSSARY.md`) is the shape a zone draws its topic in: flow, system, list, compare, mindmap, scale, cycle, timeline, tree or data. A kind touches every layer of the pipeline in `ARCHITECTURE.md`. This list was built by grepping the repo for `timeline` and `cycle`; do the same for the kind closest to yours to catch anything added since.
 
 Everything below is in order: do it top to bottom and run `pnpm turbo run typecheck lint test build` at the end. TypeScript finds most omissions, because `ZoneKind` and `ElementType` are closed unions.
 
