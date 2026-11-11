@@ -6,6 +6,7 @@
     "lint": { "dependsOn": ["transit"] },
     "test": { "dependsOn": ["transit"] },
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
-    "dev": { "persistent": true, "cache": false }
+    "dev": { "persistent": true, "cache": false },
+    "e2e": { "dependsOn": ["transit"], "cache": false }
   }
 }

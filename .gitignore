@@ -10,3 +10,7 @@ apps/server/rooms/
 .scratch/
 .claude/worktrees/
 .turbo
+
+# Playwright
+test-results/
+playwright-report/

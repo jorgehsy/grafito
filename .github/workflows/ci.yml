@@ -24,3 +24,22 @@ jobs:
       - name: Check (pull request, affected packages only)
         if: github.event_name == 'pull_request'
         run: pnpm turbo run typecheck lint test build --affected
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @grafito/web exec playwright install --with-deps chromium
+      # The app driven in a browser; no API key here, and the checks never call Claude.
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: apps/web/test-results

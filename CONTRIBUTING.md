@@ -23,12 +23,15 @@ Everything runs through Turborepo from the repo root:
 | `pnpm lint` | ESLint in every package |
 | `pnpm test` | Vitest in every package that has tests |
 | `pnpm build` | the production build of `apps/web` |
+| `pnpm e2e` | Playwright in `apps/web/e2e`: the app driven in a browser (modes, ink, a room with two people). It starts the dev servers, or uses yours if they are up, and never calls Claude |
 
 Before you push, run what CI runs:
 
 ```sh
 pnpm turbo run typecheck lint test build
 ```
+
+If you changed how the app behaves on screen, also run `pnpm e2e`. CI runs it on every pull request.
 
 Pull requests run the same tasks with `--affected`. To work on one package, use `--filter`, for example `pnpm turbo run test --filter=@grafito/board`.
 

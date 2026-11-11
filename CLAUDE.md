@@ -12,6 +12,8 @@ pnpm + Turborepo monorepo. Packages are private and source-only (no build step).
 
 `packages/*` must not import from `apps/*`, and must not use DOM or Node APIs. Check with `pnpm turbo run typecheck lint test build`.
 
+UI behaviour (modes, ink, rooms): check with `pnpm e2e` (Playwright, `apps/web/e2e`; it never calls Claude) instead of driving a browser by hand.
+
 ## Agent skills
 
 ### Issue tracker

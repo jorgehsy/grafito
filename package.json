@@ -20,7 +20,8 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "share": "node scripts/share.mjs"
+    "share": "node scripts/share.mjs",
+    "e2e": "turbo run e2e"
   },
   "devDependencies": {
     "turbo": "^2.5.0"
