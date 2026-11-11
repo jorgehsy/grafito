@@ -364,7 +364,8 @@ describe("M2: the log does not grow with ink that is no longer there", () => {
     expect(r.snapshot().events).toEqual([]);
     expect(r.logSize()).toEqual({ events: 0, bytes: 0 });
     expect(JSON.stringify(r.snapshot()).length).toBeLessThan(1000);
-  });
+    // 3000 strokes of 6000 points each: about a second here, more than the default 5 s on a CI runner
+  }, 30_000);
 
   it("everyone connected still sees each erase, in order, and a late joiner sees only the ink that is left", () => {
     const { r, got } = room([], limited({}));
