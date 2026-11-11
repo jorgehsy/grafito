@@ -27,7 +27,15 @@ export function anthropicClient(apiKey: string): ClaudeClient {
         tools: toolDefs(p.catalogs, p.opSet),
         tool_choice: { type: "auto" as const },
         output_config: { effort: p.effort },
-        messages: [{ role: "user" as const, content: p.userText }],
+        messages: [{
+          role: "user" as const,
+          content: p.image
+            ? [
+                { type: "image" as const, source: { type: "base64" as const, media_type: p.image.mediaType, data: p.image.data } },
+                { type: "text" as const, text: p.userText },
+              ]
+            : p.userText,
+        }],
       };
       const open = async (s: AbortSignal) =>
         (await client.messages.create({ ...params, stream: true }, { signal: s })) as unknown as AsyncIterable<RawEvent>;

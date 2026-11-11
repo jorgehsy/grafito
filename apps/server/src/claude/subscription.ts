@@ -47,6 +47,8 @@ export function subscriptionClient(opts: SubscriptionOptions = {}): ClaudeClient
     stream(p: ClaudeParams, signal: AbortSignal) {
       const open = async (s: AbortSignal): Promise<AsyncIterable<RawEvent>> => {
         const abortController = new AbortController();
+        // `p.image` (a sketch's picture) is not sent: this path takes a text prompt, and the sketch's text
+        // description, which is always in `userText`, is enough to tie the ink to the board.
         const messages = query({ prompt: p.userText, options: { ...options(p, subscriptionEnv(source, p.maxTokens)), abortController } });
         return rawEvents(messages, abortController, s);
       };

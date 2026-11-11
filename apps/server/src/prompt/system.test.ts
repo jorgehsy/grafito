@@ -10,10 +10,10 @@ const joined = (catalogs: string[], lang: (typeof LANGS)[number]["code"]) => sys
 
 describe("catalog off", () => {
   it("prompt and tools are byte for byte the reviewed version", () => {
-    expect(sha(BOARD_SYSTEM_PROMPT)).toBe("8cdb61fe7daf7852b075558cf57ef2b1242dfeac499d19d915b0af79fc5a8cf9");
-    expect(sha(JSON.stringify(toolDefs([])))).toBe("570a1a9d64363211a5403fee399869eea92606a164b75467e8d9e2fda4ca41da");
+    expect(sha(BOARD_SYSTEM_PROMPT)).toBe("d41cef7ee2ad2ab243f6eb262d7eafea322120ece66313faf29846587ce1e940");
+    expect(sha(JSON.stringify(toolDefs([])))).toBe("171aa823704b783042447f2c1892138cd5af462da6174bf99bdb47bdc369af23");
     // Session records stamp each request with PROMPT_VERSION: bump it whenever these hashes change.
-    expect(PROMPT_VERSION).toBe(3);
+    expect(PROMPT_VERSION).toBe(4);
   });
   it("is the base prompt, cached, then the language line, not cached", () => {
     expect(systemPrompt({ catalogs: [], lang: "es-CL" })).toEqual([

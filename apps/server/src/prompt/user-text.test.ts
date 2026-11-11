@@ -23,4 +23,9 @@ describe("buildUserText", () => {
     expect(buildUserText({ delta: "x" })).toContain("(empty board)");
     expect(buildUserText({ delta: "x" })).toContain("SUMMARY SO FAR:\n(empty)");
   });
+  it("sketch mode carries the sketch's description, and what the user said about it if anything", () => {
+    const t = buildUserText({ ...base, delta: "", mode: "sketch", sketch: "STROKES (1)\n- s1: dot", shape: "flow" });
+    expect(t).toBe("CURRENT BOARD:\nZONES\n- a\n\nSUMMARY SO FAR:\nsummary\n\nUSER SKETCH (drawn by hand on the board; turn it into board elements):\nSTROKES (1)\n- s1: dot");
+    expect(buildUserText({ ...base, mode: "sketch", sketch: "STROKES (1)" })).toContain("STROKES (1)\n\nWHAT THE USER SAID ABOUT IT:\nhola");
+  });
 });
