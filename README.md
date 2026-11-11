@@ -26,13 +26,16 @@
 
 - **Live voice.** You talk and the board draws itself while you speak.
 - **Hand-drawn style.** Animated strokes with rough.js, a highlighter and a camera that follows what is new.
-- **Drawing shapes.** Auto, Map, Flow, Scale, Cycle, Timeline, Tree, System, List or Compare.
+- **Drawing shapes.** Auto, Map, Flow, Scale, Cycle, Timeline, Tree, System, Data, List or Compare.
+- **Draw too.** Pick the pencil and sketch on the board: Grafito reads your boxes, arrows and scribbles and redraws them clean.
+- **Rooms.** Press Collaborate, share the link, and several people talk, type and draw on one board, with Claude as one more participant.
+- **Data models.** Entities as tables with fields and keys, relations with crow's-foot ends.
 - **Voice commands.** Say *"Grafito, ..."* to ask for changes: *"Grafito, split this into two diagrams"*.
 - **Saves itself.** Each session is saved to `apps/server/sessions/`. You can restore, import and export (JSON and SVG).
 - **Visible cost.** Shows the tokens and the dollar cost of each request.
 - **AWS icons.** Turn on the catalog in Options → Icons and Claude puts the official icon (Lambda, S3, Cognito... 40 services) next to boxes that are AWS services.
 - **Architect mode.** Design an AWS architecture with Claude: you type, it draws, asks and pushes back, following the AWS Well-Architected Framework.
-- **Script mode.** Demos that need no Claude and cost nothing, to see how it works.
+- **Script mode.** Demos that need no Claude and cost nothing, to see how it works: a player with chapters and a timeline you can drag. It also plays back any session you exported.
 
 ## Language
 
@@ -89,7 +92,8 @@ Only the local server reads the key. It never reaches the browser.
 - **Give commands:** say or type *"Grafito"* and then the command. What came before is drawn; what comes after is taken as an instruction. If you do not like the result, use **Undo instruction**.
 - **Pick the shape:** in **Options** you choose the drawing shape, the model (Sonnet by default, Haiku is cheaper) and the language (es-CL, es-AR, es-MX, es-ES, en-US).
 - **See costs:** press **F3** or the stats button.
-- **Demo at no cost:** open **http://localhost:5173/?mode=demo** and pick a demo. To play one right away: `/?mode=demo&demo=architecture&auto=1&speed=2`.
+- **Demo at no cost:** open **http://localhost:5173/?mode=demo** and pick a demo. To play one right away: `/?mode=demo&demo=architecture&auto=1&speed=2`. Space plays and pauses, ← and → jump between chapters, and the timeline takes you to any moment. `demo=sketch` shows hand drawing turned into a diagram.
+- **Replay a session:** in demo mode press **Open a session** (or drop the file on the bar) and pick a `.json` you exported. It plays step by step, with no Claude calls.
 - **Move around:** mouse wheel = zoom, drag = pan.
 
 ### Architect mode
@@ -118,6 +122,21 @@ The API key is never sent on a plan call. If a plan model is asked for with the 
 ```bash
 pnpm --filter @grafito/server eval instruction <record.json> "<instruction>" --model claude-sonnet-5-5@subscription
 ```
+
+### Share a room over the internet
+
+A room normally works on your machine and, with `GRAFITO_HOST=1`, on your network. To invite someone outside it, Grafito opens a tunnel from your machine (a free Cloudflare quick tunnel, no account):
+
+```bash
+brew install cloudflared   # once
+pnpm share
+```
+
+1. The terminal prints an **owner link** (`http://localhost:8790/api/owner?k=...`). Open it in your browser on this machine: it marks that browser as yours. The link works once; for another browser, restart `pnpm share`. Keep working at `http://localhost:8790`, not at the public address: through the tunnel you are a guest too.
+2. Press **Collaborate**, then **Share**, and send the link it shows. It ends in `#k=...`, the room's invite token; without it nobody gets in.
+3. Ctrl+C stops everything. The public address is new each time, so old links stop working.
+
+Guests can only load the page and join a room they were sent. Live mode, architect mode, saved sessions and opening rooms stay yours. Whoever has a room link uses Claude at your cost, so each room has limits: 12 people, 12 Claude requests a minute, 300 requests and 5 USD in total by default (`GRAFITO_ROOM_MAX_USD`, `GRAFITO_ROOM_MAX_CALLS` and others in `apps/server/.env`; the full list and what is not protected are in [ADR 0009](docs/adr/0009-rooms-over-a-tunnel.md)). Plan models are off while sharing. `pnpm share --no-tunnel` runs the same thing on your machine only, to try it.
 
 ### Saved sessions
 
@@ -166,7 +185,7 @@ pnpm --filter @grafito/icons icons:aws <zip>     # reinstall the AWS icons from 
 | `packages/wellarchitected` | The Well-Architected digest for architect mode. Pillar, question and best-practice titles, NOTICE, fetch script. |
 | `packages/config` | Shared tsconfig bases and the ESLint flat config. |
 
-Demo scripts live in `apps/web/src/demos/`.
+Demo scripts live in `apps/web/src/demos/`; the player UI is in `apps/web/src/script/`.
 
 ### Versions and releases
 
