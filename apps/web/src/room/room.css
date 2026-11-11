@@ -1,0 +1,90 @@
+/* rooms: presence, feed, share, join. Cursors are drawn by the engine, inside the board's svg. */
+
+/* presence bar: top right. In a room it holds everyone's avatar, Claude and Share; outside, the Collaborate button. */
+.presence { position: fixed; top: var(--edge); right: var(--edge); z-index: 12; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; font-size: 13px; animation: in-down var(--t3) var(--e-out) .24s both; }
+.presence .bar { display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 6px 0 12px; border-radius: var(--r-pill); }
+.presence .people { display: flex; align-items: center; padding-left: 6px; }
+.presence .avatar { position: relative; flex: none; width: 32px; height: 32px; margin-left: -7px; display: grid; place-items: center; padding: 0; border-radius: 50%; border: 2px solid var(--mina); background: var(--who, var(--humo)); color: #fff; font: 700 11.5px/1 var(--ui); user-select: none; animation: avatar-in var(--t3) var(--e-spring) both; transition: transform var(--t1) var(--e-spring); }
+.presence .avatar:hover { transform: translateY(-2px); z-index: 1; }
+.presence button.avatar { cursor: pointer; }
+.presence .avatar.me { box-shadow: 0 0 0 1.5px var(--s-ink); }
+.presence .avatar.more { background: var(--mina-2); color: var(--s-dim); }
+.presence .sep { width: 1px; height: 22px; background: var(--s-line); }
+.presence .avatar.claude { margin-left: 0; background: var(--papel); border: 0; color: var(--grafito); }
+.presence .avatar.claude > svg { width: 19px; height: 16px; }
+/* thinking: a dashed ring turns around the avatar, three dots breathe under it */
+.presence .avatar.claude.thinking::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px dashed var(--lapiz); animation: turn 2.4s linear infinite; }
+.presence .avatar.claude .dots { position: absolute; bottom: -8px; left: 50%; translate: -50% 0; display: flex; gap: 2px; }
+.presence .avatar.claude .dots b { width: 3.5px; height: 3.5px; border-radius: 50%; background: var(--lapiz); animation: dot-breathe 1s ease-in-out infinite; }
+.presence .avatar.claude .dots b:nth-child(2) { animation-delay: .15s; }
+.presence .avatar.claude .dots b:nth-child(3) { animation-delay: .3s; }
+/* drawing: a small pencil scribbles at the corner */
+.presence .avatar.claude.drawing { box-shadow: 0 0 0 2px var(--lapiz); }
+.presence .avatar.claude .pen { position: absolute; right: -8px; bottom: -7px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: var(--lapiz); border: 1.5px solid var(--mina); color: var(--mina); transform-origin: 30% 80%; animation: pen-scribble .7s ease-in-out infinite; }
+.presence .avatar.claude .pen svg { width: 11px; height: 11px; }
+.presence .doing { color: var(--lapiz); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+.presence .pill { padding: 3px 9px; border-radius: var(--r-pill); border: 1px dashed var(--s-dim); color: var(--s-dim); font-size: 12px; white-space: nowrap; }
+.presence .share { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 15px 0 12px; border: 0; border-radius: var(--r-pill); background: var(--s-on-bg); color: var(--s-on-ink); font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: transform var(--t1) var(--e-spring), filter var(--t1); }
+.presence .share:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+.presence .share:active:not(:disabled) { transform: scale(.97); }
+.presence .share:disabled { opacity: .5; cursor: default; }
+.presence .leave { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--s-dim); cursor: pointer; transition: background var(--t1), color var(--t1); }
+.presence .leave:hover { background: var(--s-hover); color: var(--s-ink); }
+.presence.solo .share { height: 44px; padding: 0 18px 0 14px; background: var(--mina); color: #EDEBE6; box-shadow: var(--lift); }
+
+/* share and rename slips hang under the bar */
+.presence .pop { width: 320px; padding: 14px; display: flex; flex-direction: column; gap: 8px; transform-origin: 100% 0; animation: pop var(--t2) var(--e-out) both; }
+.presence .pop.warn { color: #A93127; width: auto; max-width: 320px; padding: 8px 12px; }
+.presence .pop strong { font-size: 14px; }
+.presence .pop p { margin: 0; color: var(--s-dim); font-size: 12.5px; line-height: 1.4; }
+.presence .pop .row { display: flex; gap: 8px; }
+.presence .pop input { flex: 1; min-width: 0; font-size: 13px; color: var(--s-ink); border: 1px solid var(--s-line); border-radius: var(--r-ctl); padding: 7px 10px; background: var(--papel); }
+.presence .pop .pbtn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.presence .pop .pbtn.done { background: var(--verde); border-color: var(--verde); }
+.presence .pop .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid var(--s-line); color: var(--s-dim); font-size: 12px; }
+
+/* Claude's answer: a hand-drawn speech bubble that drops from its avatar, tail pointing up at it */
+.room-say { position: relative; max-width: 320px; margin-right: 96px; font-family: var(--mano); font-size: 17px; line-height: 1.35; color: var(--grafito); transform: rotate(-0.6deg); transform-origin: 100% 0; animation: say-drop .34s var(--e-spring) both; }
+.room-say .box { position: relative; padding: 9px 14px 10px; background: #fff; border: 2px solid var(--grafito); border-radius: 18px 22px 16px 24px / 22px 16px 24px 18px; box-shadow: var(--sombra); }
+.room-say .box::before, .room-say .box::after { content: ""; position: absolute; right: 22px; border: 9px solid transparent; border-top: 0; }
+.room-say .box::before { top: -11px; border-bottom: 11px solid var(--grafito); }
+.room-say .box::after { top: -7.5px; border-bottom: 11px solid #fff; }
+.room-say .who { font: 500 11px var(--ui); color: var(--humo); }
+
+/* activity feed: bottom right, folds to a pill */
+.room-feed { position: fixed; right: var(--edge); bottom: 36px; width: 300px; z-index: 7; display: flex; flex-direction: column; border-radius: var(--r-inst); font-size: 13px; overflow: hidden; animation: in-up var(--t3) var(--e-out) .3s both; }
+.room-feed:not(.open) { width: auto; border-radius: var(--r-pill); }
+.room-feed .head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border: 0; background: transparent; color: var(--s-dim); font-size: 13px; font-weight: 600; cursor: pointer; transition: color var(--t1); }
+.room-feed .head span { flex: 1; text-align: left; }
+.room-feed .head:hover { color: var(--s-ink); }
+.room-feed .count { min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: 9px; background: var(--lapiz); color: var(--mina); font: 700 11px/1 var(--ui); }
+.room-feed .lines { max-height: min(260px, 34vh); overflow-y: auto; padding: 4px 14px 12px; display: flex; flex-direction: column; gap: 7px; border-top: 1px solid var(--s-line); scrollbar-width: thin; }
+.room-feed .empty { margin: 10px 0 4px; color: var(--s-dim); }
+.room-feed .line { margin: 0; padding: 3px 0 0 9px; border-left: 2.5px solid var(--who, var(--s-dim)); line-height: 1.35; overflow-wrap: anywhere; animation: in-up var(--t2) var(--e-out) both; }
+.room-feed .line .who { color: var(--s-ink); font-weight: 600; margin-right: 6px; }
+.room-feed .line .tag, .room-feed .line .dim { color: var(--s-dim); font-style: italic; }
+.room-feed .line.say .what { font-family: var(--mano); font-size: 15.5px; }
+.room-feed .line time { margin-left: 6px; color: var(--s-dim); font-size: 10.5px; white-space: nowrap; }
+
+/* join dialog: first visit to a room link */
+.room-join { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; background: rgba(245,243,238,0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: fade var(--t2) both; }
+.room-join .card { width: min(360px, 100%); padding: 28px 24px 20px; display: flex; flex-direction: column; gap: 10px; align-items: stretch; text-align: center; border-radius: 24px; box-shadow: 0 24px 60px -16px rgba(42,42,46,0.35); animation: pop var(--t3) var(--e-spring) both; }
+.room-join .mark { display: grid; place-items: center; height: 40px; }
+.room-join .mark svg { width: 44px; height: 38px; }
+.room-join h2 { margin: 0; font-size: 21px; letter-spacing: -.01em; }
+.room-join p { margin: 0 0 6px; color: var(--s-dim); font-size: 14px; }
+.room-join input { font-size: 16px; text-align: center; color: var(--s-ink); border: 1px solid var(--s-line); border-radius: var(--r-ctl); padding: 11px 12px; background: var(--papel); }
+.room-join .pbtn { font-size: 15px; padding: 11px 12px; }
+.room-join small { color: var(--goma); font-size: 11px; }
+
+@keyframes fade { from { opacity: 0; } }
+@keyframes avatar-in { from { opacity: 0; transform: scale(.5); } }
+@keyframes dot-breathe { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-1.5px); } }
+@keyframes pen-scribble { 0%, 100% { transform: rotate(-8deg) translate(0, 0); } 30% { transform: rotate(6deg) translate(2px, -1px); } 60% { transform: rotate(-4deg) translate(-1px, 1px); } }
+@keyframes say-drop { from { opacity: 0; transform: translateY(-14px) scale(.6) rotate(-0.6deg); } to { opacity: 1; transform: rotate(-0.6deg); } }
+
+@media (max-width: 1100px) { .presence .doing { display: none; } }
+@media (max-width: 760px) {
+  .room-feed { bottom: 150px; }
+  .presence .share { padding: 0 12px; }
+}
