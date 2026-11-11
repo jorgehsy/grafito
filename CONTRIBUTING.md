@@ -48,6 +48,8 @@ These rules are enforced by tsconfig and by `no-restricted-imports` in the share
 
 ## Code style
 
+Reviewers also read [`CODING_STANDARDS.md`](CODING_STANDARDS.md): the few rules no tool can check.
+
 - Formatting: see [`.editorconfig`](.editorconfig) (two spaces, LF, final newline).
 - Names: use the terms in `GLOSSARY.md`; don't invent synonyms.
 - Code, comments and docs are in English. The only exceptions are the speech-recognition language options and the demos ([ADR 0003](docs/adr/0003-english-code-language-follows-user.md)).
