@@ -3,6 +3,7 @@ node_modules
 dist
 .idea
 apps/server/sessions/
+apps/server/rooms/
 .remember/
 .DS_Store
 
