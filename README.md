@@ -16,11 +16,28 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/jorgehsy/grafito" alt="MIT license"></a>
 </p>
 
+<p align="center">
+  <img src="docs/media/hero.gif" alt="A board drawing itself stroke by stroke: a web app architecture with a user, browser, API, queue, worker and database, plus a payment flow." width="900">
+</p>
+
 ---
 
 **grafito** turns what you say out loud into a hand-drawn board. You explain an architecture, a process or an idea, and while you talk, zones, boxes, arrows, timelines, trees and notes appear, as if someone were drawing them on a whiteboard next to you.
 
 > **Alpha.** It works, but it changes often and can break. Use it to try things out and tell us what you think.
+
+## Try it in one minute (no API key)
+
+Script mode plays ready-made demos. They need no Claude and no key, and they cost nothing.
+
+```bash
+git clone https://github.com/jorgehsy/grafito.git
+cd grafito
+corepack enable && pnpm install
+pnpm dev
+```
+
+Then open <http://localhost:5173/?mode=demo&demo=architecture&auto=1&speed=2>. The server starts without a key; only the Live and Architect modes need one, to call Claude.
 
 ## What it does
 
@@ -37,6 +54,19 @@
 - **AWS icons.** Turn on the catalog in Options → Icons and Claude puts the official icon (Lambda, S3, Cognito... 40 services) next to boxes that are AWS services.
 - **Architect mode.** Design an AWS architecture with Claude: you type or sketch, it draws, asks and pushes back, following the AWS Well-Architected Framework. It can add the data model and review the design pillar by pillar.
 - **Script mode.** Demos that need no Claude and cost nothing, to see how it works: a player with chapters and a timeline you can drag. It also plays back any session you exported.
+
+<table align="center">
+  <tr>
+    <td align="center" width="33%"><img src="docs/media/live.png" alt="A finished board in Script mode: an application architecture and a payment flow, hand-drawn." width="100%"><br><sub>A finished board</sub></td>
+    <td align="center" width="33%"><img src="docs/media/architect.png" alt="Architect mode: an AWS store architecture in ink with AWS icons, pencil proposals and a speech bubble asking a question." width="100%"><br><sub>Architect mode, with pencil proposals</sub></td>
+    <td align="center" width="33%"><img src="docs/media/rooms.png" alt="A room with two people: both draw ink on one board and see each other's cursor." width="100%"><br><sub>A room, with live cursors</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/media/sketch.gif" alt="A rough hand sketch of boxes and arrows turned into a clean diagram with an app, an API and a database." width="720"><br>
+  <sub>Draw too: a rough sketch becomes a clean diagram (the demo is in Spanish).</sub>
+</p>
 
 ## Language
 
@@ -220,6 +250,10 @@ git push --follow-tags
 ## Contributing
 
 Welcome! Open an *issue* with what you found or what you would like. If you send a *pull request*, run `pnpm turbo run typecheck lint test build` first, and `pnpm e2e` if you changed what happens on screen. Reviewers follow [CODING_STANDARDS.md](CODING_STANDARDS.md).
+
+## Support the project
+
+If grafito is useful to you, you can support it with [GitHub Sponsors](https://github.com/sponsors/jorgehsy). A star on the repository also helps. Bug reports, ideas and pull requests are welcome too: see [Contributing](#contributing).
 
 ## License
 
