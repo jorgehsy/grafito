@@ -14,6 +14,7 @@
   <a href="https://github.com/jorgehsy/grafito/releases"><img src="https://img.shields.io/github/v/release/jorgehsy/grafito?include_prereleases&label=version" alt="Version"></a>
   <a href="https://github.com/jorgehsy/grafito/actions/workflows/ci.yml"><img src="https://github.com/jorgehsy/grafito/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/jorgehsy/grafito" alt="MIT license"></a>
+  <a href="https://github.com/sponsors/jorgehsy"><img src="https://img.shields.io/badge/sponsor-%E2%9D%A4-ea4aaa?logo=GitHub-Sponsors&logoColor=white" alt="Sponsor on GitHub"></a>
 </p>
 
 <p align="center">
@@ -254,6 +255,18 @@ Welcome! Open an *issue* with what you found or what you would like. If you send
 ## Support the project
 
 If grafito is useful to you, you can support it with [GitHub Sponsors](https://github.com/sponsors/jorgehsy). A star on the repository also helps. Bug reports, ideas and pull requests are welcome too: see [Contributing](#contributing).
+
+<p align="center">
+  <a href="https://github.com/sponsors/jorgehsy"><img src="https://img.shields.io/badge/Sponsor_grafito-%E2%9D%A4-ea4aaa?style=for-the-badge&logo=GitHub-Sponsors&logoColor=white" alt="Sponsor grafito on GitHub"></a>
+</p>
+
+### Sponsors
+
+Thank you to the people who keep grafito going. Sponsors from $10 a month, or $25 once, are listed here.
+
+*No sponsors yet. [Be the first!](https://github.com/sponsors/jorgehsy)*
+
+<!-- Add sponsors as: - [Name](https://github.com/username) -->
 
 ## License
 
